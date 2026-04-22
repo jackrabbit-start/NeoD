@@ -1,0 +1,6 @@
+{
+  "required": [
+    "verdict",
+    "unresolved_risk"
+  ]
+}

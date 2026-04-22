@@ -1,0 +1,7 @@
+{
+  "required": [
+    "correctness_evidence",
+    "regression_evidence",
+    "scope_evidence"
+  ]
+}

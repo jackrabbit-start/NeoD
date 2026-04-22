@@ -1,0 +1,10 @@
+{
+  "required": [
+    "outcome",
+    "non_goals",
+    "success_signal",
+    "invariants",
+    "blast_radius",
+    "authority_boundary"
+  ]
+}

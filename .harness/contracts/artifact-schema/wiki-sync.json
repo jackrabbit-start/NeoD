@@ -1,0 +1,6 @@
+{
+  "required": [
+    "durable_facts_captured",
+    "target_pages"
+  ]
+}
