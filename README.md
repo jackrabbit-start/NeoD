@@ -1,30 +1,52 @@
 # NeoD
 
-Private repository scaffolded for new work with a repo-local harness setup.
+NeoD is a browser-first prototype for a safe fictional top-down action game where defeated enemies drop components and the player combines those drops into stronger weapons during a single run.
+
+## Locked V1 Stack
+
+- Package manager: `pnpm`
+- Language: `TypeScript`
+- App/build tool: `Vite`
+- Game framework: `Phaser`
+- Primary V1 target: web browser
+- Deferred until later: desktop packaging
+
+## Current V1 Direction
+
+- Core loop: move, fight slimes, collect drops, combine items into stronger weapons, clear waves, defeat a boss
+- Scope: one arena, slime-family waves, one boss, placeholder-safe art and naming
+- Planning baseline:
+  - `docs/game-requirements.md`
+  - `.omx/plans/prd-safe-topdown-combine-action-game-v1.md`
+  - `.omx/plans/test-spec-safe-topdown-combine-action-game-v1.md`
+
+## Repo Workflow
+
+```sh
+pnpm install
+pnpm dev
+pnpm run ai:worktree -- <task-name>
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Parallel AI worktree setup is documented in `docs/parallel-ai-worktrees.md`.
 
 ## Layout
 
-- `.harness/contracts/**`: harness stage contracts and artifact schemas
-- `.harness/templates/**`: lightweight planning template(s)
-- `scripts/harness/**`: harness runtime and hook guard implementation
-- `bin/harness`: local wrapper for running the harness
-
-## Basic Usage
-
-Run harness commands from the repository root:
-
-```sh
-./bin/harness status --json
-./bin/harness run start --process feature-delivery --goal "Describe the task"
-```
-
-When a Codex/OMX session should respect the repo-local harness, point the root explicitly:
-
-```sh
-HARNESS_ROOT="$PWD/.harness" ./bin/harness status --json
-```
+- `src/main.ts`: app bootstrap
+- `src/game/config.ts`: Phaser game configuration
+- `src/scenes/`: boot, arena, and result scenes
+- `src/systems/`: deterministic gameplay logic and helpers
+- `src/domain/`: shared gameplay types
+- `src/data/`: enemy, weapon, recipe, and wave data
+- `src/ui/`: HUD rendering helpers
+- `tests/`: deterministic logic verification
+- `docs/`: planning and requirements artifacts
+- `AGENTS.md`: repo-local agent contract
 
 ## Notes
 
-- Runtime state under `.harness/state`, `.harness/runs`, `.harness/artifacts`, `.harness/output`, and `.harness/learning` is ignored by git.
-- Update `AGENTS.md` and this README once the actual project stack and workflow are decided.
+- Keep V1 browser-first and compact.
+- Keep flavor/art decisions placeholder-safe unless a later prompt explicitly reopens them.

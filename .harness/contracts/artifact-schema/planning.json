@@ -1,8 +1,0 @@
-{
-  "required": [
-    "read_set",
-    "write_set",
-    "verification_commands",
-    "regression_hotspots"
-  ]
-}

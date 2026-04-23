@@ -1,7 +1,0 @@
-{
-  "required": [
-    "commands_run",
-    "touched_files",
-    "assumptions_made"
-  ]
-}

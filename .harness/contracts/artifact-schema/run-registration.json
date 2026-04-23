@@ -1,7 +1,0 @@
-{
-  "required": [
-    "goal",
-    "risk",
-    "verification_target"
-  ]
-}

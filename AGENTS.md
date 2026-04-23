@@ -6,35 +6,23 @@ This file is the repo-local operating contract for agents working inside `NeoD`.
 
 1. Actual code and config files
 2. Root `README.md`
-3. Repo-local harness contracts under `.harness/contracts/**`
 
-## Repo-Local Harness
+## Repo Workflow
 
-Use the repo-local harness entrypoints:
+Current concrete workflow:
 
-- `./bin/harness`
-- `./scripts/harness/**`
-- `.harness/contracts/**`
-- `.harness/templates/**`
-
-Default substantial-task flow:
-
-1. process selection
-2. run registration
-3. deep interview
-4. planning
-5. execution
-6. self verification
-7. cross verification
-8. wiki or durable context sync when needed
-9. norm update when process improvements are discovered
+- Package manager: `pnpm`
+- Language: `TypeScript`
+- App/build tool: `Vite`
+- Game framework: `Phaser`
+- Primary target: browser-first prototype
 
 ## Working Rules
 
 - Keep the repo scaffold small and reversible.
 - Prefer repo-local scripts over home-directory shared paths.
-- Do not assume a framework or package manager until the project chooses one.
-- When the stack becomes concrete, update this file and `README.md` to reflect the real workflow.
+- Keep V1 scope aligned with the existing PRD/test-spec and safe-fiction constraints.
+- Defer desktop packaging and non-essential flavor decisions unless a later prompt explicitly reopens them.
 
 ## Git / Branch Safety
 
@@ -44,5 +32,5 @@ Default substantial-task flow:
 
 ## Verification
 
-- For scaffold changes, verify file layout, harness command entry, and git state.
-- For future code changes, add stack-specific verification rules once the toolchain exists.
+- Run `pnpm typecheck`, `pnpm test`, and `pnpm build` after code changes.
+- Use deterministic tests for pure gameplay rules where possible and manual/browser checks for moment-to-moment feel.

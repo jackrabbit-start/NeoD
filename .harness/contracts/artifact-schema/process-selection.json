@@ -1,7 +1,0 @@
-{
-  "required": [
-    "selected_process",
-    "primary_lane_set",
-    "rationale"
-  ]
-}
