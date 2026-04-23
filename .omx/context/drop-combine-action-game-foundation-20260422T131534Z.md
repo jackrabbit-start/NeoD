@@ -1,0 +1,29 @@
+# Deep Interview Context Snapshot
+
+- Task statement: 적을 물리치며 떨어지는 무기/아이템을 조합해 더 높은 등급으로 성장하는 게임을 만들고 싶고, 스택 및 기반 설정부터 시작하려고 한다.
+- Desired outcome: 구현 전에 요구사항과 경계를 명확히 해서 이후 planning/execution이 흔들리지 않도록 한다.
+- Stated solution: 게임 프로젝트의 스택과 기반 설정을 정한다.
+- Probable intent hypothesis: 빠르게 프로토타입을 만들되, 나중에 구조가 꼬이지 않도록 초기에 기술 선택과 범위를 합리적으로 고정하고 싶다.
+- Known facts/evidence:
+  - 리포는 `NeoD`이며 현재 하니스/스캐폴드만 있는 초기 상태다.
+  - `README.md`에는 현재 방향으로 `pnpm + TypeScript + Vite + Phaser`와 웹 우선 프로토타입 권고가 기록되어 있다.
+  - `.harness/contracts/**`와 `bin/harness`가 존재해 substantial-task 흐름은 하니스 단계를 따르도록 되어 있다.
+  - `AGENTS.md`는 스택이 concrete 해지면 `AGENTS.md`와 `README.md`를 갱신하라고 명시한다.
+- Constraints:
+  - deep-interview 단계에서는 구현하지 않고 요구사항만 명확히 한다.
+  - 질문은 `omx question` 경로로 한 번에 하나씩 묻는다.
+  - 이후 실행 단계에서도 작은 스캐폴드와 가역성을 유지해야 한다.
+- Unknowns/open questions:
+  - 사용자가 이 게임을 왜 만들고 싶은지
+  - 첫 번째 플레이 가능한 버전의 핵심 재미가 무엇인지
+  - 무엇을 이번 범위에서 의도적으로 제외할지
+  - 어떤 결정은 OMX가 자율적으로 내려도 되는지
+  - 타깃 플랫폼과 입력 방식이 무엇인지
+- Decision-boundary unknowns:
+  - 패키지 매니저, 엔진, 렌더링 타깃을 OMX가 바로 선택해도 되는지
+  - 아트/서사 톤과 캐릭터 설정은 사용자 승인 없이 정하면 안 되는지
+- Likely codebase touchpoints:
+  - `README.md`
+  - `AGENTS.md`
+  - future: `docs/stack-foundation.md`
+  - future scaffold paths under `src/`, `assets/`, and package/tooling files

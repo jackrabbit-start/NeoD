@@ -1,0 +1,26 @@
+# Context Snapshot: Narrow Open Items And Lock Stack
+
+- Task statement: Narrow only the remaining open product decisions for NeoD and lock the first-pass technical stack.
+- Desired outcome: Leave earlier locked gameplay basics intact, resolve only the unresolved decision areas, and produce an execution-ready basis for the next planning handoff.
+- Stated solution: Run deep-interview focused on open items only; determine which tech stack to use.
+- Probable intent hypothesis: Avoid re-litigating already-decided core-loop basics while converting the repo from "recommended direction" into a more explicit, plan-ready baseline.
+- Known facts/evidence:
+  - README currently recommends `pnpm + TypeScript + Vite + Phaser` with a browser-first prototype approach.
+  - `docs/stack-foundation.md` recommends the same stack and lists open questions about ship target, input model, save scope, tone target, and packaging.
+  - `docs/game-requirements.md` locks top-down 2D, browser-first prototype, keyboard + mouse for V1, slime + boss V1 scope, and the drop+combine core loop.
+  - Prior deep-interview artifact `.omx/specs/deep-interview-safe-topdown-combine-action-game.md` already resolved safety, V1 scope, non-goals, and autonomy boundaries.
+- Constraints:
+  - Narrow only still-open items unless the user explicitly reopens a locked decision.
+  - Do not implement during deep-interview.
+  - Preserve safe-fictional framing and compact V1 scope.
+- Unknowns/open questions:
+  - Whether the recommended web-first `pnpm + TypeScript + Vite + Phaser` stack is now officially locked.
+  - Whether desktop/mobile packaging remains deferred.
+  - Whether any remaining open design/tone decisions must be fixed now versus deferred to planning.
+- Decision-boundary unknowns:
+  - Which technical choices OMX may lock autonomously versus which still require user approval.
+- Likely codebase touchpoints:
+  - `README.md`
+  - `docs/stack-foundation.md`
+  - `docs/game-requirements.md`
+  - `.omx/specs/deep-interview-safe-topdown-combine-action-game.md`
