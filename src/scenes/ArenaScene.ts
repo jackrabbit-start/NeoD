@@ -7,15 +7,25 @@ import type { HudController } from '../ui/Hud.js'
 import type { AvailableRecipe, EnemyDefinition, InventoryState, LootId, WeaponId } from '../domain/types.js'
 import { getAvailableRecipes, resolveCombine } from '../systems/combine.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
+import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import { addItem } from '../systems/inventory.js'
 import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
 
+interface EnemyHealthBar {
+  background: Phaser.GameObjects.Rectangle
+  fill: Phaser.GameObjects.Rectangle
+  width: number
+  height: number
+  offsetY: number
+}
+
 interface EnemyEntity {
   sprite: PhysicsImage
   config: EnemyDefinition
   currentHealth: number
+  healthBar: EnemyHealthBar
   lastHitAt: number
 }
 
@@ -33,6 +43,10 @@ export class ArenaScene extends Phaser.Scene {
   private hud!: HudController
 
   private player!: PhysicsImage
+
+  private enemySprites!: Phaser.Physics.Arcade.Group
+
+  private enemySpacingCollider?: Phaser.Physics.Arcade.Collider
 
   private cursors!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
 
@@ -105,6 +119,9 @@ export class ArenaScene extends Phaser.Scene {
     this.player.setCircle(14)
     this.player.setCollideWorldBounds(true)
 
+    this.enemySprites = this.physics.add.group()
+    this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
+
     const keyboard = this.input.keyboard
     if (!keyboard) {
       throw new Error('Keyboard input is required for the NeoD prototype.')
@@ -129,7 +146,6 @@ export class ArenaScene extends Phaser.Scene {
     this.updateEnemies()
     this.updateProjectiles()
     this.cleanupDestroyedEntities()
-
     if (shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
       this.advanceWave()
     }
@@ -222,6 +238,7 @@ export class ArenaScene extends Phaser.Scene {
 
       if (this.isCombining) {
         enemy.sprite.setVelocity(0, 0)
+        this.syncEnemyHealthBar(enemy)
         continue
       }
 
@@ -232,6 +249,7 @@ export class ArenaScene extends Phaser.Scene {
 
       if (direction.lengthSq() === 0) {
         enemy.sprite.setVelocity(0, 0)
+        this.syncEnemyHealthBar(enemy)
         continue
       }
 
@@ -250,6 +268,8 @@ export class ArenaScene extends Phaser.Scene {
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
       }
+
+      this.syncEnemyHealthBar(enemy)
     }
   }
 
@@ -313,6 +333,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private cleanupDestroyedEntities(): void {
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active) {
+        this.destroyEnemyHealthBar(enemy)
+      }
+    }
+
     this.enemies = this.enemies.filter((enemy) => enemy.sprite.active)
     this.lootDrops = this.lootDrops.filter((loot) => loot.sprite.active)
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
@@ -386,14 +412,19 @@ export class ArenaScene extends Phaser.Scene {
     sprite.setTint(config.tint)
     sprite.setCircle(config.size / 2)
     sprite.setCollideWorldBounds(true)
-    sprite.setBounce(0.2)
+    sprite.setBounce(0)
+    this.enemySprites.add(sprite)
 
-    this.enemies.push({
+    const enemy: EnemyEntity = {
       sprite,
       config,
       currentHealth: config.maxHealth,
+      healthBar: this.createEnemyHealthBar(sprite, config),
       lastHitAt: 0,
-    })
+    }
+
+    this.syncEnemyHealthBar(enemy)
+    this.enemies.push(enemy)
   }
 
   private damageEnemy(enemy: EnemyEntity, damage: number): void {
@@ -404,6 +435,7 @@ export class ArenaScene extends Phaser.Scene {
 
     enemy.lastHitAt = now
     enemy.currentHealth -= damage
+    this.syncEnemyHealthBar(enemy)
 
     if (enemy.currentHealth > 0) {
       enemy.sprite.setScale(1.08)
@@ -428,6 +460,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     const wasBoss = enemy.config.id === 'slime-boss'
+    this.destroyEnemyHealthBar(enemy)
     enemy.sprite.destroy()
 
     if (wasBoss) {
@@ -459,12 +492,71 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private freezeCombat(shouldFreeze: boolean): void {
+    if (this.enemySpacingCollider) {
+      this.enemySpacingCollider.active = !shouldFreeze
+    }
+
     if (!shouldFreeze) {
       return
     }
 
     for (const enemy of this.enemies) {
       enemy.sprite.setVelocity(0, 0)
+    }
+  }
+
+  private createEnemyHealthBar(
+    sprite: PhysicsImage,
+    config: EnemyDefinition,
+  ): EnemyHealthBar {
+    const { width, height, offsetY } = getEnemyHealthBarMetrics(config.size)
+
+    const background = this.add
+      .rectangle(0, 0, width, height, 0x000000, 0.9)
+      .setOrigin(0, 0.5)
+      .setDepth(sprite.depth + 2)
+
+    const fill = this.add
+      .rectangle(0, 0, width, height, 0xff4d4d, 1)
+      .setOrigin(0, 0.5)
+      .setDepth(sprite.depth + 3)
+
+    return {
+      background,
+      fill,
+      width,
+      height,
+      offsetY,
+    }
+  }
+
+  private syncEnemyHealthBar(enemy: EnemyEntity): void {
+    if (!enemy.sprite.active) {
+      return
+    }
+
+    const { background, fill, width, height, offsetY } = enemy.healthBar
+    const left = enemy.sprite.x - width / 2
+    const y = enemy.sprite.y - offsetY
+    const fillWidth = getEnemyHealthFillWidth(
+      enemy.currentHealth,
+      enemy.config.maxHealth,
+      width,
+    )
+
+    background.setPosition(left, y)
+    fill.setPosition(left, y)
+    fill.setVisible(fillWidth > 0)
+    fill.setDisplaySize(fillWidth, height)
+  }
+
+  private destroyEnemyHealthBar(enemy: EnemyEntity): void {
+    if (enemy.healthBar.background.active) {
+      enemy.healthBar.background.destroy()
+    }
+
+    if (enemy.healthBar.fill.active) {
+      enemy.healthBar.fill.destroy()
     }
   }
 

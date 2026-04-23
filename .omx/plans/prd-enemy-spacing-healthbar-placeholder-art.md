@@ -1,195 +1,287 @@
-# Plan Draft — Enemy Spacing + Overhead Health Bars
+# PRD: Enemy Spacing + Overhead Health Bars
+
+## Status
+
+- Mode: `ralplan --consensus`
+- Planning state: approved
+- Source of truth:
+  - `.omx/specs/deep-interview-enemy-spacing-healthbar-placeholder-art.md`
+  - `.omx/interviews/enemy-spacing-healthbar-placeholder-art-20260423T140303Z.md`
+  - `.omx/context/enemy-spacing-healthbar-placeholder-art-20260423T135812Z.md`
+  - `src/scenes/ArenaScene.ts`
+  - `src/data/enemies.ts`
+  - `src/domain/types.ts`
+
+## Requirements Summary
+
+현재 Phaser 브라우저 프로토타입에서 적이 전투 중 한 점처럼 포개져 보이지 않도록 만들고, 모든 적(일반 적 + 보스) 머리 위에 검은 배경 + 빨간 체력바를 표시한다. 이번 변경은 placeholder-safe 범위 안에서 작고 가역적인 brownfield 수정으로 유지한다.
+
+## Problem Statement
+
+`ArenaScene` 는 적을 `EnemyEntity[]` 로 직접 관리하고, 각 적은 플레이어를 향해 매 프레임 이동한다. 하지만 적-적 분리 경로가 없고 개별 적 체력 UI 도 없어, 몰려오는 적 수와 피격 상태를 즉시 읽기 어렵다.
+
+### Evidence
+
+- `src/scenes/ArenaScene.ts` 는 `EnemyEntity[]` 에 `sprite`, `config`, `currentHealth`, `lastHitAt` 를 보관한다.
+- `spawnEnemy` 는 `physics.add.image(...)` 와 `setCircle(config.size / 2)` 를 사용하지만 적-적 분리 처리는 없다.
+- `damageEnemy` 는 체력을 줄이지만 적 머리 위 체력바는 없다.
+- `src/data/enemies.ts` 는 적 크기(`size`)와 최대 체력(`maxHealth`)를 이미 제공한다.
+
+### Inference
+
+- 가장 작은 diff 는 새 시스템 추출보다 `ArenaScene` 내부 책임을 약간 넓혀 적 분리와 월드-스페이스 체력바를 함께 관리하는 방식이다.
+
+## Desired Outcome
+
+1. 여러 적이 플레이어를 추적해도 전투 중 완전히 같은 위치에 포개져 보이지 않는다.
+2. 슬라임과 보스 모두 머리 위에 검은 배경 + 빨간 체력바를 항상 표시한다.
+3. 체력바 fill 은 `currentHealth / maxHealth` 에 맞춰 즉시 줄어든다.
+4. 적이 죽거나 정리될 때 연결된 체력바 오브젝트도 함께 제거된다.
+5. 적 아트, HUD, VFX/SFX, 웨이브 밸런스 범위는 건드리지 않는다.
 
 ## RALPLAN-DR Summary
 
 ### Principles
-1. **Spacing-first readability:** if tradeoffs arise, preventing visible enemy stacking wins over health-bar polish.
-2. **Small brownfield diff:** prefer scene-local changes over new systems or architectural expansion.
-3. **Placeholder-safe presentation:** improve combat readability without adding art, VFX, HUD redesign, or balance changes.
-4. **Data-aware, behavior-light:** reuse existing enemy size/health data before introducing new config surface.
-5. **Reversible implementation:** keep changes easy to back out or tune inside the current Phaser/Vite/TS stack.
 
-### Top Decision Drivers
-1. **Primary success criterion:** enemies must no longer appear visually piled into one point during combat.
-2. **Scope control:** no new dependencies; no balance/HUD/VFX/art work.
-3. **Brownfield fit:** current enemy lifecycle, movement, and damage state already live in `ArenaScene`, so the plan should align with that ownership.
+1. **Spacing first:** 체력바 디테일보다 “적이 포개져 보이지 않음”을 우선한다.
+2. **Small brownfield diff:** 새 서브시스템보다 scene-local 변경을 우선한다.
+3. **Placeholder-safe:** 아트/HUD/VFX/밸런스 확장을 금지한다.
+4. **Reuse existing data:** 체력바 크기/오프셋은 기존 `size` 기반으로 계산하고, 체력 비율만 `maxHealth` 를 사용한다.
+5. **Reversible by default:** 튜닝이나 롤백이 쉬운 구조를 유지한다.
+
+### Decision Drivers
+
+1. 적이 한 점처럼 겹쳐 보이지 않아야 한다.
+2. 현재 Phaser Arcade + `ArenaScene` 구조에 자연스럽게 맞아야 한다.
+3. 새 의존성 없이 작은 범위로 끝나야 한다.
 
 ### Viable Options
 
-#### Option A — Arcade-physics separation + scene-owned health bar graphics
-Use Phaser Arcade overlap/collider-style enemy separation and attach per-enemy health-bar visuals managed by `ArenaScene`.
+#### Option A — Scene-local Arcade separation + per-enemy bars
 
-**Pros**
-- Closest to current movement model (`physics.add.image`, `setCircle`, velocity updates).
-- Smallest likely surface area; keeps spacing and health bars in one owner.
-- Lets size-based collision radius drive separation consistently for normal enemies and boss.
+- 접근: 적 sprite 를 scene-local physics group 에 넣고 same-group collider 기반 분리를 켠다. 각 `EnemyEntity` 가 자신의 health-bar background/fill refs 를 소유한다.
+- Pros:
+  - 현재 `physics.add.image` 기반 구조와 가장 잘 맞는다.
+  - diff 가 가장 작다.
+  - 기존 `size` 원형 body 를 그대로 활용할 수 있다.
+- Cons:
+  - `ArenaScene` 책임이 조금 늘어난다.
+  - collider 감각은 약간의 튜닝이 필요할 수 있다.
 
-**Cons**
-- May require tuning bounce/push behavior to avoid jitter near the player.
-- Health-bar drawing lifecycle must be cleaned up carefully with enemy destruction.
+#### Option B — Scene-local manual repulsion + per-enemy bars
 
-#### Option B — Manual post-move repulsion + scene-owned health bar graphics
-Keep current chase movement, then apply a custom pairwise push-apart pass each update; draw health bars in the scene.
-
-**Pros**
-- Maximum control over visual spacing behavior.
-- Easier to prioritize “looks separated” over strict physics behavior.
-
-**Cons**
-- More custom logic in the hot update loop.
-- Higher risk of edge-case oscillation or uneven separation.
-- More bespoke math to maintain than using existing Phaser physics primitives.
+- 접근: 현재 추적 이동은 유지하고, update loop 에 커스텀 밀어내기 계산을 추가한다.
+- Pros:
+  - 시각적으로 “더 벌어져 보이게” 직접 제어하기 쉽다.
+- Cons:
+  - hot loop 에 bespoke 수학이 늘어난다.
+  - 진동/불안정성 위험이 있다.
+  - 현재 Arcade usage 와의 일관성이 약하다.
 
 ### Recommended Option
-**Option A** — use Arcade-physics-based enemy separation plus scene-owned overhead health bars.
+
+Option A.
 
 ### Invalidation Rationale
-- **Why not Option B first:** it is viable, but the repo already uses Arcade physics for enemy/player/projectile bodies, so a custom repulsion layer would add more bespoke behavior than needed for a first-pass brownfield change.
-- **Why no larger refactor option:** moving enemies into a dedicated rendering/combat subsystem would exceed the requested small, reversible scope.
 
----
-
-## Problem Statement
-During combat, enemies currently chase the player directly and can visually collapse into the same space, making target counting and threat reading hard. Enemy health exists in state but is not shown above each enemy, so damage feedback is not immediately readable.
-
-### Evidence
-- `src/scenes/ArenaScene.ts` tracks enemies in a local `EnemyEntity[]`, moves them in `updateEnemies`, and stores `currentHealth`, but no per-enemy health-bar rendering exists.
-- `spawnEnemy` uses `physics.add.image(...)` with `setCircle(config.size / 2)`, but no enemy-enemy separation behavior is visible.
-- `src/data/enemies.ts` already defines `size` and `maxHealth` for both normal and boss enemies.
-
-### Inference
-- The smallest safe change is likely to remain inside `ArenaScene` and extend `EnemyEntity` with minimal render metadata rather than introducing a new UI/combat subsystem.
-
----
-
-## Desired Outcome
-- Enemies no longer appear stacked on top of each other while converging on the player.
-- Every enemy, including the boss, shows an overhead health bar with a black background and red fill.
-- Health-bar fill tracks `currentHealth / maxHealth`.
-- Placeholder visuals remain intact; no art, HUD, VFX/SFX, or balance expansion is introduced.
-
----
+- Option B 는 가능하지만, 현재 코드가 이미 Arcade bodies 를 사용하므로 첫 패스에서 커스텀 repulsion 을 넣는 것은 불필요한 전용 로직 증가다.
+- 적 렌더/충돌 서브시스템 추출은 이번 요청의 “작고 가역적” 범위를 넘는다.
 
 ## Scope
 
 ### In Scope
-- First-pass enemy spacing / anti-overlap behavior during combat.
-- Overhead enemy health bars for regular enemies and boss.
-- Minimal supporting type/scene updates needed to create, update, and destroy those visuals.
+
+- 1차 적 anti-overlap 처리
+- 슬라임 + 보스 overhead health bar
+- create/update/destroy lifecycle 을 위한 최소 scene-local ownership 확장
 
 ### Out of Scope
-- Enemy art or sprite imports.
-- Wave pacing, enemy stats, spawn counts, or combat balance tuning.
-- Player HUD redesign.
-- Hit flashes, particles, sound, or other VFX/SFX work.
 
----
+- 적 아트/스프라이트 추가
+- 웨이브/난이도/수치 밸런스 조정
+- 플레이어 HUD 개편
+- 피격 이펙트/사운드 추가
+- 대규모 렌더/전투 아키텍처 리팩터
 
 ## Acceptance Criteria
-1. When multiple enemies chase the player, they no longer appear fully collapsed into one point.
-2. Regular enemies and the boss both display overhead health bars with black background + red health fill.
-3. Health-bar width/fill updates as enemy damage is applied.
-4. Enemy cleanup also removes associated health-bar visuals without leaving artifacts.
-5. No new dependency is added, and no balance/HUD/VFX/art scope is expanded.
 
----
+1. 여러 적이 동시에 추적할 때 완전히 하나의 blob 처럼 겹쳐 보이지 않는다.
+2. 슬라임과 보스 모두 머리 위에 검은 배경 + 빨간 fill 체력바를 가진다.
+3. 체력 감소 직후 체력바 fill 이 줄고, 이동 중에도 정렬이 유지된다.
+4. 적 사망/cleanup 시 체력바 잔상이 남지 않는다.
+5. combine pause/freeze 동작은 깨지지 않는다.
+6. 새 dependency 또는 out-of-scope 변경이 추가되지 않는다.
 
-## Brownfield Implementation Plan
+## Brownfield Technical Shape
 
-### Likely File Touchpoints
-- `src/scenes/ArenaScene.ts` — primary implementation surface for enemy separation, health-bar creation/update/cleanup.
-- `src/domain/types.ts` — only if a small shared type addition is needed for enemy render metadata; otherwise avoid.
-- `src/data/enemies.ts` — likely read-only, unless bar sizing/offset tuning truly needs lightweight enemy-specific metadata; avoid if size-based defaults suffice.
+### Primary Touchpoints
 
-### Plan Steps
+- `src/scenes/ArenaScene.ts`
+- `src/data/enemies.ts` (기본적으로 read-only)
+- `src/domain/types.ts` (정말 필요할 때만 최소 타입 추가)
 
-1. **Confirm brownfield hooks and protect scope**
-   - Map where enemies are spawned, moved, damaged, and destroyed in `ArenaScene`.
-   - Keep the change scene-local unless inspection proves a type addition is necessary.
-   - Acceptance: clear ownership for spawn/update/damage/cleanup paths is documented before implementation.
+### Ownership Model
 
-2. **Add first-pass anti-overlap strategy**
-   - Introduce enemy-enemy separation using existing Arcade physics bodies/collision geometry, tuned from current `config.size`.
-   - Preserve chase behavior toward the player while reducing visible pile-up.
-   - Acceptance: the chosen strategy is compatible with existing `updateEnemies` movement and does not require balance changes.
+- `EnemyEntity[]` 는 계속 gameplay truth 로 유지한다.
+- 각 `EnemyEntity` 는 scene-local bar refs 를 소유한다.
+- bar refs 는 `spawnEnemy` 에서 생성되고:
+  - position sync: enemy update/render sync 단계에서 처리
+  - fill sync: damage 후 즉시 반영
+  - destroy: death path + cleanup guard 둘 다에서 처리
 
-3. **Add overhead health-bar lifecycle**
-   - Create per-enemy bar visuals at spawn.
-   - Update bar position and fill during the scene update/damage flow.
-   - Destroy bar visuals when enemies die or are cleaned up.
-   - Acceptance: bars exist for normal enemies and boss, follow enemy position, and reflect current health ratio.
+### Separation Mechanism
 
-4. **Keep the diff reversible and data-light**
-   - Prefer deriving bar width/offset from existing enemy `size` and `maxHealth`.
-   - Only extend shared types/data if scene-local typing becomes awkward or boss readability clearly requires a minimal explicit override.
-   - Acceptance: no new dependency, no unrelated refactor, no broadened config surface without need.
+- enemy sprite 를 scene-local physics group 으로 묶는다.
+- same-group collider/separation 을 켜서 기존 circular body 기반으로 적-적 겹침을 완화한다.
+- chase velocity 는 유지하되, 목표는 “완벽한 군집 AI” 가 아니라 “보기에 포개지지 않음”이다.
 
-5. **Verify against the scoped success criteria**
-   - Run typecheck, tests, and build.
-   - Do a manual browser check focused on two scenarios: clustered normal enemies and boss readability.
-   - Acceptance: spacing-first behavior is visibly improved and health-bar behavior matches scope.
+### Health-Bar Geometry Rule
 
----
+- width / offset: `config.size` 기반 계산 + 소형/대형 clamp
+- height: 작고 읽기 쉬운 고정 또는 clamp 기반 값
+- fill ratio: `currentHealth / config.maxHealth`
+- boss 특이값은 기본 규칙으로 충분하지 않을 때만 최소 override 허용
 
-## Risks and Mitigations
+## Implementation Plan
 
-### Risk 1 — Separation introduces jitter or awkward crowd motion
-- **Mitigation:** prefer conservative separation tuning and judge success by “not visibly stacked,” not by perfect flocking behavior.
+### Step 1 — Confirm hooks and protect scope
 
-### Risk 2 — Health bars drift, linger, or desync on enemy destroy/cleanup
-- **Mitigation:** bind bar lifecycle explicitly to spawn/update/damage/destroy paths already present in `ArenaScene`.
+- `ArenaScene` 의 spawn / movement / damage / cleanup 경로를 유지한다.
+- scene-local ownership 밖으로 범위를 넓히지 않는다.
 
-### Risk 3 — Scope creep into balance or presentation polish
-- **Mitigation:** reject changes to enemy stats, wave data, HUD, VFX, or art unless required to satisfy a stated acceptance criterion.
+### Step 2 — Wire scene-local enemy separation
 
-### Risk 4 — Boss readability differs from regular enemies
-- **Mitigation:** start from size-derived bar dimensions; only add a minimal boss-specific adjustment if manual verification shows default sizing is insufficient.
+- enemy physics group 을 도입한다.
+- enemy sprite 를 group 에 등록하고 same-group collision/separation 을 활성화한다.
+- 현재 chase movement 와 충돌 없이 작동하도록 최소 튜닝만 한다.
 
----
+### Step 3 — Add per-enemy overhead bar lifecycle
+
+- 각 적 spawn 시 background/fill bar 를 생성한다.
+- 이동 중 위치를 따라가게 하고, damage 시 fill 비율을 즉시 갱신한다.
+
+### Step 4 — Make cleanup explicit
+
+- death path 에서 sprite 와 bars 를 함께 정리한다.
+- `cleanupDestroyedEntities` 도 bars orphan 방지 guard 역할을 하게 한다.
+
+### Step 5 — Keep the diff data-light
+
+- 가능한 한 `src/data/enemies.ts` 변경 없이 `size` 기반 규칙으로 처리한다.
+- boss 가독성이 실제로 부족할 때만 최소 metadata 추가를 검토한다.
+
+### Step 6 — Verify against the deep-interview contract
+
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm build`
+- 브라우저 수동 확인
+
+## Risks And Mitigations
+
+- **Collider jitter**
+  - Mitigation: 시각적 비중첩을 만족하는 보수적 튜닝을 우선한다.
+- **Bar drift / orphan**
+  - Mitigation: `EnemyEntity` ownership 에 bar refs 를 명시하고 death + cleanup 양쪽에서 제거한다.
+- **Scene complexity creep**
+  - Mitigation: 헬퍼를 scene-local 로 유지하고 새 서브시스템 추출은 미룬다.
+- **Boss readability mismatch**
+  - Mitigation: `size` 기반 clamp 로 시작하고, 필요 시 최소 boss override 만 허용한다.
 
 ## Verification Plan
 
-### Evidence-driven checks
-- **Static verification:** `pnpm typecheck`
-- **Regression verification:** `pnpm test`
-- **Build verification:** `pnpm build`
+### Static / Regression
 
-### Manual browser checks
-1. Spawn/chase scenario with multiple slimes: confirm enemies no longer visually merge into a single blob while closing on the player.
-2. Damage normal enemies: confirm overhead red fill shrinks against a black background.
-3. Boss encounter: confirm boss also shows a readable overhead bar and cleanup still works at death.
-4. Boundary sanity: confirm no HUD layout changes, no added art/VFX/SFX, and no obvious wave/balance edits.
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm build`
 
-### Evidence vs Inference Notes
-- **Evidence:** current enemy state, movement, damage, and cleanup are centralized in `ArenaScene`.
-- **Inference:** manual browser checks will likely be the decisive proof for the spacing criterion, because “does not visually stack” is experiential rather than purely unit-testable.
+### Manual Browser Checks
 
----
+1. 다수 슬라임 추적 시 한 점처럼 뭉쳐 보이지 않는지 확인
+2. 슬라임 체력 감소 시 머리 위 검정/빨강 바가 즉시 줄어드는지 확인
+3. 보스 이동/피격 tween 중에도 bar 정렬이 유지되는지 확인
+4. 적 사망 시 bar 가 함께 사라지는지 확인
+5. combine freeze 동안 분리/바 갱신이 pause 동작을 깨지 않는지 확인
+6. HUD 개편/아트 추가/밸런스 조정/VFX-SFX 추가가 섞이지 않았는지 확인
 
 ## ADR
 
 ### Decision
-Implement enemy anti-overlap and overhead health bars as a **small, scene-local brownfield change centered in `ArenaScene`**, using existing Phaser Arcade physics primitives where possible and deriving presentation from current enemy data.
+
+`ArenaScene` 중심의 small brownfield change 로 적-적 Arcade separation 과 per-enemy world-space health bars 를 함께 구현한다.
 
 ### Drivers
-- Spacing is the primary success criterion.
-- Existing enemy ownership is already concentrated in the scene.
-- The change must stay small, dependency-free, reversible, and placeholder-safe.
+
+- spacing-first 성공 기준
+- 기존 scene ownership 과의 정합성
+- dependency-free / reversible diff 요구
 
 ### Alternatives Considered
-1. **Manual pairwise repulsion in the update loop**
-   - More control, but more bespoke math and maintenance risk.
-2. **Broader enemy/render subsystem extraction**
-   - Cleaner long-term separation, but disproportionate to this scoped V1 brownfield change.
+
+- manual repulsion
+- 더 큰 enemy presentation / collision subsystem 추출
 
 ### Why Chosen
-This approach best matches the existing architecture, minimizes diff size, and gives the highest chance of fixing visible enemy stacking without pulling new systems or scope into the repo.
+
+현재 코드에 가장 자연스럽고, 가장 작은 변경으로 핵심 문제를 해결할 가능성이 높다.
 
 ### Consequences
-- `ArenaScene` will take on a bit more responsibility for enemy presentation state.
-- Some tuning may still be needed for collision/separation feel.
-- Shared type/data changes should remain optional, not default.
+
+- `ArenaScene` 책임이 조금 늘어난다.
+- collider feel 튜닝이 약간 필요할 수 있다.
+- shared data/type 확장은 optional 로 남긴다.
 
 ### Follow-ups
-- If future work expands enemy presentation, consider extracting enemy render helpers after this first-pass change proves the desired behavior.
-- The deferred non-goals (art, balance, HUD, VFX/SFX) can be tracked separately without blocking this implementation.
+
+- 적 연출/표현이 더 커지면 이후 helper 추출을 재검토한다.
+- deferred non-goals(아트, 밸런스, HUD, VFX/SFX)는 별도 후속 작업으로 유지한다.
+
+## Execution Handoff
+
+### Available Agent Types
+
+- `executor`: 구현
+- `architect`: 설계 확인 / 트레이드오프 점검
+- `test-engineer`: 테스트 전략 / 검증 보강
+- `verifier`: 완료 증거 검토
+- `explore`: repo-local 코드 맵 확인
+
+### Suggested Reasoning by Lane
+
+- `executor`: high
+- `architect`: high
+- `test-engineer`: medium
+- `verifier`: high
+- `explore`: low
+
+### Ralph Staffing Guidance
+
+- 단일 owner 가 `ArenaScene` 중심으로 수정 → 테스트 → 수동 검증까지 순차 수행하기에 적합하다.
+- 추천 when:
+  - write set 이 거의 `src/scenes/ArenaScene.ts` 로 제한될 때
+  - 수동 브라우저 검증을 leader 가 직접 통합하고 싶을 때
+
+### Team Staffing Guidance
+
+- Lane 1 (`executor`): `ArenaScene` separation + bar lifecycle 구현
+- Lane 2 (`test-engineer` or `verifier`): verification checklist, regression 확인, 수동 확인 포인트 정리
+- Lane 3 (`architect`, optional): 과도한 scene complexity 여부 점검
+
+### Launch Hints
+
+- Sequential execution: `$ralph enemy spacing + overhead health bars implementation from approved prd`
+- Team execution: `$team implement approved enemy spacing + health-bar plan`
+- Shell form: `omx team "Implement approved enemy spacing + health-bar plan in NeoD"`
+
+### Concrete Team Verification Path
+
+1. `executor` 가 구현 후 `pnpm typecheck`, `pnpm test`, `pnpm build`
+2. `verifier` 가 changed-file scope 와 acceptance criteria 매핑 점검
+3. 수동 브라우저 확인:
+   - multi-slime spacing
+   - slime bar fill
+   - boss bar readability
+   - death cleanup
+   - combine freeze regression
+4. leader 가 out-of-scope 침범 여부 최종 판정

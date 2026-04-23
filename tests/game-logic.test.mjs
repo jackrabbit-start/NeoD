@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/combine.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
+import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
 import { isBossWaveReady, shouldAdvanceWave } from '../.tmp-test/src/systems/waves.js'
 
@@ -50,4 +51,27 @@ test('boss trigger stays behind the final regular wave', () => {
   assert.equal(isBossWaveReady(1), false)
   assert.equal(isBossWaveReady(2), false)
   assert.equal(isBossWaveReady(3), true)
+})
+
+test('enemy health bar metrics clamp across enemy sizes', () => {
+  assert.deepEqual(getEnemyHealthBarMetrics(20), {
+    width: 32,
+    height: 4,
+    offsetY: 22,
+  })
+
+  assert.deepEqual(getEnemyHealthBarMetrics(80), {
+    width: 68,
+    height: 8,
+    offsetY: 56,
+  })
+})
+
+test('enemy health bar fill width tracks clamped health ratio', () => {
+  assert.equal(getEnemyHealthFillWidth(26, 26, 32), 32)
+  assert.equal(getEnemyHealthFillWidth(13, 26, 32), 16)
+  assert.equal(getEnemyHealthFillWidth(0, 26, 32), 0)
+  assert.equal(getEnemyHealthFillWidth(-10, 26, 32), 0)
+  assert.equal(getEnemyHealthFillWidth(40, 26, 32), 32)
+  assert.equal(getEnemyHealthFillWidth(5, 0, 32), 0)
 })
