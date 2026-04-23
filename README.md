@@ -27,6 +27,7 @@ pnpm install
 pnpm dev
 pnpm run ai:session -- <session-name>
 pnpm run ai:ralph-session -- <session-name> -- "<task text>"
+pnpm run ai:switch-session -- --name <session-name> [--task "<task text>"]
 pnpm typecheck
 pnpm test
 pnpm build

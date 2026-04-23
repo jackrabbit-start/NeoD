@@ -14,7 +14,8 @@
     "ai:worktree": "bash scripts/ai/create-worktree.sh",
     "ai:session": "bash scripts/ai/create-worktree.sh",
     "ai:publish": "bash scripts/ai/publish-session.sh",
-    "ai:ralph-session": "bash scripts/ai/ralph-session.sh"
+    "ai:ralph-session": "bash scripts/ai/ralph-session.sh",
+    "ai:switch-session": "bash scripts/ai/switch-current-session.sh"
   },
   "dependencies": {
     "phaser": "^3.90.0"

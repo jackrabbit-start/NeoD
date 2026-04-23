@@ -92,6 +92,18 @@ The Stop hook only auto-publishes when all of these are true:
 - the session-scoped Ralph state is terminal with `run_outcome=finish`
 - the same completion was not already published
 
+For current-session switching inside OMX, NeoD can also auto-switch the active worktree into `ai-task/*` when `$ralph` starts and the worktree is clean. The backend command is:
+
+```sh
+pnpm run ai:switch-session -- --name hud-pass --task "Improve HUD readability during combat"
+```
+
+Project-local OMX skill name:
+
+```text
+$neo-new-session
+```
+
 ## Per-Agent Workflow
 
 Inside each worktree:
