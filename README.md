@@ -16,7 +16,7 @@ NeoD is a browser-first prototype for a safe fictional top-down action game wher
 - Core loop: move, fight slimes, collect drops, combine items into stronger weapons, clear waves, defeat a boss
 - Scope: one arena, slime-family waves, one boss, placeholder-safe art and naming
 - Planning baseline:
-  - `docs/game-requirements.md`
+  - `docs/wiki/game-requirements.md`
   - `.omx/plans/prd-safe-topdown-combine-action-game-v1.md`
   - `.omx/plans/test-spec-safe-topdown-combine-action-game-v1.md`
 
@@ -33,7 +33,8 @@ pnpm test
 pnpm build
 ```
 
-Parallel AI worktree setup is documented in `docs/parallel-ai-worktrees.md`.
+Documentation follows the `raw sources / wiki / schema` layout with `docs/index.md` as the entrypoint.
+Parallel AI worktree setup is documented in `docs/wiki/parallel-ai-worktrees.md`.
 
 ## Layout
 

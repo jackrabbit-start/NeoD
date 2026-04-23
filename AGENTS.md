@@ -6,6 +6,7 @@ This file is the repo-local operating contract for agents working inside `NeoD`.
 
 1. Actual code and config files
 2. Root `README.md`
+3. `docs/schema.md` for documentation layout and maintenance conventions
 
 ## Repo Workflow
 
@@ -23,6 +24,7 @@ Current concrete workflow:
 - Prefer repo-local scripts over home-directory shared paths.
 - Keep V1 scope aligned with the existing PRD/test-spec and safe-fiction constraints.
 - Defer desktop packaging and non-essential flavor decisions unless a later prompt explicitly reopens them.
+- Treat `docs/index.md` as the docs entrypoint and keep repo-authored documentation under `docs/wiki/` unless it is a raw source or schema file.
 
 ## Git / Branch Safety
 

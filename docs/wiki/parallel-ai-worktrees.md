@@ -193,6 +193,6 @@ git push origin --delete ai-task/ui-polish
 - Stack: `TypeScript + Vite + Phaser`
 - Verification expectation: `pnpm typecheck`, `pnpm test`, `pnpm build`
 - V1 work should stay aligned with:
-  - `docs/game-requirements.md`
+  - `docs/wiki/game-requirements.md`
   - `.omx/plans/prd-safe-topdown-combine-action-game-v1.md`
   - `.omx/plans/test-spec-safe-topdown-combine-action-game-v1.md`

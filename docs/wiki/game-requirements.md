@@ -13,7 +13,7 @@ Use it as the shared upstream artifact for later workflows:
 ## Requirement Sources
 
 - `README.md`
-- `docs/stack-foundation.md`
+- `docs/wiki/stack-foundation.md`
 - `.omx/specs/deep-interview-safe-topdown-combine-action-game.md`
 - `.omx/context/safe-topdown-combine-action-game-20260422T132330Z.md`
 
@@ -258,24 +258,6 @@ Use this document as the upstream requirements baseline and derive:
 
 ### For `ralph` Or `team`
 
-Do not execute directly from this baseline alone.
+Treat this document plus the current PRD/test spec as the execution boundary.
 
-Execution should start only after:
-
-1. a slice-specific PRD exists in `.omx/plans/`
-2. a slice-specific test spec exists in `.omx/plans/`
-3. the scoped plan still conforms to this baseline
-
-## Open Decisions Reserved For Later Workflows
-
-- Exact art style and palette
-- Exact slime variants, boss identity, and naming
-- Exact weapon stat values
-- Exact component names
-- Exact HUD layout
-- Whether V1 combat should be melee-first, ranged-first, or hybrid
-- Whether later releases add desktop packaging
-
-## Change Control
-
-If a future workflow changes any of these baseline requirements, it should update this file first or alongside the downstream PRD so that later agents do not drift from the new source of truth.
+Implementation workflows may choose exact values, file splits, and system boundaries autonomously as long as they preserve the locked V1 requirements and non-goals in this document.
