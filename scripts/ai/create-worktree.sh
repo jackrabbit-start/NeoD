@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/ai/create-worktree.sh <task-name> [base-branch]
+  scripts/ai/create-worktree.sh <session-name> [base-branch]
 
 Examples:
   scripts/ai/create-worktree.sh ui-polish
@@ -83,7 +83,7 @@ worktree_count="$(git -C "$repo_root" worktree list | wc -l | tr -d ' ')"
 recommended_port="$((5173 + worktree_count - 1))"
 
 cat <<EOF
-Created worktree:
+Created OMX session worktree:
   path:   $worktree_dir
   branch: $branch_name
   base:   $base_ref
@@ -92,9 +92,9 @@ Recommended next steps:
   cd $worktree_dir
   pnpm install
   pnpm dev -- --port $recommended_port
+  omx
   pnpm typecheck
   pnpm test
   pnpm build
-  git push -u origin $branch_name
-  gh pr create --base ai-dev --head $branch_name
+  pnpm run ai:publish -- --message-file <commit-message-file>
 EOF

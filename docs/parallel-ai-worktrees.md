@@ -9,11 +9,19 @@ This repo is set up for parallel AI delivery with `git worktree`, not full dupli
 - Clean branch-per-agent isolation
 - Easy PR flow back into `ai-dev`
 
+## OMX Session Model
+
+- one OMX session = one worktree
+- one OMX session = one `ai-task/<session-name>` branch
+- one OMX session = one PR back into `ai-dev`
+
+Do not reuse the same worktree for multiple independent OMX sessions.
+
 ## Branch Model
 
 - `main`: publication branch
 - `ai-dev`: integration branch for AI work
-- `ai-task/<task-name>`: one branch per AI task
+- `ai-task/<session-name>`: one branch per OMX session
 
 Default rule: each AI gets exactly one branch and one worktree directory.
 
@@ -36,22 +44,22 @@ From the main repo:
 
 ```sh
 git fetch origin
-pnpm run ai:worktree -- ui-polish
-pnpm run ai:worktree -- combat-balance
-pnpm run ai:worktree -- drop-loop
+pnpm run ai:session -- ui-polish
+pnpm run ai:session -- combat-balance
+pnpm run ai:session -- drop-loop
 ```
 
 The helper script:
 
-- creates `ai-task/<task-name>` when missing
+- creates `ai-task/<session-name>` when missing
 - creates a sibling worktree directory
 - bases new work on `ai-dev` by default
-- prints the next commands to run inside that worktree
+- prints the next OMX session commands to run inside that worktree
 
 Use another base branch only when you mean to stack work:
 
 ```sh
-pnpm run ai:worktree -- boss-phase-2 ai-task/combat-balance
+pnpm run ai:session -- boss-phase-2 ai-task/combat-balance
 ```
 
 ## Per-Agent Workflow
@@ -61,6 +69,7 @@ Inside each worktree:
 ```sh
 pnpm install
 pnpm dev -- --port 5173
+omx
 ```
 
 Use a unique port per worktree:
@@ -69,19 +78,35 @@ Use a unique port per worktree:
 - second extra worktree: `5174`
 - third extra worktree: `5175`
 
-Before pushing:
+When the OMX session is done, publish from inside that worktree:
 
 ```sh
-pnpm typecheck
-pnpm test
-pnpm build
+pnpm run ai:publish -- --message-file .git/commit-msg-ai.txt
 ```
 
-Then publish the branch:
+The publish script:
+
+- requires the current branch to match `ai-task/*`
+- runs `pnpm typecheck`, `pnpm test`, and `pnpm build`
+- stages and commits all local changes using the Lore-format message file
+- pushes the branch to origin
+- opens a PR to `ai-dev` with `gh`
+
+Example Lore commit message file:
 
 ```sh
-git push -u origin ai-task/ui-polish
-gh pr create --base ai-dev --head ai-task/ui-polish
+Implement drop loop readability improvements
+
+Adjust the arena feedback so early-run pickups and upgrades are easier to read
+without changing the V1 combat scope.
+
+Constraint: Must preserve browser-first V1 scope
+Rejected: Add a new HUD framework dependency | unnecessary for current UI scope
+Confidence: medium
+Scope-risk: narrow
+Directive: Keep pickup/combine feedback lightweight until the core loop is stable
+Tested: pnpm typecheck; pnpm test; pnpm build
+Not-tested: Manual browser feel check
 ```
 
 ## Task Splitting Guidance
@@ -99,8 +124,8 @@ Avoid parallel tasks that edit the same files unless one task is explicitly stac
 ## Recommended Operating Rules
 
 - One AI per worktree
-- One task branch per AI
-- One PR per task branch
+- One session branch per OMX session
+- One PR per session branch
 - Default PR base is `ai-dev`
 - Merge into `ai-dev` first, then promote `ai-dev` to `main`
 - Rebase or restack only when conflicts actually appear

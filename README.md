@@ -25,7 +25,7 @@ NeoD is a browser-first prototype for a safe fictional top-down action game wher
 ```sh
 pnpm install
 pnpm dev
-pnpm run ai:worktree -- <task-name>
+pnpm run ai:session -- <session-name>
 pnpm typecheck
 pnpm test
 pnpm build

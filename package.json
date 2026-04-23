@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "build:test": "tsc -p tsconfig.logic.json",
     "test": "pnpm run build:test && node --experimental-specifier-resolution=node --test tests/**/*.test.mjs",
-    "ai:worktree": "bash scripts/ai/create-worktree.sh"
+    "ai:worktree": "bash scripts/ai/create-worktree.sh",
+    "ai:session": "bash scripts/ai/create-worktree.sh",
+    "ai:publish": "bash scripts/ai/publish-session.sh"
   },
   "dependencies": {
     "phaser": "^3.90.0"
