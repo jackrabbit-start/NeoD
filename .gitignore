@@ -1,6 +1,16 @@
 .DS_Store
 .env
-.omx/
+.omx/*
+!.omx/README.md
+!.omx/context/
+!.omx/context/**
+!.omx/interviews/
+!.omx/interviews/**
+!.omx/plans/
+!.omx/plans/**
+!.omx/specs/
+!.omx/specs/**
+!.omx/hud-config.json
 node_modules/
 dist/
 coverage/

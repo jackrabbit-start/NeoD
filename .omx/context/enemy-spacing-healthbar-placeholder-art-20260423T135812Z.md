@@ -1,0 +1,28 @@
+# Deep Interview Context Snapshot
+
+- Task statement: 적들이 서로 겹치지 않도록 하고, 적 머리 위에 빨간 체력바/검은 배경을 표시하며, 적 이미지는 나중에 추가할 수 있게 유지한다.
+- Desired outcome: 현재 Phaser 프로토타입에서 적 개체 가독성과 전투 피드백을 개선한다.
+- Stated solution: 적 간 겹침 방지 + 적 상단 체력바 표시 + 적 비주얼은 임시 플레이스홀더 유지.
+- Probable intent hypothesis: 전투 중 적 구분이 쉬워지고 피해 상태를 즉시 읽을 수 있게 하려는 요청으로 보인다.
+- Known facts/evidence:
+  - `src/scenes/ArenaScene.ts` 에서 적은 `EnemyEntity` 배열로 관리된다.
+  - 적은 현재 `physics.add.image(..., 'slime'|'boss')` 로 생성되고 `setCircle(config.size / 2)` 만 적용된다.
+  - 적 체력은 `EnemyEntity.currentHealth` 로 추적되지만 개별 체력 UI는 없다.
+  - 적은 플레이어를 향해 직접 이동하고, 적-적 충돌/분리 로직은 현재 보이지 않는다.
+  - README와 기존 계획은 V1에서 placeholder-safe art 를 유지하도록 잠근 상태다.
+- Constraints:
+  - 브라우저 우선 Phaser/Vite/TypeScript 스택 유지
+  - V1 범위는 작고 가역적으로 유지
+  - 적 이미지는 이번 변경에서 필수 아님
+- Unknowns/open questions:
+  - 겹침 방지 방식이 물리 충돌인지, 단순 분리/밀어내기인지
+  - 체력바 표시 조건이 항상 표시인지, 피해 시에만 표시인지
+  - 이번 범위에 플레이어/보스 외형 조정까지 포함되는지
+- Decision-boundary unknowns:
+  - 플레이스홀더 적 비주얼을 계속 tint/circle 기반으로 둬도 되는지
+  - 체력바 스타일/크기/표시 규칙을 OMX가 자율 결정해도 되는지
+- Likely codebase touchpoints:
+  - `src/scenes/ArenaScene.ts`
+  - `src/domain/types.ts`
+  - 부가적으로 적 렌더링 유틸이 필요하면 `src/ui/` 또는 scene 내부 helper
+- Prompt-safe initial-context summary status: not_needed

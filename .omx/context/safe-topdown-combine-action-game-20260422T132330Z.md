@@ -1,0 +1,29 @@
+# Deep Interview Context Snapshot
+
+- Task statement: 사용자는 위에서 보는 2D 시점, 자유 이동, 여러 무기와 아이템 조합, 성장 루프가 있는 액션 게임을 원한다. 다만 처음 표현은 실존 인물 살해를 포함해 안전하지 않았으므로, 허구 적 대상의 안전한 게임 기획으로 재정의해야 한다.
+- Desired outcome: 안전 정책을 지키면서 이후 planning/execution에 넘길 수 있는 게임 콘셉트와 요구사항 경계를 명확히 한다.
+- Stated solution: 탑다운 2D 액션 게임에서 무기/아이템 조합으로 더 강한 무기를 만들며 성장하는 구조를 구체화한다.
+- Probable intent hypothesis: 빠르게 재미있는 성장 루프가 있는 액션 게임 콘셉트를 잡고, 이후 프로토타입이나 기획 문서로 발전시키고 싶다.
+- Known facts/evidence:
+  - 사용자는 `$deep-interview`를 직접 호출해 구체화 전 질문 기반 정리를 원한다.
+  - 리포는 아직 초기 스캐폴드 중심이며, 하니스 단계 순서를 따라야 한다.
+  - 실존 인물을 죽이는 내용은 지원할 수 없으므로 허구 적/가상 세계관으로 안전 재구성이 필요하다.
+  - 사용자가 이미 제시한 핵심 메커닉은 탑다운 2D, 이동 가능, 여러 무기, 아이템/무기 조합, 성장이다.
+- Constraints:
+  - deep-interview 단계에서는 구현하지 않는다.
+  - 질문은 `omx question`으로 한 번에 하나씩 진행해야 한다.
+  - 실존 인물 대상 살해·폭력 조장 콘셉트는 제외하고 안전한 대체 설정으로 유도해야 한다.
+- Unknowns/open questions:
+  - 이 게임의 핵심 재미를 생존, 빌드 제작, 보스 공략 중 어디에 둘지
+  - 적과 세계관을 어떤 허구 설정으로 바꿀지
+  - 첫 버전에서 제외할 요소는 무엇인지
+  - OMX가 자율적으로 정해도 되는 범위와 사용자 승인 범위
+  - 목표 플랫폼과 플레이 세션 길이
+- Decision-boundary unknowns:
+  - 아트 톤과 세계관을 OMX가 임의로 정해도 되는지
+  - 초기 무기 수, 조합 수, 진행 구조를 OMX가 좁혀도 되는지
+- Likely codebase touchpoints:
+  - `.omx/context/`
+  - `.omx/interviews/`
+  - `.omx/specs/`
+  - `README.md` / 향후 게임 기획 문서

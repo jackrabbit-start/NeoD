@@ -1,0 +1,30 @@
+# Ralph Context Snapshot: Safe Topdown Combine Action Game V1
+
+- Task statement: Execute the first playable NeoD prototype using the approved safe topdown combine-action-game plan.
+- Desired outcome: A browser-first playable scaffold exists with the locked V1 stack (`pnpm + TypeScript + Vite + Phaser`) and enough gameplay/data architecture to support movement, slime waves, drops, combining, and boss-win/loss flow.
+- Known facts/evidence:
+  - `.omx/specs/deep-interview-safe-topdown-combine-action-game.md` locked the core product shape and V1 scope.
+  - `.omx/specs/deep-interview-narrow-open-items-lock-stack.md` locked the technical stack and deferred remaining flavor/post-V1 choices.
+  - `.omx/plans/prd-safe-topdown-combine-action-game-v1.md` and `.omx/plans/test-spec-safe-topdown-combine-action-game-v1.md` already exist and align with the current V1 direction.
+  - The repository currently contains docs only and no game runtime implementation.
+- Constraints:
+  - Keep V1 compact and browser-first.
+  - Use `pnpm + TypeScript + Vite + Phaser`.
+  - Preserve safe-fiction framing and `slime + boss` V1 scope.
+  - Prefer data-driven rules for drops, recipes, and waves.
+  - No unnecessary new dependencies beyond what the approved stack needs.
+- Unknowns/open questions:
+  - Smallest implementation slice that can still satisfy the plan within this session.
+  - Minimal verification/tooling setup that fits repo constraints while keeping evidence credible.
+- Likely codebase touchpoints:
+  - `package.json`
+  - `tsconfig.json`
+  - `vite.config.ts`
+  - `index.html`
+  - `src/main.ts`
+  - `src/game/config.ts`
+  - `src/scenes/*`
+  - `src/systems/*`
+  - `src/domain/*`
+  - `src/data/*`
+  - `src/ui/*`
