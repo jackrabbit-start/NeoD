@@ -77,11 +77,27 @@ if [[ "$skip_verify" != "true" ]]; then
   )
 fi
 
+if git rev-parse --verify "$base_branch^{commit}" >/dev/null 2>&1; then
+  compare_ref="$base_branch"
+elif git rev-parse --verify "origin/$base_branch^{commit}" >/dev/null 2>&1; then
+  compare_ref="origin/$base_branch"
+else
+  compare_ref=""
+fi
+
 if [[ -n "$(git status --short)" ]]; then
   git add -A
   git commit -F "$message_file"
 else
   echo "No local changes to commit. Continuing with push/PR."
+fi
+
+if [[ -n "$compare_ref" ]]; then
+  ahead_count="$(git rev-list --count "${compare_ref}..HEAD")"
+  if [[ "$ahead_count" == "0" ]]; then
+    echo "No commits ahead of $compare_ref. Skipping push and PR creation."
+    exit 0
+  fi
 fi
 
 git push -u origin "$current_branch"

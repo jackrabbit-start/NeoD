@@ -62,6 +62,36 @@ Use another base branch only when you mean to stack work:
 pnpm run ai:session -- boss-phase-2 ai-task/combat-balance
 ```
 
+## Ralph Sessions
+
+If the task should run under OMX `ralph`, start it with the Ralph wrapper instead of launching from `ai-dev` directly:
+
+```sh
+pnpm run ai:ralph-session -- hud-pass -- "Improve HUD readability during combat"
+```
+
+This flow:
+
+- creates or reuses the sibling worktree
+- stores repo-local session metadata in `.omx/ai-session.json`
+- launches `omx ralph ...` inside that worktree
+
+When the Ralph run reaches a terminal finished state, the repo-specific Stop hook can auto-run the publish flow for that worktree:
+
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm build`
+- commit all local changes
+- push the `ai-task/*` branch
+- open a PR to `ai-dev`
+
+The Stop hook only auto-publishes when all of these are true:
+
+- current repo is `jackrabbit-start/NeoD`
+- current branch matches `ai-task/*`
+- the session-scoped Ralph state is terminal with `run_outcome=finish`
+- the same completion was not already published
+
 ## Per-Agent Workflow
 
 Inside each worktree:
