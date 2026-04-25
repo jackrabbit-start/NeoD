@@ -65,7 +65,17 @@ import {
   projectWorldRectToMiniMap,
   type MiniMapBounds,
 } from '../systems/minimap.js'
-import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
+import {
+  getPlayerExperienceFillWidth,
+  getPlayerHealthBarMetrics,
+  getPlayerHealthFillWidth,
+} from '../systems/playerHealthBar.js'
+import {
+  applyEnemyPlayerXp,
+  getPlayerProgressionView,
+  type PlayerProgressionResult,
+  type PlayerProgressionState,
+} from '../systems/playerProgression.js'
 import { resolvePlayerMovementStep, type MovementVector } from '../systems/playerMovement.js'
 import {
   canStartPlayerDash,
@@ -153,8 +163,13 @@ interface PlayerHealthBar {
   background: Phaser.GameObjects.Rectangle
   fill: Phaser.GameObjects.Rectangle
   label: Phaser.GameObjects.Text
+  levelLabel: Phaser.GameObjects.Text
+  xpBackground: Phaser.GameObjects.Rectangle
+  xpFill: Phaser.GameObjects.Rectangle
   width: number
   height: number
+  xpWidth: number
+  xpHeight: number
 }
 
 interface MiniMapDisplay {
@@ -328,6 +343,11 @@ export class ArenaScene extends Phaser.Scene {
   private playerHealth = 100
 
   private playerMaxHealth = 100
+
+  private playerProgression: PlayerProgressionState = {
+    totalXp: 0,
+    level: 1,
+  }
 
   private playerSpeed = 220
 
@@ -1597,11 +1617,14 @@ export class ArenaScene extends Phaser.Scene {
       return true
     }
 
+    const playerXpResult = this.grantPlayerXpForEnemy(enemy.config.id)
     const defeatOutcome = getDefeatedEnemyRunOutcome(enemy.config.id)
     const didDropPachinkoToken = defeatOutcome === 'continue' && shouldEnemyGrantPachinkoToken(enemy.config.id)
+    const xpMessage = playerXpResult.grantedXp > 0 ? ` · XP +${playerXpResult.grantedXp}` : ''
+    const levelMessage = playerXpResult.didLevelUp ? ` · Lv.${playerXpResult.level}!` : ''
     if (didDropPachinkoToken) {
       this.spawnPachinkoTokenPickup(enemy.sprite.x, enemy.sprite.y, enemy.config.id)
-      this.statusMessage = `${enemy.config.name} 처치. 토큰이 떨어졌습니다. 캐릭터로 먹으면 파친코에 투입됩니다.`
+      this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 토큰이 떨어졌습니다. 캐릭터로 먹으면 파친코에 투입됩니다.`
     }
     if (enemy.telegraph?.visual.active) {
       enemy.telegraph.visual.destroy()
@@ -1621,9 +1644,45 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     if (!didDropPachinkoToken) {
-      this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
+      this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 드롭을 계속 모으세요.`
     }
     return true
+  }
+
+  private grantPlayerXpForEnemy(enemyId: EnemyDefinition['id']): PlayerProgressionResult {
+    const result = applyEnemyPlayerXp(this.playerProgression, enemyId)
+    this.playerProgression = result.state
+    this.syncPlayerHealthBar()
+
+    if (result.didLevelUp) {
+      this.showPlayerLevelUpFeedback(result.level)
+    }
+
+    return result
+  }
+
+  private showPlayerLevelUpFeedback(level: number): void {
+    const viewport = this.getViewportSize()
+    const text = this.add
+      .text(viewport.width / 2, 74, `LEVEL UP · Lv.${level}`, {
+        color: '#f7fbff',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '18px',
+        fontStyle: '900',
+      })
+      .setOrigin(0.5)
+      .setDepth(44)
+      .setScrollFactor(0)
+      .setShadow(0, 2, '#020713', 6)
+
+    this.tweens.add({
+      targets: text,
+      y: 62,
+      alpha: 0,
+      duration: 820,
+      ease: 'Quad.Out',
+      onComplete: () => text.destroy(),
+    })
   }
 
   private damagePlayer(damage: number): void {
@@ -1926,7 +1985,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private createPlayerHealthBar(): PlayerHealthBar {
     const viewport = this.getViewportSize()
-    const { x, y, width, height } = getPlayerHealthBarMetrics(viewport.width, viewport.height)
+    const { x, y, width, height, levelLabelY, xpY, xpWidth, xpHeight } = getPlayerHealthBarMetrics(
+      viewport.width,
+      viewport.height,
+    )
     const depth = 30
 
     const background = this.add
@@ -1954,12 +2016,42 @@ export class ArenaScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setShadow(0, 1, '#020713', 2)
 
+    const levelLabel = this.add
+      .text(viewport.width / 2, levelLabelY, '', {
+        color: '#bfe2ff',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '11px',
+        fontStyle: '800',
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + 2)
+      .setScrollFactor(0)
+      .setShadow(0, 1, '#020713', 2)
+
+    const xpBackground = this.add
+      .rectangle(x, xpY, xpWidth, xpHeight, 0x020713, 0.62)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(1, 0x52d7ff, 0.32)
+      .setDepth(depth)
+      .setScrollFactor(0)
+
+    const xpFill = this.add
+      .rectangle(x + 2, xpY, xpWidth - 4, xpHeight - 2, 0x52d7ff, 0.88)
+      .setOrigin(0, 0.5)
+      .setDepth(depth + 1)
+      .setScrollFactor(0)
+
     return {
       background,
       fill,
       label,
+      levelLabel,
+      xpBackground,
+      xpFill,
       width,
       height,
+      xpWidth,
+      xpHeight,
     }
   }
 
@@ -1968,16 +2060,26 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    const { fill, label, width, height } = this.playerHealthBar
+    const { fill, label, levelLabel, xpFill, width, height, xpWidth, xpHeight } = this.playerHealthBar
     const fillAreaWidth = width - 4
     const fillWidth = getPlayerHealthFillWidth(this.playerHealth, this.playerMaxHealth, fillAreaWidth)
     const healthRatio = this.playerMaxHealth > 0 ? this.playerHealth / this.playerMaxHealth : 0
     const fillColor = healthRatio <= 0.3 ? 0xff5c6c : healthRatio <= 0.6 ? 0xffd166 : 0x43ef9a
+    const progression = getPlayerProgressionView(this.playerProgression.totalXp)
+    const xpFillAreaWidth = xpWidth - 4
+    const xpFillWidth = getPlayerExperienceFillWidth(progression.progressRatio, xpFillAreaWidth)
 
     fill.setFillStyle(fillColor, 0.92)
     fill.setVisible(fillWidth > 0)
     fill.setDisplaySize(fillWidth, height - 4)
     label.setText(`HP ${this.playerHealth}/${this.playerMaxHealth}`)
+    levelLabel.setText(
+      progression.isMaxLevel
+        ? `Lv.${progression.level} · XP MAX`
+        : `Lv.${progression.level} · XP ${progression.xpIntoLevel}/${progression.xpToNextLevel}`,
+    )
+    xpFill.setVisible(xpFillWidth > 0)
+    xpFill.setDisplaySize(xpFillWidth, xpHeight - 2)
   }
 
   private destroyPlayerHealthBar(): void {
@@ -1985,7 +2087,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    const { background, fill, label } = this.playerHealthBar
+    const { background, fill, label, levelLabel, xpBackground, xpFill } = this.playerHealthBar
     if (background.active) {
       background.destroy()
     }
@@ -1994,6 +2096,15 @@ export class ArenaScene extends Phaser.Scene {
     }
     if (label.active) {
       label.destroy()
+    }
+    if (levelLabel.active) {
+      levelLabel.destroy()
+    }
+    if (xpBackground.active) {
+      xpBackground.destroy()
+    }
+    if (xpFill.active) {
+      xpFill.destroy()
     }
 
     this.playerHealthBar = undefined
@@ -2026,6 +2137,7 @@ export class ArenaScene extends Phaser.Scene {
     this.isRunEnding = initialState.isRunEnding
     this.playerHealth = initialState.playerHealth
     this.playerMaxHealth = initialState.playerMaxHealth
+    this.playerProgression = initialState.playerProgression
     this.playerSpeed = initialState.playerSpeed
     this.playerDashState = createReadyPlayerDashState()
     this.playerDashDirection.set(1, 0)
@@ -2152,12 +2264,16 @@ export class ArenaScene extends Phaser.Scene {
     const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
     const activeStar = activeStack?.star ?? 1
     const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar)
+    const playerProgression = getPlayerProgressionView(this.playerProgression.totalXp)
 
     this.hud.update({
       title: 'NeoD',
       subtitle: this.activeRunLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
+        playerProgression.isMaxLevel
+          ? `플레이어 레벨: Lv.${playerProgression.level} · XP MAX`
+          : `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel}`,
         `무기: ${weapon.name} ${'★'.repeat(activeStar)} · ${getWeaponSummary(weapon)}`,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
