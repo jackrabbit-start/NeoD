@@ -8,6 +8,7 @@ import type {
   WeaponAttributeDefinition,
   WeaponDefinition,
   WeaponExecuteDefinition,
+  WeaponAttributeDefinition,
   WeaponImpactAoeBehavior,
   WeaponImpactBurstBehavior,
   WeaponKnockbackDefinition,
@@ -40,6 +41,7 @@ export interface HazardSpawnSpec {
   tickEveryMs: number
   damage: number
   tint: number
+  attribute?: WeaponAttributeDefinition
   mode?: 'damage-zone' | 'trigger-trap'
   armingDelayMs?: number
   visualPowerTier?: number
@@ -63,6 +65,7 @@ export interface ImpactBurstSpec {
 
 export interface TurretDeploySpec extends WeaponTurretDefinition {
   tint: number
+  attribute?: WeaponAttributeDefinition
   visualPowerTier?: number
   attribute?: WeaponAttributeDefinition
 }
@@ -79,6 +82,7 @@ export interface ProjectileSpawnSpec {
   maxTravelDistance: number
   maxHits: number
   knockback: WeaponKnockbackDefinition
+  attribute?: WeaponAttributeDefinition
   chain?: ChainSpec
   explosionOnHit?: HazardSpawnSpec
   explosionOnExpire?: HazardSpawnSpec
@@ -108,6 +112,7 @@ export interface MeleeSwingSpec {
   visualDurationMs: number
   maxTargets: number
   knockback: WeaponKnockbackDefinition
+  attribute?: WeaponAttributeDefinition
   execute?: WeaponExecuteDefinition
   healOnHit?: number
   visualPowerTier?: number
@@ -222,6 +227,14 @@ const rotate = (vector: Point, degrees: number): Point => {
     x: vector.x * cos - vector.y * sin,
     y: vector.x * sin + vector.y * cos,
   }
+}
+
+const getWeaponAttributeSummary = (weapon: WeaponDefinition): string => {
+  if (!weapon.attribute) {
+    return ''
+  }
+
+  return ` · ${weapon.attribute.elementLabel} · ${weapon.attribute.traitLabel}${weapon.attribute.statusEffect ? ` · ${weapon.attribute.statusEffect.label}` : ''}`
 }
 
 const createHazardSpec = (
@@ -857,7 +870,7 @@ export function getWeaponSummary(weapon: WeaponDefinition): string {
     : ''
 
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
-    return `피해 ${weapon.damage} · 공 ${weapon.attackBehavior.ricochet.projectileCount ?? 1}개 · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+    return `피해 ${weapon.damage} · 공 ${weapon.attackBehavior.ricochet.projectileCount ?? 1}개 · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${getWeaponAttributeSummary(weapon)}`
   }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.summonOnKill) {
     return `피해 ${weapon.damage} · 처치 시 아군화 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
