@@ -2169,7 +2169,12 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    this.pendingPassiveChoices = getPassiveCardChoices(level, this.passiveState)
+    this.pendingPassiveChoices = getPassiveCardChoices(
+      level,
+      this.passiveState,
+      Math.random,
+      this.getActiveWeaponId(),
+    )
     this.isPassiveSelectionOpen = true
     this.applyInteractionPause(true)
     this.statusMessage = `Lv.${level} 달성! 패시브 카드 1장을 선택하세요.`
@@ -2900,6 +2905,7 @@ export class ArenaScene extends Phaser.Scene {
           effectSummary: choice.effectSummary,
           grade: choice.grade,
           gradeLabel: choice.gradeLabel,
+          iconKey: choice.iconKey,
         })),
       },
       pachinko: {

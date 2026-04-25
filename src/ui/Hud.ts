@@ -496,7 +496,9 @@ export class HudController {
       }
     }
 
-    return [...groupedWeapons.values()].map((group) => this.createOwnedWeaponGroup(group))
+    return [...groupedWeapons.values()].map((group) =>
+      group.length <= 1 ? this.createWeaponRow(group[0], 'owned') : this.createOwnedWeaponGroup(group),
+    )
   }
 
   private createWeaponRow(weapon: HudOwnedWeaponView, variant: 'equipped' | 'owned'): HTMLElement {
@@ -623,8 +625,16 @@ export class HudController {
       button.dataset.action = 'passive-select'
       button.dataset.passiveId = choice.id
 
+      const left = document.createElement('div')
+      left.className = 'hud-modal__left'
+
       const textGroup = document.createElement('span')
       textGroup.className = 'hud-modal__content'
+
+      const icon = this.createHudIcon(choice.iconKey, choice.name)
+      if (icon) {
+        left.append(icon)
+      }
 
       const title = document.createElement('strong')
       title.textContent = choice.name
@@ -640,7 +650,8 @@ export class HudController {
       description.textContent = choice.description
 
       textGroup.append(title, grade, summary, description)
-      button.append(textGroup)
+      left.append(textGroup)
+      button.append(left)
       return button
     })
   }
