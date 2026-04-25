@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,6 +25,19 @@ import {
   LOOT_COLLECT_RADIUS,
   LEGACY_LOOT_PICKUP_DISTANCE,
 } from '../.tmp-test/src/systems/lootPickup.js'
+import {
+  AMBIENT_ITEM_RADIUS,
+  ARENA_WORLD_BOUNDS,
+  ENEMY_SPAWN_MIN_DISTANCE,
+  PLAYER_SAFE_RADIUS,
+  createMapLayout,
+  getAmbientItemSpawnPoints,
+  getWorldCenter,
+  isCircleClearOfObstacles,
+  isPointWithinWorld,
+  selectAmbientItemSpawnPoint,
+  selectEnemySpawnPoint,
+} from '../.tmp-test/src/systems/mapLayout.js'
 import { createInitialArenaRunState } from '../.tmp-test/src/systems/runState.js'
 import {
   describeAvailableRecipes,
@@ -148,6 +161,16 @@ test('mist vortex recipe resolves from existing frost and mist drops', () => {
   assert.deepEqual(combined?.nextInventory, {})
 })
 
+test('melee weapon recipes resolve from unused material pairings', () => {
+  const glaiveInventory = addItem(addItem({}, 'acid-core'), 'spark-knot')
+  const cutterInventory = addItem(addItem({}, 'acid-core'), 'mist-bead')
+
+  assert.ok(getAvailableRecipes(glaiveInventory).some(({ recipe }) => recipe.id === 'slime-glaive-recipe'))
+  assert.ok(getAvailableRecipes(cutterInventory).some(({ recipe }) => recipe.id === 'prism-cutter-recipe'))
+  assert.equal(resolveCombine(glaiveInventory, 'slime-glaive-recipe')?.weaponId, 'slime-glaive')
+  assert.equal(resolveCombine(cutterInventory, 'prism-cutter-recipe')?.weaponId, 'prism-cutter')
+})
+
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
@@ -255,6 +278,63 @@ test('new arena run state does not reuse mutable containers', () => {
   assert.deepEqual(second.inventory, {})
   assert.deepEqual(second.ownedWeaponIds, ['starter-blaster'])
   assert.deepEqual(second.tuningState, {})
+})
+
+test('map layout defines a larger scrolling world with a safe starting area', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const start = getWorldCenter(layout.worldBounds)
+
+  assert.equal(layout.worldBounds.width > 960, true)
+  assert.equal(layout.worldBounds.height > 540, true)
+  assert.deepEqual(layout.playerStart, start)
+  assert.ok(layout.obstacles.length > 0)
+
+  for (const obstacle of layout.obstacles) {
+    assert.equal(isPointWithinWorld({ x: obstacle.x, y: obstacle.y }, layout.worldBounds), true)
+    assert.equal(
+      isPointWithinWorld(
+        { x: obstacle.x + obstacle.width, y: obstacle.y + obstacle.height },
+        layout.worldBounds,
+      ),
+      true,
+    )
+  }
+
+  assert.equal(isCircleClearOfObstacles(start, PLAYER_SAFE_RADIUS, layout.obstacles), true)
+})
+
+test('ambient map item points stay clear and reuse existing loot ids', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawnPoints = getAmbientItemSpawnPoints(layout.worldBounds, layout.obstacles)
+
+  assert.equal(spawnPoints.length >= 5, true)
+  for (const spawn of spawnPoints) {
+    assert.equal(LOOT_IDS.includes(spawn.itemId), true)
+    assert.notEqual(spawn.itemId, 'tuning-capsule')
+    assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 48), true)
+    assert.equal(isCircleClearOfObstacles(spawn, AMBIENT_ITEM_RADIUS, layout.obstacles), true)
+  }
+
+  assert.deepEqual(selectAmbientItemSpawnPoint(spawnPoints, () => 0), spawnPoints[0])
+  assert.deepEqual(selectAmbientItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
+})
+
+test('enemy map spawn selection respects player distance, world bounds, and obstacle clearance', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawn = selectEnemySpawnPoint(
+    layout.playerStart,
+    layout.worldBounds,
+    layout.obstacles,
+    () => 0,
+    28,
+  )
+
+  assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 48), true)
+  assert.equal(isCircleClearOfObstacles(spawn, 28, layout.obstacles), true)
+  assert.equal(
+    Math.hypot(spawn.x - layout.playerStart.x, spawn.y - layout.playerStart.y) >= ENEMY_SPAWN_MIN_DISTANCE,
+    true,
+  )
 })
 
 test('recipe presenter mirrors the actionable combine summary strings', () => {
@@ -583,6 +663,8 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'arc-loom-recipe',
     'spark-carbine-recipe',
     'mist-vortex-recipe',
+    'slime-glaive-recipe',
+    'prism-cutter-recipe',
   ])
   assert.deepEqual(WEAPON_IDS, [
     'starter-blaster',
@@ -592,6 +674,8 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'arc-loom',
     'spark-carbine',
     'mist-vortex',
+    'slime-glaive',
+    'prism-cutter',
   ])
   assert.deepEqual(ENEMY_IDS, [
     'slime',
@@ -613,25 +697,22 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.ok(thirdWave)
   assert.ok(eliteWave)
   assert.ok(bossWave)
+  assert.equal(secondWave.burstSize, 3)
+  assert.equal(thirdWave.burstSize, 4)
+  assert.equal(bossWave.burstSize, undefined)
   assert.deepEqual(
     getWaveSpawnSequence(secondWave),
-    ['slime', 'slime', 'slime', 'slime', 'slime', 'dash-slime', 'dash-slime', 'dash-slime'],
+    [...Array(15).fill('slime'), ...Array(9).fill('dash-slime')],
   )
   assert.deepEqual(
     flattenWaveEntries(thirdWave.entries),
     [
-      'spark-slime',
-      'spark-slime',
-      'spark-slime',
-      'spark-slime',
-      'orbit-slime',
-      'orbit-slime',
-      'orbit-slime',
-      'dash-slime',
-      'dash-slime',
+      ...Array(12).fill('spark-slime'),
+      ...Array(9).fill('orbit-slime'),
+      ...Array(6).fill('dash-slime'),
     ],
   )
-  assert.equal(getWaveSpawnCount(thirdWave), 9)
+  assert.equal(getWaveSpawnCount(thirdWave), 27)
   assert.deepEqual(getWaveSpawnSequence(eliteWave), ['prism-slime'])
   assert.deepEqual(bossWave.entries, [{ enemyId: 'slime-boss', count: 1 }])
   assert.equal(getBossEnemyId(), 'slime-boss')
@@ -667,6 +748,29 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   assert.equal(hudState.modal.isOpen, false)
 })
 
+test('arena frame stops immediately after any run-ending combat step', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+
+  for (const step of ['updateEnemies(delta)', 'updateProjectiles(delta)', 'updateHazards(delta)']) {
+    assert.ok(
+      arenaSceneSource.includes(`this.${step}
+    if (this.isRunEnding) {
+      return
+    }`),
+      `${step} must be followed by an isRunEnding guard so boss defeat cannot leave a frozen arena frame`,
+    )
+  }
+
+  assert.ok(
+    arenaSceneSource.includes(`for (const enemy of this.enemies) {
+      if (enemy.sprite.active) {
+        enemy.sprite.setVelocity(0, 0)
+      }
+    }`),
+    'freezeCombat must skip destroyed enemy sprites because boss defeat destroys the boss before endRun freezes combat',
+  )
+})
+
 test('loss result presentation keeps restart guidance distinct from boss clear', () => {
   const presentation = createRunResultPresentation({
     outcome: 'loss',
@@ -690,7 +794,7 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
 
   assert.equal(codex.isOpen, true)
   assert.equal(codex.items.length, 6)
-  assert.equal(codex.recipes.length, 6)
+  assert.equal(codex.recipes.length, 8)
   assert.equal(codex.enemies.length, 6)
 
   const arcRecipe = codex.recipes.find((recipe) => recipe.id === 'arc-loom-recipe')
@@ -716,6 +820,22 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
     ['frost-mote', 'mist-bead'],
   )
   assert.equal(mistRecipe?.output.id, 'mist-vortex')
+
+  const glaiveRecipe = codex.recipes.find((recipe) => recipe.id === 'slime-glaive-recipe')
+  assert.equal(glaiveRecipe?.identityLabel, '광역 참격')
+  assert.deepEqual(
+    glaiveRecipe?.inputs.map((input) => input.id),
+    ['acid-core', 'spark-knot'],
+  )
+  assert.equal(glaiveRecipe?.output.id, 'slime-glaive')
+
+  const cutterRecipe = codex.recipes.find((recipe) => recipe.id === 'prism-cutter-recipe')
+  assert.equal(cutterRecipe?.identityLabel, '집중 절단')
+  assert.deepEqual(
+    cutterRecipe?.inputs.map((input) => input.id),
+    ['acid-core', 'mist-bead'],
+  )
+  assert.equal(cutterRecipe?.output.id, 'prism-cutter')
 
   const voltSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
   assert.ok(voltSlime)
@@ -756,6 +876,8 @@ test('recipe identity metadata stays aligned with known ids and weapon outputs',
 
   assert.ok(WEAPON_DEFINITIONS['spark-carbine'].identityLabel?.trim())
   assert.ok(WEAPON_DEFINITIONS['mist-vortex'].identityLabel?.trim())
+  assert.ok(WEAPON_DEFINITIONS['slime-glaive'].identityLabel?.trim())
+  assert.ok(WEAPON_DEFINITIONS['prism-cutter'].identityLabel?.trim())
 })
 
 test('codex controller preserves scroll across repeated open renders', () => {
@@ -930,6 +1052,24 @@ test('effective weapon stats apply each tuning without mutating base definitions
   assert.deepEqual(WEAPON_DEFINITIONS['acid-sprayer'], baseWeapon)
 })
 
+test('effective melee weapon tuning updates nested behavior immutably', () => {
+  const baseWeapon = WEAPON_DEFINITIONS['slime-glaive']
+  const baseBehavior = baseWeapon.attackBehavior
+
+  assert.equal(baseBehavior.kind, 'melee-cleave')
+
+  const sharpened = deriveEffectiveWeaponStats('slime-glaive', { 'slime-glaive': 'sharpened-core' })
+  const quick = deriveEffectiveWeaponStats('slime-glaive', { 'slime-glaive': 'quick-loader' })
+  const stabilized = deriveEffectiveWeaponStats('slime-glaive', { 'slime-glaive': 'stabilized-bore' })
+
+  assert.equal(sharpened.damage, baseWeapon.damage + 4)
+  assert.equal(quick.fireRateMs, Math.round(baseWeapon.fireRateMs * 0.9))
+  assert.equal(stabilized.attackBehavior.kind, 'melee-cleave')
+  assert.equal(stabilized.attackBehavior.range, baseBehavior.range + 18)
+  assert.notEqual(stabilized.attackBehavior, baseBehavior)
+  assert.deepEqual(WEAPON_DEFINITIONS['slime-glaive'], baseWeapon)
+})
+
 test('visual asset manifest paths exist for all external art assets', () => {
   const missingAssets = VECTOR_ASSETS.filter((asset) => {
     const assetPath = resolve(TEST_DIR, '..', 'public', asset.path)
@@ -1003,7 +1143,7 @@ test('dash slime movement locks a burst vector through the charge window', () =>
     dashSlime.speed,
     dashSlime.movementBehavior,
     lockedMove.runtimeState,
-    1_500,
+    1_550,
   )
 
   assert.equal(recoveryMove.mode, 'dash-recover')
@@ -1102,6 +1242,14 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'mist-vortex': {
         projectileTextureKey: 'mist-projectile',
         hudIconKey: 'weapon-mist-vortex',
+      },
+      'slime-glaive': {
+        projectileTextureKey: 'arc-projectile',
+        hudIconKey: 'weapon-slime-glaive',
+      },
+      'prism-cutter': {
+        projectileTextureKey: 'frost-projectile',
+        hudIconKey: 'weapon-prism-cutter',
       },
     },
   )

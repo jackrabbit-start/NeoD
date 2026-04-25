@@ -1,0 +1,32 @@
+# Deep Interview Context Snapshot: map traversal obstacles items
+
+- Task statement: "이제 맵안에서 움직이는 느낌으로 진행하고 장애물 및 아이템이 곳곳에 간헐적으로 존재하도록" — make the game feel like moving through a map, with obstacles and items intermittently present across the area.
+- Desired outcome: A clarified, execution-ready requirement for map traversal feel plus sparse obstacles/items.
+- Stated solution: Add map-like movement/progression, obstacles, and intermittent item placement.
+- Probable intent hypothesis: Current arena is a static 960x540 rectangle; the user likely wants stronger exploration/traversal feel, more spatial texture, and loot/objects that encourage movement beyond enemy dodging.
+- Known facts/evidence:
+  - `src/scenes/ArenaScene.ts` currently sets a fixed camera/background and Arcade world bounds to `GAME_WIDTH/GAME_HEIGHT` minus margins, draws one arena rectangle, and spawns the player at screen center.
+  - Player movement is WASD velocity with `setCollideWorldBounds(true)` in `ArenaScene.handlePlayerMovement`.
+  - Enemy spawns occur near the fixed arena edges; enemy drops create loot only when enemies die.
+  - Loot pickup already supports idle/attract/collect phases via `src/systems/lootPickup.ts` and inventory pickup via `combineInventoryWorkflow.ts`.
+  - No obstacle/domain system was found in the quick scan; likely new data/system + ArenaScene integration would be needed.
+- Constraints:
+  - Browser-first Vite/Phaser prototype, TypeScript, pnpm.
+  - Keep V1 scope small/reversible; no new dependencies unless explicitly requested.
+  - Deep-interview must not implement directly; it should produce a spec/handoff.
+- Unknowns/open questions:
+  - Whether the desired "map movement" means a larger scrolling world/camera, looping/parallax background, room/zone progression, or simply decorative floor markers.
+  - Whether obstacles should block player/enemies/projectiles, only decorate, or act as hazards/destructibles.
+  - Whether intermittently placed items are existing recipe loot, healing/speed pickups, tuning capsules, or purely visual props.
+  - Desired spawn cadence, density, and fairness rules.
+- Decision-boundary unknowns:
+  - What OMX may decide about exact obstacle shapes, quantities, item spawn rates, and visual placeholders.
+  - What must remain out of scope for the first pass.
+- Likely codebase touchpoints:
+  - `src/scenes/ArenaScene.ts`
+  - `src/game/config.ts`
+  - `src/systems/lootPickup.ts`
+  - `src/systems/drop.ts`
+  - possible new `src/systems/mapObjects.ts` / `src/data/mapObjects.ts`
+  - tests in `tests/game-logic.test.mjs` or new deterministic tests for placement rules.
+- Prompt-safe initial-context summary status: not_needed

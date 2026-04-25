@@ -153,12 +153,26 @@ test('telegraphing target suppresses direct-hit knockback state creation', () =>
   assert.equal(clearKnockbackForTelegraph(), undefined)
 })
 
-test('source policy keeps hazard and chain knockback disabled for v1', () => {
+test('source policy enables melee swing knockback while keeping hazard and chain disabled for v1', () => {
   const activeState = createKnockbackState({ x: 1, y: 0 }, 80, 100, 100)
 
   assert.equal(shouldApplyKnockbackSource('direct-projectile'), true)
+  assert.equal(shouldApplyKnockbackSource('melee-swing'), true)
   assert.equal(shouldApplyKnockbackSource('hazard'), false)
   assert.equal(shouldApplyKnockbackSource('chain'), false)
+
+  const meleeResult = resolveKnockbackHit({
+    source: 'melee-swing',
+    direction: { x: 0, y: 1 },
+    weapon: WEAPON_DEFINITIONS['slime-glaive'].knockback,
+    enemy: ENEMY_DEFINITIONS.slime.knockback,
+    activeState,
+    targetIsTelegraphing: false,
+    hitTimeMs: 150,
+  })
+
+  assert.equal(meleeResult.applied, true)
+  assert.notEqual(meleeResult.reason, 'source-disabled')
 
   for (const source of ['hazard', 'chain']) {
     const result = resolveKnockbackHit({
@@ -183,5 +197,5 @@ test('enemy data keeps boss knockback restrained with resistance and weight', ()
     ENEMY_DEFINITIONS['slime-boss'].knockback,
   )
 
-  approx(force, 20.833333333333332)
+  approx(force, 14.583333333333336)
 })

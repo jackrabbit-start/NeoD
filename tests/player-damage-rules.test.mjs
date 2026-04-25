@@ -18,3 +18,8 @@ test('player damage gate blocks before cooldown and allows at the cooldown bound
 test('player damage gate preserves interaction-block immunity', () => {
   assert.equal(shouldApplyPlayerDamage(2000, 1000, true), false)
 })
+
+test('player damage gate preserves dash invulnerability', () => {
+  assert.equal(shouldApplyPlayerDamage(2000, 1000, false, true), false)
+  assert.equal(shouldApplyPlayerDamage(2000, 1000, false, false), true)
+})

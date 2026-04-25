@@ -20,6 +20,7 @@ export const TUNING_EFFECT_DEFINITIONS = [
     id: 'stabilized-bore',
     label: '안정화 총열',
     projectileSpeedDelta: 70,
+    meleeRangeDelta: 18,
   },
 ] as const
 
@@ -110,6 +111,14 @@ export function deriveEffectiveWeaponStats(
     return { ...weapon }
   }
 
+  const attackBehavior =
+    weapon.attackBehavior.kind === 'melee-cleave' && 'meleeRangeDelta' in effect
+      ? {
+          ...weapon.attackBehavior,
+          range: weapon.attackBehavior.range + effect.meleeRangeDelta,
+        }
+      : weapon.attackBehavior
+
   return {
     ...weapon,
     damage: weapon.damage + ('damageDelta' in effect ? effect.damageDelta : 0),
@@ -118,6 +127,7 @@ export function deriveEffectiveWeaponStats(
     ),
     projectileSpeed:
       weapon.projectileSpeed + ('projectileSpeedDelta' in effect ? effect.projectileSpeedDelta : 0),
+    attackBehavior,
     tuningEffectId: effect.id,
     tuningLabel: effect.label,
   }

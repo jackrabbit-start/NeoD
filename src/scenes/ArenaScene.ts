@@ -38,7 +38,23 @@ import {
   getLootPickupPhase,
   LOOT_COLLECT_RADIUS,
 } from '../systems/lootPickup.js'
+import {
+  createMapLayout,
+  selectEnemySpawnPoint,
+  type MapLayout,
+  type RectObstacle,
+} from '../systems/mapLayout.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
+import {
+  canStartPlayerDash,
+  createReadyPlayerDashState,
+  isPlayerDashActive,
+  isPlayerDashInvulnerable,
+  PLAYER_DASH_SPEED,
+  resolvePlayerDashDirection,
+  startPlayerDash,
+  type PlayerDashState,
+} from '../systems/playerDash.js'
 import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
 import {
@@ -53,13 +69,15 @@ import {
   advanceHazardState,
   applyProjectileHitState,
   buildAttackPlan,
+  collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
   getWeaponSummary,
+  isAttackPlanActionable,
   isProjectileOutOfBounds,
   selectChainTargets,
 } from '../systems/weaponBehaviors.js'
-import type { ChainSpec, HazardSpawnSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
+import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import {
   deriveEffectiveWeaponStats,
   getTuningEffectLabel,
@@ -87,6 +105,9 @@ import {
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
 type PhysicsSprite = Phaser.Physics.Arcade.Sprite
+type ObstacleBody = Phaser.GameObjects.Rectangle & {
+  body: Phaser.Physics.Arcade.StaticBody
+}
 
 interface EnemyHealthBar {
   background: Phaser.GameObjects.Rectangle
@@ -175,11 +196,23 @@ export class ArenaScene extends Phaser.Scene {
 
   private enemySpacingCollider?: Phaser.Physics.Arcade.Collider
 
+  private obstacleBodies?: Phaser.Physics.Arcade.StaticGroup
+
+  private playerObstacleCollider?: Phaser.Physics.Arcade.Collider
+
+  private enemyObstacleCollider?: Phaser.Physics.Arcade.Collider
+
+  private mapVisuals: Phaser.GameObjects.GameObject[] = []
+
+  private readonly mapLayout: MapLayout = createMapLayout()
+
   private cursors!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
 
   private inventoryKey!: Phaser.Input.Keyboard.Key
 
   private codexKey!: Phaser.Input.Keyboard.Key
+
+  private dashKey!: Phaser.Input.Keyboard.Key
 
   private enemies: EnemyEntity[] = []
 
@@ -209,6 +242,12 @@ export class ArenaScene extends Phaser.Scene {
 
   private playerSpeed = 220
 
+  private playerDashState: PlayerDashState = createReadyPlayerDashState()
+
+  private playerDashDirection = new Phaser.Math.Vector2(1, 0)
+
+  private lastPlayerMoveDirection = new Phaser.Math.Vector2(1, 0)
+
   private nextFireAt = 0
 
   private remainingSpawns = 0
@@ -223,7 +262,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private statusMessage = 'WASD로 이동하고 회피하는 동안 무기가 자동으로 발사됩니다.'
+  private statusMessage = 'WASD로 이동하고 J 대시로 회피하는 동안 무기가 자동으로 발사됩니다.'
 
   private lastPlayerHitAt = 0
 
@@ -247,27 +286,33 @@ export class ArenaScene extends Phaser.Scene {
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
-    this.physics.world.setBounds(24, 24, GAME_WIDTH - 48, GAME_HEIGHT - 48)
-
-    const arena = this.add.rectangle(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      GAME_WIDTH - 48,
-      GAME_HEIGHT - 48,
-      0x0d1d33,
-      1,
+    const { worldBounds, playerStart } = this.mapLayout
+    this.physics.world.setBounds(
+      worldBounds.x,
+      worldBounds.y,
+      worldBounds.width,
+      worldBounds.height,
     )
-    arena.setStrokeStyle(2, 0x214266, 0.9)
+    this.cameras.main.setBounds(
+      worldBounds.x,
+      worldBounds.y,
+      worldBounds.width,
+      worldBounds.height,
+    )
+    this.createMapVisuals()
 
-    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'player')
+    this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'player')
     this.player.setCircle(PLAYER_COLLISION_RADIUS)
     this.player.setCollideWorldBounds(true)
     this.player.play('player-idle')
+    this.cameras.main.startFollow(this.player, true, 0.09, 0.09)
     this.playerHealthBar = this.createPlayerHealthBar()
     this.syncPlayerHealthBar()
 
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
+    this.createObstacles()
+    this.seedAmbientLoot()
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
@@ -282,6 +327,7 @@ export class ArenaScene extends Phaser.Scene {
     }) as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
     this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
+    this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
 
     this.startWave(0)
     this.updateHud()
@@ -295,12 +341,24 @@ export class ArenaScene extends Phaser.Scene {
 
     this.handleInventoryToggle()
     this.handleCodexToggle()
-    this.handlePlayerMovement()
+    this.handlePlayerMovement(time)
     this.handleFiring(time)
     this.updateEnemies(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.updateProjectiles(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.updateLootDrops(delta)
     this.updateHazards(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.cleanupDestroyedEntities()
 
     if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
@@ -313,6 +371,69 @@ export class ArenaScene extends Phaser.Scene {
 
   private isInteractionBlocked(): boolean {
     return this.isInventoryOpen || this.isCodexOpen
+  }
+
+  private createMapVisuals(): void {
+    const { worldBounds } = this.mapLayout
+    const arena = this.add.rectangle(
+      worldBounds.x + worldBounds.width / 2,
+      worldBounds.y + worldBounds.height / 2,
+      worldBounds.width,
+      worldBounds.height,
+      0x0d1d33,
+      1,
+    )
+    arena.setStrokeStyle(3, 0x214266, 0.9)
+    arena.setDepth(-20)
+    this.mapVisuals.push(arena)
+
+    const grid = this.add.graphics()
+    grid.lineStyle(1, 0x173150, 0.28)
+    for (let x = worldBounds.x; x <= worldBounds.x + worldBounds.width; x += 160) {
+      grid.lineBetween(x, worldBounds.y, x, worldBounds.y + worldBounds.height)
+    }
+    for (let y = worldBounds.y; y <= worldBounds.y + worldBounds.height; y += 135) {
+      grid.lineBetween(worldBounds.x, y, worldBounds.x + worldBounds.width, y)
+    }
+    grid.setDepth(-19)
+    this.mapVisuals.push(grid)
+  }
+
+  private createObstacles(): void {
+    this.obstacleBodies = this.physics.add.staticGroup()
+
+    for (const obstacle of this.mapLayout.obstacles) {
+      const visual = this.createObstacleBody(obstacle)
+      this.obstacleBodies.add(visual)
+      this.mapVisuals.push(visual)
+    }
+    this.obstacleBodies.refresh()
+
+    this.playerObstacleCollider = this.physics.add.collider(this.player, this.obstacleBodies)
+    this.enemyObstacleCollider = this.physics.add.collider(this.enemySprites, this.obstacleBodies)
+  }
+
+  private createObstacleBody(obstacle: RectObstacle): ObstacleBody {
+    const visual = this.add.rectangle(
+      obstacle.x + obstacle.width / 2,
+      obstacle.y + obstacle.height / 2,
+      obstacle.width,
+      obstacle.height,
+      0x1b3145,
+      0.96,
+    ) as ObstacleBody
+    visual.setStrokeStyle(2, 0x426a8f, 0.82)
+    visual.setDepth(1)
+    this.physics.add.existing(visual, true)
+    visual.body.setSize(obstacle.width, obstacle.height)
+    visual.body.updateFromGameObject()
+    return visual
+  }
+
+  private seedAmbientLoot(): void {
+    for (const spawn of this.mapLayout.ambientItemSpawns) {
+      this.spawnLootDrop(spawn.x, spawn.y, spawn.itemId)
+    }
   }
 
   private handleInventoryToggle(): void {
@@ -337,24 +458,48 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handlePlayerMovement(): void {
+  private handlePlayerMovement(time: number): void {
     if (this.isInteractionBlocked()) {
       this.player.setVelocity(0, 0)
       this.setPlayerAnimation(false)
       return
     }
 
-    const velocity = new Phaser.Math.Vector2(
+    const inputVelocity = new Phaser.Math.Vector2(
       Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
       Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
     )
 
-    const isMoving = velocity.lengthSq() > 0
+    const isMoving = inputVelocity.lengthSq() > 0
     if (isMoving) {
-      velocity.normalize().scale(this.playerSpeed)
+      inputVelocity.normalize()
+      this.lastPlayerMoveDirection.set(inputVelocity.x, inputVelocity.y)
     }
 
-    this.player.setVelocity(velocity.x, velocity.y)
+    if (
+      Phaser.Input.Keyboard.JustDown(this.dashKey) &&
+      canStartPlayerDash(time, this.playerDashState, false)
+    ) {
+      const dashDirection = resolvePlayerDashDirection(inputVelocity, this.lastPlayerMoveDirection)
+      this.playerDashDirection.set(dashDirection.x, dashDirection.y)
+      this.playerDashState = startPlayerDash(time)
+      this.statusMessage = 'J 대시! 짧은 무적 시간으로 보스 예고 공격을 피하세요.'
+    }
+
+    if (isPlayerDashActive(time, this.playerDashState)) {
+      this.player.setVelocity(
+        this.playerDashDirection.x * PLAYER_DASH_SPEED,
+        this.playerDashDirection.y * PLAYER_DASH_SPEED,
+      )
+      this.setPlayerAnimation(true)
+      return
+    }
+
+    if (isMoving) {
+      inputVelocity.scale(this.playerSpeed)
+    }
+
+    this.player.setVelocity(inputVelocity.x, inputVelocity.y)
     this.setPlayerAnimation(isMoving)
   }
 
@@ -383,12 +528,16 @@ export class ArenaScene extends Phaser.Scene {
 
     const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
     const attackPlan = buildAttackPlan(weapon, origin, new Phaser.Math.Vector2(target.x, target.y))
-    if (attackPlan.projectiles.length === 0) {
+    if (!isAttackPlanActionable(attackPlan)) {
       return
     }
 
     for (const projectileSpec of attackPlan.projectiles) {
       this.spawnProjectile(projectileSpec, weapon.projectileTextureKey)
+    }
+
+    for (const meleeSwing of attackPlan.meleeSwings) {
+      this.applyMeleeSwing(meleeSwing)
     }
 
     this.nextFireAt = time + attackPlan.cooldownMs
@@ -432,6 +581,9 @@ export class ArenaScene extends Phaser.Scene {
             )
           ) {
             this.damagePlayer(enemy.telegraph.damage)
+            if (this.isRunEnding) {
+              return
+            }
           }
 
           enemy.telegraph.visual.destroy()
@@ -504,6 +656,9 @@ export class ArenaScene extends Phaser.Scene {
       const touchingPlayer = distanceToPlayer < enemy.config.size / 2 + ENEMY_CONTACT_PADDING
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
+        if (this.isRunEnding) {
+          return
+        }
       }
 
       this.syncEnemyHealthBar(enemy)
@@ -529,8 +684,7 @@ export class ArenaScene extends Phaser.Scene {
       if (
         isProjectileOutOfBounds(
           { x: projectile.sprite.x, y: projectile.sprite.y },
-          GAME_WIDTH,
-          GAME_HEIGHT,
+          this.mapLayout.worldBounds,
         )
       ) {
         this.destroyProjectile(projectile, projectile.hazardOnExpire)
@@ -682,6 +836,35 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private spawnLootDrop(x: number, y: number, itemId: LootId): void {
+    const itemDefinition = ITEM_DEFINITIONS[itemId]
+    const aura = this.add.circle(x, y, 16, itemDefinition.color, 0.18)
+    aura.setStrokeStyle(2, itemDefinition.color, 0.78)
+    aura.setBlendMode(Phaser.BlendModes.ADD)
+    aura.setDepth(3)
+    const auraTween = this.tweens.add({
+      targets: aura,
+      scale: { from: 0.88, to: 1.18 },
+      alpha: { from: 0.48, to: 0.86 },
+      duration: 720,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    })
+
+    const loot = this.physics.add.image(x, y, itemDefinition.textureKey)
+    loot.setCircle(10)
+    loot.setDepth(4)
+    loot.setScale(1.08)
+    this.lootDrops.push({
+      sprite: loot,
+      itemId,
+      aura,
+      auraTween,
+      isAttracting: false,
+    })
+  }
+
   private updateHazards(delta: number): void {
     if (this.isInteractionBlocked()) {
       return
@@ -725,6 +908,9 @@ export class ArenaScene extends Phaser.Scene {
           this.damageEnemy(enemy, hazard.damage, {
             ignoreRecentHit: true,
           })
+          if (this.isRunEnding) {
+            return
+          }
         }
       }
 
@@ -791,20 +977,15 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnEnemy(enemyId: EnemyDefinition['id']): void {
     const config = ENEMY_DEFINITIONS[enemyId]
-    const x =
-      Math.random() < 0.5
-        ? Phaser.Math.Between(48, GAME_WIDTH - 48)
-        : Math.random() < 0.5
-          ? 48
-          : GAME_WIDTH - 48
-    const y =
-      x === 48 || x === GAME_WIDTH - 48
-        ? Phaser.Math.Between(48, GAME_HEIGHT - 48)
-        : Math.random() < 0.5
-          ? 48
-          : GAME_HEIGHT - 48
+    const spawnPoint = selectEnemySpawnPoint(
+      { x: this.player.x, y: this.player.y },
+      this.mapLayout.worldBounds,
+      this.mapLayout.obstacles,
+      Math.random,
+      config.size / 2,
+    )
 
-    const sprite = this.physics.add.sprite(x, y, config.textureKey)
+    const sprite = this.physics.add.sprite(spawnPoint.x, spawnPoint.y, config.textureKey)
     sprite.setCircle(config.size / 2)
     sprite.setCollideWorldBounds(true)
     sprite.setBounce(0)
@@ -859,32 +1040,7 @@ export class ArenaScene extends Phaser.Scene {
     if (enemy.config.drops) {
       const droppedItem = resolveWeightedDrop(enemy.config.drops)
       if (droppedItem) {
-        const itemDefinition = ITEM_DEFINITIONS[droppedItem]
-        const aura = this.add.circle(enemy.sprite.x, enemy.sprite.y, 16, itemDefinition.color, 0.18)
-        aura.setStrokeStyle(2, itemDefinition.color, 0.78)
-        aura.setBlendMode(Phaser.BlendModes.ADD)
-        aura.setDepth(3)
-        const auraTween = this.tweens.add({
-          targets: aura,
-          scale: { from: 0.88, to: 1.18 },
-          alpha: { from: 0.48, to: 0.86 },
-          duration: 720,
-          ease: 'Sine.easeInOut',
-          yoyo: true,
-          repeat: -1,
-        })
-
-        const loot = this.physics.add.image(enemy.sprite.x, enemy.sprite.y, itemDefinition.textureKey)
-        loot.setCircle(10)
-        loot.setDepth(4)
-        loot.setScale(1.08)
-        this.lootDrops.push({
-          sprite: loot,
-          itemId: droppedItem,
-          aura,
-          auraTween,
-          isAttracting: false,
-        })
+        this.spawnLootDrop(enemy.sprite.x, enemy.sprite.y, droppedItem)
       }
     }
 
@@ -908,7 +1064,14 @@ export class ArenaScene extends Phaser.Scene {
 
   private damagePlayer(damage: number): void {
     const now = this.time.now
-    if (!shouldApplyPlayerDamage(now, this.lastPlayerHitAt, this.isInteractionBlocked())) {
+    if (
+      !shouldApplyPlayerDamage(
+        now,
+        this.lastPlayerHitAt,
+        this.isInteractionBlocked(),
+        isPlayerDashInvulnerable(now, this.playerDashState),
+      )
+    ) {
       return
     }
 
@@ -1072,7 +1235,9 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const enemy of this.enemies) {
-      enemy.sprite.setVelocity(0, 0)
+      if (enemy.sprite.active) {
+        enemy.sprite.setVelocity(0, 0)
+      }
     }
   }
 
@@ -1140,11 +1305,13 @@ export class ArenaScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setStrokeStyle(1, 0x9cb5ff, 0.36)
       .setDepth(depth)
+      .setScrollFactor(0)
 
     const fill = this.add
       .rectangle(x + 2, y, width - 4, height - 4, 0x43ef9a, 0.92)
       .setOrigin(0, 0.5)
       .setDepth(depth + 1)
+      .setScrollFactor(0)
 
     const label = this.add
       .text(GAME_WIDTH / 2, y - 1, '', {
@@ -1155,6 +1322,7 @@ export class ArenaScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(depth + 2)
+      .setScrollFactor(0)
       .setShadow(0, 1, '#020713', 2)
 
     return {
@@ -1217,6 +1385,9 @@ export class ArenaScene extends Phaser.Scene {
     this.playerHealth = initialState.playerHealth
     this.playerMaxHealth = initialState.playerMaxHealth
     this.playerSpeed = initialState.playerSpeed
+    this.playerDashState = createReadyPlayerDashState()
+    this.playerDashDirection.set(1, 0)
+    this.lastPlayerMoveDirection.set(1, 0)
     this.nextFireAt = initialState.nextFireAt
     this.remainingSpawns = initialState.remainingSpawns
     this.currentWaveIndex = initialState.currentWaveIndex
@@ -1233,6 +1404,10 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnTimer = undefined
     this.enemySpacingCollider?.destroy()
     this.enemySpacingCollider = undefined
+    this.playerObstacleCollider?.destroy()
+    this.playerObstacleCollider = undefined
+    this.enemyObstacleCollider?.destroy()
+    this.enemyObstacleCollider = undefined
     this.destroyPlayerHealthBar()
 
     if (this.player?.active) {
@@ -1269,10 +1444,22 @@ export class ArenaScene extends Phaser.Scene {
       this.enemySprites.clear(true, true)
     }
 
+    if (this.obstacleBodies) {
+      this.obstacleBodies.clear(true, true)
+      this.obstacleBodies = undefined
+    }
+
+    for (const visual of this.mapVisuals) {
+      if ('active' in visual && visual.active) {
+        visual.destroy()
+      }
+    }
+
     this.enemies = []
     this.lootDrops = []
     this.projectiles = []
     this.hazardZones = []
+    this.mapVisuals = []
   }
 
   private endRun(outcome: RunOutcome): void {
@@ -1320,7 +1507,7 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isBossActive
         ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
         : '웨이브를 돌파하며 드롭을 모아 새로운 무기를 완성하세요.',
-      tip: 'WASD 이동 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리에서 조합 또는 무기 교체 · Q 코덱스',
+      tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen,
@@ -1442,11 +1629,87 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
+  private applyMeleeSwing(swing: MeleeSwingSpec): void {
+    const affectedEnemyIds = new Set(
+      collectTargetsInCleave(
+        { x: this.player.x, y: this.player.y },
+        swing.direction,
+        swing.range,
+        swing.arcDegrees,
+        this.enemies
+          .filter((enemy) => enemy.sprite.active)
+          .map((enemy) => ({
+            id: enemy.runtimeId,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            radius: enemy.config.size / 2,
+          })),
+        swing.maxTargets,
+      ),
+    )
+
+    this.spawnMeleeSwingVisual(swing)
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active || !affectedEnemyIds.has(enemy.runtimeId)) {
+        continue
+      }
+
+      const didDamage = this.damageEnemy(enemy, swing.damage)
+      if (didDamage && enemy.sprite.active) {
+        this.applyMeleeSwingKnockback(enemy, swing)
+      }
+    }
+  }
+
+  private spawnMeleeSwingVisual(swing: MeleeSwingSpec): void {
+    const graphics = this.add.graphics({ x: this.player.x, y: this.player.y })
+    const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
+
+    graphics.fillStyle(swing.tint, 0.28)
+    graphics.lineStyle(3, swing.tint, 0.65)
+    graphics.beginPath()
+    graphics.moveTo(0, 0)
+    graphics.slice(0, 0, swing.range, -halfArcRadians, halfArcRadians, false)
+    graphics.closePath()
+    graphics.fillPath()
+    graphics.strokePath()
+    graphics.setRotation(Math.atan2(swing.direction.y, swing.direction.x))
+    graphics.setDepth(0.7)
+
+    this.tweens.add({
+      targets: graphics,
+      alpha: 0,
+      scaleX: 1.08,
+      scaleY: 1.08,
+      duration: swing.visualDurationMs,
+      onComplete: () => graphics.destroy(),
+    })
+  }
+
   private applyDirectProjectileKnockback(enemy: EnemyEntity, projectile: ProjectileEntity): void {
     const result = resolveKnockbackHit({
       source: 'direct-projectile',
       direction: projectile.direction,
       weapon: projectile.knockback,
+      enemy: enemy.config.knockback,
+      activeState: enemy.knockback,
+      targetIsTelegraphing: Boolean(enemy.telegraph),
+      hitTimeMs: this.time.now,
+    })
+
+    enemy.knockback = result.state
+  }
+
+  private applyMeleeSwingKnockback(enemy: EnemyEntity, swing: MeleeSwingSpec): void {
+    const result = resolveKnockbackHit({
+      source: 'melee-swing',
+      direction: {
+        x: enemy.sprite.x - this.player.x,
+        y: enemy.sprite.y - this.player.y,
+      },
+      fallbackDirection: swing.direction,
+      weapon: swing.knockback,
       enemy: enemy.config.knockback,
       activeState: enemy.knockback,
       targetIsTelegraphing: Boolean(enemy.telegraph),
