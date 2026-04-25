@@ -128,15 +128,22 @@ import {
 } from '../systems/playerDash.js'
 import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import {
+  PACHINKO_FEVER_CHARGE_MAX,
   PACHINKO_SLOT_COUNT,
+  applyPachinkoMomentumState,
   applyEnemyPachinkoTokenProgress,
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
+  createInitialPachinkoMomentumState,
   getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
+  getPachinkoFeverChargeRatio,
+  getPachinkoMomentumLabel,
   getPachinkoWeaponOddsRows,
   getPachinkoWeaponSynergySummary,
   getTokenXpForEnemy,
+  isPachinkoFeverActive,
+  type PachinkoMomentumState,
   type PachinkoTokenProgressResult,
   resolvePachinkoSlotIndex,
   resolvePachinkoSlotReward,
@@ -300,6 +307,15 @@ interface PachinkoTokenEntity {
   sprite: PhysicsImage
   collider?: Phaser.Physics.Arcade.Collider
   isResolving: boolean
+  resolutionSnapshot: {
+    totalTokenXp: number
+    tableSeed: number
+    playerLevel: number
+    activeWeaponId: WeaponStack['weaponId']
+    activeWeaponWeightMultiplier: number
+    nonActiveWeaponWeightMultiplier: number
+    momentumState: PachinkoMomentumState
+  }
 }
 
 interface PachinkoTokenPickupEntity {
@@ -540,6 +556,8 @@ export class ArenaScene extends Phaser.Scene {
   private pachinkoTokenXp = 0
 
   private pachinkoTokenQueue: number[] = []
+
+  private pachinkoMomentumState: PachinkoMomentumState = createInitialPachinkoMomentumState()
 
   private activePachinkoTokens: PachinkoTokenEntity[] = []
 
@@ -3110,6 +3128,7 @@ export class ArenaScene extends Phaser.Scene {
     this.nextMagnetPickupAt = 0
     this.magnetizedUntil = 0
     this.pachinkoTokenXp = initialState.pachinkoTokenXp
+    this.pachinkoMomentumState = createInitialPachinkoMomentumState()
     this.latestPachinkoReward = null
     this.pachinkoRewardTableSeed = 0
     this.pachinkoDisplayedOddsSeed = -1
@@ -3325,6 +3344,11 @@ export class ArenaScene extends Phaser.Scene {
         queuedTokens: this.pachinkoTokenQueue.length,
         isTokenInFlight: this.activePachinkoTokens.length > 0,
         latestReward: this.latestPachinkoReward,
+        feverChargePercent: getPachinkoFeverChargeRatio(this.pachinkoMomentumState) * 100,
+        feverLabel: getPachinkoMomentumLabel(this.pachinkoMomentumState),
+        pityCounter: this.pachinkoMomentumState.pityCounter,
+        feverTokensRemaining: this.pachinkoMomentumState.feverTokensRemaining,
+        isFeverActive: isPachinkoFeverActive(this.pachinkoMomentumState),
         synergy: getPachinkoWeaponSynergySummary(weaponId),
         enemyOdds: {
           stageLabel: this.getRunStageOddsLabel(currentPhase),
@@ -3552,6 +3576,15 @@ export class ArenaScene extends Phaser.Scene {
     const rect = this.syncPachinkoBoard()
     const spawnOffset = this.activePachinkoTokens.length % PACHINKO_SLOT_COUNT
     const spawnRatio = (spawnOffset + 0.5) / PACHINKO_SLOT_COUNT
+    const resolutionSnapshot = {
+      totalTokenXp: this.pachinkoTokenXp,
+      tableSeed: this.pachinkoRewardTableSeed,
+      playerLevel: this.playerProgression.level,
+      activeWeaponId: this.getActiveWeaponId(),
+      activeWeaponWeightMultiplier: this.getPachinkoActiveWeaponWeightMultiplier(),
+      nonActiveWeaponWeightMultiplier: this.getPachinkoNonActiveWeaponWeightMultiplier(),
+      momentumState: { ...this.pachinkoMomentumState },
+    }
     const sprite = this.physics.add.image(
       rect.x + rect.width * spawnRatio,
       rect.y + 12,
@@ -3568,6 +3601,7 @@ export class ArenaScene extends Phaser.Scene {
       runtimeId: this.nextPachinkoTokenRuntimeId,
       sprite,
       isResolving: false,
+      resolutionSnapshot,
     }
     this.nextPachinkoTokenRuntimeId += 1
     if (this.pachinkoPins) {
@@ -3586,15 +3620,17 @@ export class ArenaScene extends Phaser.Scene {
     const rect = this.syncPachinkoBoard()
     const laneRatio = Phaser.Math.Clamp((token.sprite.x - rect.x) / rect.width, 0, 0.999)
     const slotIndex = resolvePachinkoSlotIndex(laneRatio)
+    const snapshot = token.resolutionSnapshot
     const reward = resolvePachinkoSlotReward(
-      this.pachinkoTokenXp,
+      snapshot.totalTokenXp,
       laneRatio,
       PACHINKO_SLOT_COUNT,
-      this.pachinkoRewardTableSeed,
-      this.playerProgression.level,
-      this.getActiveWeaponId(),
-      this.getPachinkoActiveWeaponWeightMultiplier(),
-      this.getPachinkoNonActiveWeaponWeightMultiplier(),
+      snapshot.tableSeed,
+      snapshot.playerLevel,
+      snapshot.activeWeaponId,
+      snapshot.activeWeaponWeightMultiplier,
+      snapshot.nonActiveWeaponWeightMultiplier,
+      snapshot.momentumState,
     )
     const fusionResult = addWeaponStackWithAutoFusion(
       { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
@@ -3610,9 +3646,21 @@ export class ArenaScene extends Phaser.Scene {
       ? ` · 자동 합성: ${WEAPON_DEFINITIONS[lastFusion.weaponId].name} ${formatWeaponStarLabel(lastFusion.resultStar)}`
       : ''
     const modifierLabel = reward.modifier ? ` · ${reward.modifier.label} 보너스` : ''
-    this.latestPachinkoReward = `${rewardLabel}${modifierLabel}${fusionLabel}`
-    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}${modifierLabel}${fusionLabel}`
+    const momentumUpdate = applyPachinkoMomentumState(this.pachinkoMomentumState, reward)
+    this.pachinkoMomentumState = momentumUpdate.state
+    const burstLabel = momentumUpdate.feverTriggered
+      ? ' · FEVER 돌입!'
+      : momentumUpdate.outcome === 'fever-jackpot'
+        ? ' · FEVER JACKPOT!'
+        : momentumUpdate.outcome === 'jackpot'
+          ? ' · JACKPOT!'
+          : reward.isNearJackpot
+            ? ' · 리치 적립'
+            : ''
+    this.latestPachinkoReward = `${rewardLabel}${modifierLabel}${burstLabel}${fusionLabel}`
+    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}${modifierLabel}${burstLabel}${fusionLabel}`
     this.destroyActivePachinkoToken(token)
+    this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
   }
 
@@ -3666,6 +3714,9 @@ export class ArenaScene extends Phaser.Scene {
 
   private syncPachinkoBoard(): RectBounds {
     const rect = this.getPachinkoWorldRect()
+    const feverActive = isPachinkoFeverActive(this.pachinkoMomentumState)
+    const feverChargeRatio = getPachinkoFeverChargeRatio(this.pachinkoMomentumState)
+    const accentColor = feverActive ? 0xff7ac8 : 0x8fe4ff
     const previousRect = this.pachinkoBoardRect
     for (const token of this.activePachinkoTokens) {
       const inFlightSprite = token.sprite
@@ -3684,21 +3735,27 @@ export class ArenaScene extends Phaser.Scene {
     this.pachinkoBoardVisual
       ?.setPosition(rect.x + rect.width / 2, rect.y + rect.height / 2)
       .setDisplaySize(rect.width, rect.height)
+      .setStrokeStyle(2, accentColor, 0.85)
 
     this.pachinkoDividerVisual
       ?.setPosition(rect.x - 12, rect.y + rect.height / 2)
       .setDisplaySize(6, rect.height + 26)
 
     this.pachinkoTitleVisual?.setPosition(rect.x + 12, rect.y + 10)
+      .setText(feverActive ? 'TOKEN\nFEVER' : 'TOKEN\nPACHINKO')
+      .setColor(feverActive ? '#ffd3f2' : '#dbeafe')
     this.pachinkoTopTrimVisual
       ?.setPosition(rect.x + rect.width / 2, rect.y + 36)
       .setDisplaySize(rect.width - 18, 5)
+      .setFillStyle(accentColor, feverActive ? 0.95 : 0.45 + feverChargeRatio * 0.4)
     this.pachinkoBottomGlowVisual
       ?.setPosition(rect.x + rect.width / 2, rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT - 4)
       .setDisplaySize(rect.width - 16, 4)
+      .setFillStyle(accentColor, feverActive ? 0.9 : 0.35 + feverChargeRatio * 0.35)
     this.pachinkoLevelBadge
       ?.setPosition(rect.x + rect.width - 12, rect.y + 14)
-      .setText(`Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)} · LIVE`)
+      .setText(feverActive ? `FEVER · ${this.pachinkoMomentumState.feverTokensRemaining}` : `Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)} · ${Math.round(feverChargeRatio * PACHINKO_FEVER_CHARGE_MAX)}%`)
+      .setColor(feverActive ? '#ffd3f2' : '#dbeafe')
     const queueBadgeX = this.getPachinkoQueueBadgeX(rect)
     this.pachinkoQueueBadge
       ?.setPosition(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET)
@@ -3714,6 +3771,7 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
       light.visual.setPosition(rect.x + rect.width * light.xRatio, rect.y + rect.height * light.yRatio)
+      light.visual.setFillStyle(accentColor, feverActive ? 0.95 : 0.18 + feverChargeRatio * 0.45)
     }
 
     for (const pin of this.pachinkoPinEntities) {
@@ -3839,6 +3897,7 @@ export class ArenaScene extends Phaser.Scene {
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
       this.getPachinkoNonActiveWeaponWeightMultiplier(),
+      this.pachinkoMomentumState,
     )
 
     for (let index = 0; index < rows.length; index += 1) {
@@ -3869,6 +3928,7 @@ export class ArenaScene extends Phaser.Scene {
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
       this.getPachinkoNonActiveWeaponWeightMultiplier(),
+      this.pachinkoMomentumState,
     )
 
     for (let index = 0; index < this.pachinkoOddsVisuals.length; index += 1) {
@@ -3893,6 +3953,7 @@ export class ArenaScene extends Phaser.Scene {
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
       this.getPachinkoNonActiveWeaponWeightMultiplier(),
+      this.pachinkoMomentumState,
     )) {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
@@ -3941,6 +4002,7 @@ export class ArenaScene extends Phaser.Scene {
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
       this.getPachinkoNonActiveWeaponWeightMultiplier(),
+      this.pachinkoMomentumState,
     )
     for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
       const visual = this.pachinkoSlotVisuals[index]

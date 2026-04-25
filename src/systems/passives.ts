@@ -237,12 +237,8 @@ const PASSIVE_CARD_TEMPLATES = [
   {
     id: 'split-focus',
     name: '분산 집중',
-<<<<<<< HEAD
-    description: '분사형 무기가 탄을 더 흩뿌립니다.',
-    kind: 'weapon-specialized',
-=======
     description: '분사형·연발형 무기가 투사체를 더 뿌립니다.',
->>>>>>> origin/ai-dev
+    kind: 'weapon-specialized',
     preferredFamilies: ['spray', 'zone'],
     weight: { base: 0.82, levelScale: 0.03, repeatPenalty: 0.55, familyBonus: 0.72 },
     roll(level, random) {
