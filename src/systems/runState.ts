@@ -1,12 +1,15 @@
-import type { InventoryState, WeaponId } from '../domain/types.js'
+import type { InventoryState, WeaponId, WeaponStack, WeaponStackKey } from '../domain/types.js'
 import type { WeaponTuningState } from './tuning.js'
-import { seedOwnedWeapons, STARTER_WEAPON_ID } from './weaponOwnership.js'
+import { seedOwnedWeapons, seedWeaponStacks, STARTER_WEAPON_ID, STARTER_WEAPON_STACK_KEY } from './weaponOwnership.js'
 
 export interface ArenaRunState {
   ownedWeaponIds: WeaponId[]
   activeWeaponId: WeaponId
+  weaponStacks: WeaponStack[]
+  activeWeaponKey: WeaponStackKey
   inventory: InventoryState
   tuningState: WeaponTuningState
+  pachinkoTokenXp: number
   isInventoryOpen: boolean
   isCodexOpen: boolean
   isRunEnding: boolean
@@ -28,8 +31,11 @@ export function createInitialArenaRunState(): ArenaRunState {
   return {
     ownedWeaponIds: seedOwnedWeapons(),
     activeWeaponId: STARTER_WEAPON_ID,
+    weaponStacks: seedWeaponStacks(),
+    activeWeaponKey: STARTER_WEAPON_STACK_KEY,
     inventory: {},
     tuningState: {},
+    pachinkoTokenXp: 0,
     isInventoryOpen: false,
     isCodexOpen: false,
     isRunEnding: false,
@@ -42,7 +48,7 @@ export function createInitialArenaRunState(): ArenaRunState {
     activeWaveLabel: '',
     wavesCleared: 0,
     isBossActive: false,
-    statusMessage: 'WASD로 이동하고 회피하는 동안 무기가 자동으로 발사됩니다.',
+    statusMessage: 'WASD로 이동하고 회피하며 토큰을 파친코 보상으로 바꾸세요.',
     lastPlayerHitAt: 0,
     nextEnemyRuntimeId: 1,
   }

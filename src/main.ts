@@ -15,7 +15,7 @@ app.innerHTML = `
     <header class="game-header">
       <div class="game-header__brand">
         <strong>NeoD · 브라우저 우선 V1 프로토타입</strong>
-        <span>안전한 가상 슬라임 런 · 드롭 + 조합 루프</span>
+        <span>안전한 가상 슬라임 런 · 토큰 파친코 + 별 합성 루프</span>
       </div>
       <div class="game-header__rails" aria-hidden="true">
         <span></span>
@@ -49,13 +49,20 @@ hud.update({
   title: 'NeoD 프로토타입',
   subtitle: '아레나 불러오는 중…',
   stats: ['게임 런타임 시작 중'],
-  inventory: ['드롭 대기 중'],
-  recipes: ['조합 상태 대기 중'],
+  inventory: ['파친코 보상 레벨 준비 중'],
+  recipes: ['같은 별 무기 합성 대기 중'],
   objective: '런을 시작하고 슬라임 보스를 쓰러뜨리세요.',
-  tip: 'WASD 이동 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리에서 조합 · Q 코덱스',
+  tip: 'WASD 이동 · 자동 사격 · 토큰은 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스',
   status: '시작 중',
   inventoryButtonLabel: '인벤토리 열기',
   inventoryButtonDisabled: false,
+  pachinko: {
+    level: 1,
+    totalTokenXp: 0,
+    queuedTokens: 0,
+    isTokenInFlight: false,
+    latestReward: null,
+  },
   modal: {
     isOpen: false,
     items: [],

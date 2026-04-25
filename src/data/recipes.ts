@@ -3,7 +3,7 @@ import type { RecipeDefinition } from '../domain/types.js'
 export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   {
     id: 'acid-sprayer-recipe',
-    name: '산성 분사기',
+    name: '매운맛 분무기',
     inputs: ['gel-shard', 'acid-core'],
     outputWeaponId: 'acid-sprayer',
     identityLabel: '부식 압박',
@@ -12,7 +12,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'frost-lance-recipe',
-    name: '서리 랜스',
+    name: '얼음참교육 랜스',
     inputs: ['gel-shard', 'frost-mote'],
     outputWeaponId: 'frost-lance',
     identityLabel: '정밀 관통',
@@ -21,7 +21,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'storm-cannon-recipe',
-    name: '폭풍 캐넌',
+    name: '억까 폭풍포',
     inputs: ['acid-core', 'frost-mote'],
     outputWeaponId: 'storm-cannon',
     identityLabel: '혼합 중화력',
@@ -30,7 +30,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'arc-loom-recipe',
-    name: '아크 룸',
+    name: '감전 밈직기',
     inputs: ['spark-knot', 'mist-bead'],
     outputWeaponId: 'arc-loom',
     identityLabel: '연쇄 제압',
@@ -39,7 +39,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'spark-carbine-recipe',
-    name: '스파크 카빈',
+    name: '번쩍댓글 카빈',
     inputs: ['gel-shard', 'spark-knot'],
     outputWeaponId: 'spark-carbine',
     identityLabel: '고속 전격',
@@ -48,7 +48,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'mist-vortex-recipe',
-    name: '안개 소용돌이',
+    name: '시야차단 안개팡',
     inputs: ['frost-mote', 'mist-bead'],
     outputWeaponId: 'mist-vortex',
     identityLabel: '안개 제어',
@@ -57,7 +57,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'slime-glaive-recipe',
-    name: '슬라임 글레이브',
+    name: '말랑휘두르개',
     inputs: ['acid-core', 'spark-knot'],
     outputWeaponId: 'slime-glaive',
     identityLabel: '광역 참격',
@@ -66,7 +66,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'prism-cutter-recipe',
-    name: '프리즘 커터',
+    name: '무지개 컷편집기',
     inputs: ['acid-core', 'mist-bead'],
     outputWeaponId: 'prism-cutter',
     identityLabel: '집중 절단',
