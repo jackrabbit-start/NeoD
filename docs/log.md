@@ -60,3 +60,8 @@
 
 - Updated `docs/wiki/enemy-boss-pressure.md` with the low-clear-rate near-miss follow-up: burst/group spawns, harder dash/AOE reach, and explicit readability non-goals.
 - Source artifacts: `.omx/specs/deep-interview-difficulty-near-miss-pressure.md`, `.omx/interviews/difficulty-near-miss-pressure-20260425T114801Z.md`, and `.omx/context/post-interview-difficulty-near-miss-pressure-20260425T115729Z.md`.
+
+## [2026-04-25] gameplay | Captured boss dash dodge follow-up
+
+- Updated `docs/wiki/enemy-boss-pressure.md` with the Space dash + short i-frame rule for avoiding boss telegraphed AOE without reducing wave or boss pressure.
+- Source artifacts: `.omx/specs/deep-interview-boss-dash-dodge.md`, `.omx/interviews/boss-dash-dodge-20260425T121731Z.md`, and `.omx/context/post-interview-boss-dash-dodge-20260425T122704Z.md`.
