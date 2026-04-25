@@ -3,8 +3,8 @@ import type { EnemyDefinition } from '../domain/types.js'
 export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> = {
   slime: {
     id: 'slime',
-    name: '소액 빚 독촉장',
-    description: '김동성이 제일 먼저 마주치는 작은 독촉장입니다. 약해 보여도 계속 쌓이면 도망칠 이유가 됩니다.',
+    name: '출석 체크 알림',
+    description: '공대생 김동성이 제일 먼저 마주치는 1교시 출석 체크입니다. 약해 보여도 지각 몇 번이면 런이 흔들립니다.',
     maxHealth: 30,
     speed: 84,
     contactDamage: 18,
@@ -23,7 +23,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     attackBehavior: {
       kind: 'contact',
     },
-    behaviorSummary: '직선으로 따라붙어 작은 독촉처럼 계속 압박합니다.',
+    behaviorSummary: '직선으로 따라붙어 출석 알림처럼 계속 압박합니다.',
     visual: {
       portraitKey: 'slime',
     },
@@ -35,8 +35,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'spark-slime': {
     id: 'spark-slime',
-    name: '번쩍이는 잭팟 환청',
-    description: '파친코 전광판처럼 번쩍이며 아직 한 번만 더 하면 된다고 속삭이는 환청입니다.',
+    name: '밤샘 커피 캔',
+    description: '실험실 책상 위에서 번쩍이는 밤샘 커피 캔입니다. 한 캔만 더 마시면 된다고 속삭이며 심박을 올립니다.',
     maxHealth: 40,
     speed: 92,
     contactDamage: 20,
@@ -78,8 +78,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'prism-slime': {
     id: 'prism-slime',
-    name: '대박 직전 착각',
-    description: '거의 땄다는 착각이 덩어리처럼 굳은 적입니다. 잡으면 보상은 크지만 가까이 두면 판단이 흐려집니다.',
+    name: 'A+ 착각 노트',
+    description: '이번 시험은 왠지 A+일 것 같다는 착각이 굳은 노트입니다. 잡으면 보상은 크지만 가까이 두면 판단이 흐려집니다.',
     maxHealth: 110,
     speed: 82,
     contactDamage: 28,
@@ -98,7 +98,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     attackBehavior: {
       kind: 'contact',
     },
-    behaviorSummary: '빠르게 추적하며 큰 토큰 보상 경험치를 주는 착각 덩어리입니다.',
+    behaviorSummary: '빠르게 추적하며 큰 토큰 보상 경험치를 주는 시험 착각 덩어리입니다.',
     visual: {
       portraitKey: 'spark-slime',
     },
@@ -106,8 +106,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'dash-slime': {
     id: 'dash-slime',
-    name: '급전 문자',
-    description: '잊을 만하면 날아와 도주 경로를 끊는 급전 문자입니다. 짧고 빠르게 꽂혀 멘탈을 흔듭니다.',
+    name: '팀플 카톡 폭탄',
+    description: '잊을 만하면 날아와 도주 경로를 끊는 팀플 카톡 폭탄입니다. 짧고 빠르게 꽂혀 멘탈을 흔듭니다.',
     maxHealth: 46,
     speed: 76,
     contactDamage: 22,
@@ -142,8 +142,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'orbit-slime': {
     id: 'orbit-slime',
-    name: '미련 순찰대',
-    description: '김동성 주변을 빙빙 돌며 다시 파친코 쪽으로 고개를 돌리게 만드는 미련입니다.',
+    name: '복도 순찰 조교',
+    description: '실습실 복도를 빙빙 돌며 김동성이 딴짓하지 못하게 만드는 조교입니다. 주변을 맴돌며 직선 이동을 흔듭니다.',
     maxHealth: 38,
     speed: 82,
     contactDamage: 19,
@@ -177,8 +177,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'needle-wasp': {
     id: 'needle-wasp',
-    name: '악플 바늘벌레',
-    description: '커뮤 댓글창에서 날아온 바늘 같은 악플입니다. 거리를 두고 여러 줄로 찔러 도망치는 발을 무겁게 만듭니다.',
+    name: '코드리뷰 빨간줄',
+    description: 'PR에 달린 코드리뷰 빨간줄입니다. 거리를 두고 여러 줄로 찔러 도망치는 발을 무겁게 만듭니다.',
     maxHealth: 42,
     speed: 58,
     contactDamage: 12,
@@ -224,8 +224,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'splitter-slime': {
     id: 'splitter-slime',
-    name: '잃은 토큰 떼',
-    description: '잃어버린 토큰들이 한꺼번에 굴러와 사방으로 튀는 떼입니다. 지나간 선택들이 다시 튀어나옵니다.',
+    name: '프린터 대기열',
+    description: '과제 마감 직전 한꺼번에 밀려드는 프린터 대기열입니다. 지나간 출력 실패들이 다시 튀어나옵니다.',
     maxHealth: 58,
     speed: 78,
     contactDamage: 21,
@@ -254,7 +254,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
       tint: 0x9dffb0,
       projectileTextureKey: 'starter-projectile',
     },
-    behaviorSummary: '접근 후 전방위로 잃은 토큰 파편을 뿌립니다.',
+    behaviorSummary: '접근 후 전방위로 출력 실패 파편을 뿌립니다.',
     visual: {
       portraitKey: 'splitter-slime',
     },
@@ -266,8 +266,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'shard-sentinel': {
     id: 'shard-sentinel',
-    name: 'CCTV 감시자',
-    description: '파친코장 입구와 골목 끝에서 김동성의 동선을 훑는 감시자입니다. 긴 시선으로 도주 축을 잘라냅니다.',
+    name: '빔프로젝터 포인터',
+    description: '강의실 앞에서 움직임을 훑는 빔프로젝터 포인터입니다. 긴 직선 시선으로 도주 축을 잘라냅니다.',
     maxHealth: 92,
     speed: 50,
     contactDamage: 18,
@@ -308,8 +308,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'mender-slime': {
     id: 'mender-slime',
-    name: '미련 펌프',
-    description: '다 끊었다고 생각한 순간 다시 심장을 두근거리게 만드는 미련입니다. 주변에 후회 장판을 남깁니다.',
+    name: '실습실 멀티탭',
+    description: '실습실 바닥에 놓인 멀티탭입니다. 밟으면 주변에 전기 같은 압박이 퍼지고 동선이 꼬입니다.',
     maxHealth: 34,
     speed: 68,
     contactDamage: 14,
@@ -350,8 +350,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'void-orb': {
     id: 'void-orb',
-    name: '빈 지갑 공허',
-    description: '지갑을 열었을 때 남는 아무것도 없음이 둥글게 떠다닙니다. 얇지만 아픈 현실선을 긋습니다.',
+    name: '와이파이 끊김',
+    description: '온라인 강의 중 갑자기 뜨는 와이파이 끊김입니다. 얇지만 아픈 현실선을 그어 집중을 쪼갭니다.',
     maxHealth: 72,
     speed: 62,
     contactDamage: 16,
@@ -392,8 +392,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'crusher-slime': {
     id: 'crusher-slime',
-    name: '원금 회수꾼',
-    description: '느리지만 끝까지 따라오는 원금 회수꾼입니다. 가까워지면 김동성의 합리화를 한 번에 부숩니다.',
+    name: '노트북 발열괴물',
+    description: '컴파일 한 번 돌릴 때마다 뜨거워지는 노트북 발열괴물입니다. 가까워지면 집중력과 손목을 같이 부숩니다.',
     maxHealth: 150,
     speed: 54,
     contactDamage: 30,
@@ -436,8 +436,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
 
   'lantern-moth': {
     id: 'lantern-moth',
-    name: '네온 삐끼나방',
-    description: '파친코장 네온에 꼬인 삐끼 같은 비행 적입니다. 번쩍이는 말로 유혹하고 바늘 같은 대가를 뿌립니다.',
+    name: '편의점 형광등 벌레',
+    description: '밤샘 코딩 후 들른 편의점 형광등 주변을 도는 벌레입니다. 번쩍이는 빛 아래에서 자잘한 침 같은 피로를 뿌립니다.',
     maxHealth: 64,
     speed: 96,
     contactDamage: 16,
@@ -483,8 +483,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'mirror-wisp': {
     id: 'mirror-wisp',
-    name: '자기합리화 유령',
-    description: '이번엔 다르다고 말하던 김동성의 자기합리화가 유령처럼 떠돕니다. 얇은 말로 안전지대를 쪼갭니다.',
+    name: '세그폴트 유령',
+    description: '분명 방금 고쳤는데 다시 뜨는 세그폴트 유령입니다. 얇은 에러선으로 안전지대를 쪼갭니다.',
     maxHealth: 52,
     speed: 88,
     contactDamage: 15,
@@ -522,8 +522,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'siege-toad': {
     id: 'siege-toad',
-    name: '빚더미 두꺼비',
-    description: '불어난 빚이 두꺼비처럼 배를 부풀린 모습입니다. 느리지만 한번 들이받으면 생활 반경이 무너집니다.',
+    name: '캡스톤 마감덩어리',
+    description: '학기 말 캡스톤 마감이 덩어리째 굴러온 모습입니다. 느리지만 한번 들이받으면 생활 반경이 무너집니다.',
     maxHealth: 184,
     speed: 48,
     contactDamage: 32,
@@ -568,8 +568,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'slime-boss': {
     id: 'slime-boss',
-    name: '잭팟 망령',
-    description: '김동성이 끝까지 떨쳐내야 하는 잭팟의 망령입니다. 쓰러뜨리면 비로소 오늘의 런이 끝납니다.',
+    name: '최종 발표 교수님',
+    description: '김동성이 끝까지 통과해야 하는 최종 발표 교수님입니다. 쓰러뜨리면 비로소 오늘의 런이 끝납니다.',
     maxHealth: 720,
     speed: 64,
     contactDamage: 34,
@@ -596,7 +596,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
       targetJitterRadius: 120,
       tint: 0xd3a0ff,
     },
-    behaviorSummary: '강화된 체력으로 압박하며 플레이어 위치에 빠른 잭팟 충격을 예고합니다.',
+    behaviorSummary: '강화된 체력으로 압박하며 플레이어 위치에 빠른 발표 질문을 예고합니다.',
     visual: {
       portraitKey: 'slime-boss',
     },

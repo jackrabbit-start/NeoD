@@ -1213,7 +1213,7 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
   assert.deepEqual(firstRows, [
     {
       enemyId: 'slime',
-      enemyName: '소액 빚 독촉장',
+      enemyName: '출석 체크 알림',
       count: 9,
       ratio: 1,
       percentLabel: '100%',
@@ -1456,11 +1456,11 @@ test('third wave still includes the existing spark slime sample enemy', () => {
 })
 
 
-test('enemy names match Kim Dong-sung escape story beats', () => {
-  assert.equal(ENEMY_DEFINITIONS.slime.name, '소액 빚 독촉장')
-  assert.equal(ENEMY_DEFINITIONS['slime-boss'].name, '잭팟 망령')
-  assert.match(ENEMY_DEFINITIONS['needle-wasp'].description, /커뮤 댓글창/)
-  assert.match(ENEMY_DEFINITIONS['siege-toad'].description, /불어난 빚/)
+test('enemy names match college engineering life story beats', () => {
+  assert.equal(ENEMY_DEFINITIONS.slime.name, '출석 체크 알림')
+  assert.equal(ENEMY_DEFINITIONS['slime-boss'].name, '최종 발표 교수님')
+  assert.match(ENEMY_DEFINITIONS['needle-wasp'].description, /코드리뷰/)
+  assert.match(ENEMY_DEFINITIONS['siege-toad'].description, /캡스톤 마감/)
   assert.ok(Object.values(ENEMY_DEFINITIONS).every((enemy) => !enemy.name.includes('슬라임')))
 })
 
@@ -1636,7 +1636,7 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   const hudState = createRunResultHudState(payload)
 
   assert.equal(presentation.title, '런 클리어')
-  assert.match(presentation.subtitle, /잭팟 망령/)
+  assert.match(presentation.subtitle, /최종 발표 교수님/)
   assert.match(presentation.restartPrompt, /버튼/)
   assert.deepEqual(presentation.statLines, [
     '결과: 클리어',
@@ -1841,7 +1841,7 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
 
   const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
   assert.ok(needleWasp)
-  assert.ok(needleWasp?.description.includes('악플'))
+  assert.ok(needleWasp?.description.includes('코드리뷰'))
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('부채꼴')))
   assert.deepEqual(needleWasp?.drops, [])
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('보상 경험치 +120')))
