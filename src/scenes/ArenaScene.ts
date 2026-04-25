@@ -2749,6 +2749,7 @@ export class ArenaScene extends Phaser.Scene {
     const enemyChanceLines = getRunEnemySpawnChanceRows(currentPhase).map(
       (row) => `${row.enemyName} ${row.percentLabel}`,
     )
+    const enemyChanceSummary = enemyChanceLines.join(' · ')
     const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
 
     this.hud.update({
@@ -2759,6 +2760,7 @@ export class ArenaScene extends Phaser.Scene {
         `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel} · 공격력 ×${playerStats.damageMultiplier.toFixed(2)}`,
         `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
         `현재 시간: ${formatRunTime(this.runElapsedMs)}`,
+        `적 출현 확률: ${enemyChanceSummary}`,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,

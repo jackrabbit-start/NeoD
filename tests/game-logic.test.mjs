@@ -1164,6 +1164,13 @@ test('hud places enemy spawn odds beside the game title for visibility', () => {
   assert.ok(styleSource.includes('.hud-summary__enemy-odds'))
 })
 
+test('arena hud injects enemy spawn odds into the visible stats list', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+
+  assert.ok(arenaSceneSource.includes('const enemyChanceSummary = enemyChanceLines.join'))
+  assert.ok(arenaSceneSource.includes('`적 출현 확률: ${enemyChanceSummary}`'))
+})
+
 test('nearest auto-attack target returns null when no active enemies are available', () => {
   assert.equal(resolveNearestAutoAttackTarget({ x: 10, y: 10 }, []), null)
   assert.equal(
