@@ -93,6 +93,7 @@ export function createRunResultHudState(payload: RunResultPayload): HudState {
       items: [],
       recipes: [],
       weapons: [],
+      characterStats: [],
     },
   }
 }

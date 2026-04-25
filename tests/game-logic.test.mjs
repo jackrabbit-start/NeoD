@@ -1710,6 +1710,7 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
         this.#regions.set('button[data-action="inventory-close"]', new FakeElement('button'))
         this.#regions.set('[data-region="equipped-weapons"]', new FakeElement('div'))
         this.#regions.set('[data-region="weapons"]', new FakeElement('div'))
+        this.#regions.set('[data-region="character-stats"]', new FakeElement('div'))
       }
       if (value.includes('data-region="stages"')) {
         this.#regions.set('button[data-action="stage-close"]', new FakeElement('button'))
@@ -1768,6 +1769,7 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
         items: [],
         recipes: [],
         weapons: [],
+        characterStats: [],
       },
     }
 

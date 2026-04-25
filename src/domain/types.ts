@@ -324,6 +324,11 @@ export interface HudOwnedWeaponView {
   accentColor?: number
 }
 
+export interface HudCharacterStatView {
+  label: string
+  value: string
+}
+
 export interface HudPassiveChoiceView {
   id: string
   name: string
@@ -336,6 +341,7 @@ export interface HudModalState {
   items: HudOwnedItemView[]
   recipes: HudRecipeView[]
   weapons: HudOwnedWeaponView[]
+  characterStats: HudCharacterStatView[]
 }
 
 export interface HudPassiveSelectionState {

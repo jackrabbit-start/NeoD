@@ -1,4 +1,5 @@
 import type {
+  HudCharacterStatView,
   HudModalState,
   HudOwnedWeaponView,
   HudStageSelectionState,
@@ -82,6 +83,8 @@ export class HudController {
 
   private readonly weaponList: HTMLDivElement
 
+  private readonly characterStatsList: HTMLDivElement
+
   private modalSignature = ''
 
   private summaryMarkup = ''
@@ -133,6 +136,11 @@ export class HudController {
             <p class="hud-modal__hint">장착할 무기만 고르세요. 스펙은 항목에 마우스를 올리면 보입니다.</p>
             <div class="hud-modal__list" data-region="weapons"></div>
           </section>
+          <section class="hud-modal__section hud-modal__section--character">
+            <h3>현재 캐릭터 스탯</h3>
+            <p class="hud-modal__hint">현재 레벨과 장착 무기 기준 실시간 수치입니다.</p>
+            <div class="hud-modal__stats" data-region="character-stats"></div>
+          </section>
         </div>
       </section>
     `
@@ -171,6 +179,7 @@ export class HudController {
     const resumeButton = this.modalLayer.querySelector<HTMLButtonElement>('button[data-action="inventory-close"]')
     const equippedWeaponList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="equipped-weapons"]')
     const weaponList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="weapons"]')
+    const characterStatsList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="character-stats"]')
     const stageResumeButton = this.stageModalLayer.querySelector<HTMLButtonElement>('button[data-action="stage-close"]')
     const stageList = this.stageModalLayer.querySelector<HTMLDivElement>('[data-region="stages"]')
     const passiveList =
@@ -183,7 +192,14 @@ export class HudController {
         return fallback
       })()
 
-    if (!resumeButton || !equippedWeaponList || !weaponList || !stageResumeButton || !stageList) {
+    if (
+      !resumeButton ||
+      !equippedWeaponList ||
+      !weaponList ||
+      !characterStatsList ||
+      !stageResumeButton ||
+      !stageList
+    ) {
       throw new Error('안정적인 HUD 모달 경계를 초기화하지 못했습니다.')
     }
 
@@ -193,6 +209,7 @@ export class HudController {
     this.passiveList = passiveList
     this.equippedWeaponList = equippedWeaponList
     this.weaponList = weaponList
+    this.characterStatsList = characterStatsList
 
     this.element.replaceChildren(this.summaryElement, this.modalLayer, this.stageModalLayer, this.passiveModalLayer)
     this.element.addEventListener('click', this.handleClick)
@@ -341,10 +358,15 @@ export class HudController {
       this.modalSignature = 'closed'
       this.equippedWeaponList.replaceChildren()
       this.weaponList.replaceChildren()
+      this.characterStatsList.replaceChildren()
       return
     }
 
-    const nextSignature = JSON.stringify({ isOpen: modal.isOpen, weapons: modal.weapons })
+    const nextSignature = JSON.stringify({
+      isOpen: modal.isOpen,
+      weapons: modal.weapons,
+      characterStats: modal.characterStats,
+    })
     if (nextSignature !== this.modalSignature) {
       this.modalSignature = nextSignature
       this.renderModalCollections(modal)
@@ -386,6 +408,29 @@ export class HudController {
   private renderModalCollections(modal: HudModalState): void {
     this.equippedWeaponList.replaceChildren(...this.createEquippedWeaponRows(modal.weapons))
     this.weaponList.replaceChildren(...this.createOwnedWeaponRows(modal.weapons))
+    this.characterStatsList.replaceChildren(...this.createCharacterStatRows(modal.characterStats))
+  }
+
+  private createCharacterStatRows(characterStats: HudCharacterStatView[]): HTMLElement[] {
+    if (characterStats.length === 0) {
+      return [this.createEmptyText('표시할 캐릭터 스탯이 없습니다.')]
+    }
+
+    return characterStats.map((stat) => {
+      const row = document.createElement('div')
+      row.className = 'hud-modal__stat-row'
+
+      const label = document.createElement('span')
+      label.className = 'hud-modal__stat-label'
+      label.textContent = stat.label
+
+      const value = document.createElement('strong')
+      value.className = 'hud-modal__stat-value'
+      value.textContent = stat.value
+
+      row.append(label, value)
+      return row
+    })
   }
 
   private createEquippedWeaponRows(weapons: HudOwnedWeaponView[]): HTMLElement[] {

@@ -90,6 +90,7 @@ hud.update({
     items: [],
     recipes: [],
     weapons: [],
+    characterStats: [],
   },
 })
 
