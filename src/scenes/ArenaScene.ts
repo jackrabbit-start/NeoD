@@ -271,7 +271,7 @@ export class ArenaScene extends Phaser.Scene {
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
-      throw new Error('NeoD 프로토타입에는 키보드 입력이 필요합니다.')
+      throw new Error('NeoD에는 키보드 입력이 필요합니다.')
     }
 
     this.cursors = keyboard.addKeys({
@@ -1307,8 +1307,8 @@ export class ArenaScene extends Phaser.Scene {
     const tuningText = weapon.tuningLabel ? ` · ${weapon.tuningLabel}` : ''
 
     this.hud.update({
-      title: 'NeoD 프로토타입',
-      subtitle: this.activeWaveLabel || '아레나 준비 중',
+      title: 'NeoD',
+      subtitle: this.activeWaveLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `무기: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
@@ -1318,8 +1318,8 @@ export class ArenaScene extends Phaser.Scene {
       inventory: describeInventoryEntries(this.inventory),
       recipes: describeAvailableRecipes(actionableRecipes),
       objective: this.isBossActive
-        ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
-        : '웨이브를 버티고 드롭을 모아 인벤토리에서 업그레이드를 조합하세요.',
+        ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
+        : '웨이브를 돌파하며 드롭을 모아 새로운 무기를 완성하세요.',
       tip: 'WASD 이동 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리에서 조합 또는 무기 교체 · Q 코덱스',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
