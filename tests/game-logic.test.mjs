@@ -517,7 +517,7 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
   })
 })
 
-test('player progression starts per run and levels from enemy defeat xp', () => {
+test('player progression starts per run and levels from token pickup xp', () => {
   assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 500, 1200, 2200, 3600])
   assert.deepEqual(ENEMY_PLAYER_XP, {
     slime: 100,
@@ -552,23 +552,23 @@ test('player progression starts per run and levels from enemy defeat xp', () => 
   assert.equal(getPlayerLevelForXp(5500), 6)
   assert.equal(getPlayerLevelForXp(99900), 17)
 
-  const firstDefeat = applyEnemyPlayerXp(initial, 'prism-slime')
-  assert.deepEqual(firstDefeat.state, { totalXp: 500, level: 2 })
-  assert.equal(firstDefeat.grantedXp, 500)
-  assert.equal(firstDefeat.didLevelUp, true)
-  assert.equal(firstDefeat.view.xpIntoLevel, 0)
-  assert.equal(firstDefeat.view.xpToNextLevel, 700)
+  const firstTokenPickup = applyEnemyPlayerXp(initial, 'prism-slime')
+  assert.deepEqual(firstTokenPickup.state, { totalXp: 500, level: 2 })
+  assert.equal(firstTokenPickup.grantedXp, 500)
+  assert.equal(firstTokenPickup.didLevelUp, true)
+  assert.equal(firstTokenPickup.view.xpIntoLevel, 0)
+  assert.equal(firstTokenPickup.view.xpToNextLevel, 700)
 
-  const nextDefeat = applyEnemyPlayerXp(firstDefeat.state, 'needle-wasp')
-  assert.deepEqual(nextDefeat.state, { totalXp: 800, level: 2 })
-  assert.equal(nextDefeat.didLevelUp, false)
-  assert.equal(nextDefeat.view.xpIntoLevel, 300)
-  assert.equal(nextDefeat.view.progressRatio, 300 / 700)
+  const nextTokenPickup = applyEnemyPlayerXp(firstTokenPickup.state, 'needle-wasp')
+  assert.deepEqual(nextTokenPickup.state, { totalXp: 800, level: 2 })
+  assert.equal(nextTokenPickup.didLevelUp, false)
+  assert.equal(nextTokenPickup.view.xpIntoLevel, 300)
+  assert.equal(nextTokenPickup.view.progressRatio, 300 / 700)
 
-  const bossDefeat = applyEnemyPlayerXp(nextDefeat.state, 'slime-boss')
-  assert.deepEqual(bossDefeat.state, nextDefeat.state)
-  assert.equal(bossDefeat.grantedXp, 0)
-  assert.equal(bossDefeat.didLevelUp, false)
+  const bossTokenPickup = applyEnemyPlayerXp(nextTokenPickup.state, 'slime-boss')
+  assert.deepEqual(bossTokenPickup.state, nextTokenPickup.state)
+  assert.equal(bossTokenPickup.grantedXp, 0)
+  assert.equal(bossTokenPickup.didLevelUp, false)
 })
 
 test('player progression view clamps invalid xp and continues past seeded levels', () => {
@@ -1609,16 +1609,21 @@ test('arena frame stops immediately after any run-ending combat step', () => {
   )
 })
 
-test('arena enemy defeat applies player xp before outcome handling', () => {
+test('arena token pickup applies player xp before pachinko token enqueue', () => {
   const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
 
   assert.ok(
+    arenaSceneSource.includes('const playerXpResult = this.grantPlayerXpForEnemy(pickup.enemyId)'),
+    'collectPachinkoTokenPickup should grant run-local player XP only when the dropped token is collected',
+  )
+  assert.equal(
     arenaSceneSource.includes('const playerXpResult = this.grantPlayerXpForEnemy(enemy.config.id)'),
-    'damageEnemy should grant run-local player XP at the enemy defeat chokepoint',
+    false,
+    'damageEnemy must not level the player before the token is collected',
   )
   assert.ok(
     arenaSceneSource.includes('this.playerProgression = result.state'),
-    'grantPlayerXpForEnemy should update the scene progression state immediately',
+    'grantPlayerXpForEnemy should update the scene progression state on token pickup',
   )
   assert.ok(
     arenaSceneSource.includes('this.showPlayerLevelUpFeedback(result.level)'),

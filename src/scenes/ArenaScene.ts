@@ -133,6 +133,7 @@ import {
   getPachinkoWeaponOddsRows,
   getPachinkoWeaponSynergySummary,
   getTokenXpForEnemy,
+  type PachinkoTokenProgressResult,
   resolvePachinkoSlotIndex,
   resolvePachinkoSlotReward,
   shouldEnemyGrantPachinkoToken,
@@ -1779,7 +1780,13 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private collectPachinkoTokenPickup(pickup: PachinkoTokenPickupEntity): void {
-    this.enqueuePachinkoToken(pickup.enemyId)
+    const playerXpResult = this.grantPlayerXpForEnemy(pickup.enemyId)
+    const tokenProgress = this.enqueuePachinkoToken(pickup.enemyId)
+    const xpMessage = playerXpResult.grantedXp > 0 ? ` · 캐릭터 XP +${playerXpResult.grantedXp}` : ''
+    const levelMessage = playerXpResult.didLevelUp ? ` · Lv.${playerXpResult.level}!` : ''
+    if (tokenProgress) {
+      this.statusMessage = `토큰 획득: 파친코 +${tokenProgress.grantedTokenXp} XP · 보상 Lv.${tokenProgress.rewardLevel}${xpMessage}${levelMessage}`
+    }
     this.destroyPachinkoTokenPickup(pickup)
   }
 
@@ -2114,14 +2121,11 @@ export class ArenaScene extends Phaser.Scene {
       return true
     }
 
-    const playerXpResult = this.grantPlayerXpForEnemy(enemy.config.id)
     const defeatOutcome = getDefeatedEnemyRunOutcome(enemy.config.id)
     const didDropPachinkoToken = defeatOutcome === 'continue' && shouldEnemyGrantPachinkoToken(enemy.config.id)
-    const xpMessage = playerXpResult.grantedXp > 0 ? ` · XP +${playerXpResult.grantedXp}` : ''
-    const levelMessage = playerXpResult.didLevelUp ? ` · Lv.${playerXpResult.level}!` : ''
     if (didDropPachinkoToken) {
       this.spawnPachinkoTokenPickup(enemy.sprite.x, enemy.sprite.y, enemy.config.id)
-      this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 토큰이 떨어졌습니다. 캐릭터로 먹으면 파친코에 투입됩니다.`
+      this.statusMessage = `${enemy.config.name} 처치. 토큰이 떨어졌습니다. 캐릭터로 먹으면 XP와 파친코 보상이 적용됩니다.`
     }
     if (enemy.telegraph?.visual.active) {
       enemy.telegraph.visual.destroy()
@@ -2145,7 +2149,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     if (!didDropPachinkoToken) {
-      this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 드롭을 계속 모으세요.`
+      this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
     }
     return true
   }
@@ -3266,7 +3270,7 @@ export class ArenaScene extends Phaser.Scene {
     return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${formatWeaponStarLabel(stack.star)}` : ''}`
   }
 
-  private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): void {
+  private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): PachinkoTokenProgressResult | null {
     const tokenMultiplier = getPassiveTokenXpMultiplier(this.passiveState)
     const nextProgress = applyEnemyPachinkoTokenProgress(
       {
@@ -3277,14 +3281,14 @@ export class ArenaScene extends Phaser.Scene {
       tokenMultiplier,
     )
     if (!nextProgress.didEnqueue) {
-      return
+      return null
     }
 
     this.pachinkoTokenXp = nextProgress.totalTokenXp
     this.pachinkoTokenQueue = nextProgress.queuedTokenXp
-    this.statusMessage = `파친코 토큰 획득: +${nextProgress.grantedTokenXp} XP · 보상 Lv.${nextProgress.rewardLevel}`
     this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
+    return nextProgress
   }
 
   private updatePachinko(): void {
