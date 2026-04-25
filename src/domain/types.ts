@@ -17,6 +17,42 @@ export interface WeaponVisualDefinition {
   accentColor: number
 }
 
+export interface WeaponSingleBehavior {
+  kind: 'single'
+  projectileLifetimeMs: number
+}
+
+export interface WeaponSprayHazardBehavior {
+  kind: 'spray-hazard'
+  projectileCount: number
+  spreadDegrees: number
+  projectileLifetimeMs: number
+  hazardRadius: number
+  hazardDurationMs: number
+  hazardTickMs: number
+  hazardDamage: number
+}
+
+export interface WeaponPierceBehavior {
+  kind: 'pierce'
+  projectileLifetimeMs: number
+  maxHits: number
+}
+
+export interface WeaponChainBehavior {
+  kind: 'chain'
+  projectileLifetimeMs: number
+  maxChains: number
+  chainRange: number
+  chainFalloff: number
+}
+
+export type WeaponAttackBehavior =
+  | WeaponSingleBehavior
+  | WeaponSprayHazardBehavior
+  | WeaponPierceBehavior
+  | WeaponChainBehavior
+
 export interface WeaponDefinition {
   id: WeaponId
   name: string
@@ -26,6 +62,7 @@ export interface WeaponDefinition {
   projectileSpeed: number
   projectileTint: number
   projectileTextureKey: string
+  attackBehavior: WeaponAttackBehavior
   visual: WeaponVisualDefinition
 }
 
