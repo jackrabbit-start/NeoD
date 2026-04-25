@@ -119,6 +119,18 @@ test('equipped weapon presentation reuses active weapon HUD icons with melee emp
   assert.equal('range' in starterPresentation, false)
 })
 
+test('equipped weapon presentation grows visually with level upgrades', () => {
+  const starter = WEAPON_DEFINITIONS['starter-blaster']
+  const basePresentation = resolveEquippedWeaponPresentation(starter, { x: 1, y: 0 })
+  const upgradedPresentation = resolveEquippedWeaponPresentation({
+    ...starter,
+    visualPowerTier: 2,
+  }, { x: 1, y: 0 })
+
+  assert.equal(upgradedPresentation.textureKey, starter.visual.hudIconKey)
+  assert.ok(upgradedPresentation.scale > basePresentation.scale)
+})
+
 test('equipped weapon presentation flips left-facing weapons without changing texture ownership', () => {
   const frost = WEAPON_DEFINITIONS['frost-lance']
   const presentation = resolveEquippedWeaponPresentation(frost, { x: -1, y: 0 })

@@ -80,7 +80,7 @@ import {
   PLAYER_HEALTH_PER_LEVEL,
   getPlayerLevelCombatStats,
 } from '../.tmp-test/src/systems/playerScaling.js'
-import { getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.js'
+import { buildAttackPlan, getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.js'
 import {
   STARTER_WEAPON_STACK_KEY,
   addWeaponStack,
@@ -123,6 +123,7 @@ import {
   FINAL_STAGE_START_MS,
   RUN_DURATION_MS,
   formatRunTime,
+  getRunEnemySpawnChanceRows,
   getRunPhaseByElapsedMs,
   getRunSpawnCapacity,
   getUnknownRunEnemyIds,
@@ -1119,6 +1120,28 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
 })
 
+test('run progression exposes per-enemy spawn chance rows for the current minute', () => {
+  const firstPhase = getRunPhaseByElapsedMs(0)
+  const latePhase = getRunPhaseByElapsedMs(24 * 60_000)
+  const firstRows = getRunEnemySpawnChanceRows(firstPhase)
+  const lateRows = getRunEnemySpawnChanceRows(latePhase)
+
+  assert.deepEqual(firstRows, [
+    {
+      enemyId: 'slime',
+      enemyName: '진흙 슬라임',
+      count: 16,
+      ratio: 1,
+      percentLabel: '100%',
+    },
+  ])
+  assert.ok(lateRows.length > 4)
+  assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
+  assert.ok(lateRows.some((row) => row.enemyId === 'void-orb'))
+  assert.equal(lateRows.reduce((sum, row) => sum + row.count, 0) > 0, true)
+  assert.equal(lateRows.reduce((sum, row) => sum + row.ratio, 0).toFixed(4), '1.0000')
+})
+
 test('nearest auto-attack target returns null when no active enemies are available', () => {
   assert.equal(resolveNearestAutoAttackTarget({ x: 10, y: 10 }, []), null)
   assert.equal(
@@ -1941,6 +1964,9 @@ test('player level combat stats raise health and weapon damage globally', () => 
   assert.equal(levelTenBlaster.range, 487)
   assert.equal(levelTenBlaster.playerDamageMultiplier, 1.45)
   assert.equal(levelTenBlaster.weaponSpecialTier, 1)
+  assert.equal(levelTenBlaster.visualPowerTier, 1)
+  assert.match(levelTenBlaster.levelUpgradeLabel, /관통 2회/)
+  assert.match(levelTenBlaster.levelUpgradeDescription, /관통탄/)
 })
 
 test('weapon milestone upgrades expand behavior every five and ten player levels', () => {
@@ -1965,6 +1991,24 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
   assert.equal(levelTwentyMist.attackBehavior.kind, 'spray-hazard')
   assert.equal(levelTwentyMist.attackBehavior.projectileCount, 7)
   assert.equal(levelTwentyMist.attackBehavior.hazardRadius, 48)
+})
+
+test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
+  const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
+  const plan = buildAttackPlan(levelTenBlaster, { x: 0, y: 0 }, { x: 10, y: 0 })
+
+  assert.equal(plan.projectiles.length, 1)
+  assert.equal(plan.projectiles[0].visualPowerTier, 1)
+  assert.equal(plan.projectiles[0].radius, 6)
+
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+  const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
+
+  assert.ok(arenaSceneSource.includes('levelUpgradeLabel: effectiveWeapon.levelUpgradeLabel'))
+  assert.ok(arenaSceneSource.includes('projectile.setScale(1 + visualTier * 0.08)'))
+  assert.ok(arenaSceneSource.includes('graphics.lineStyle(3 + visualTier'))
+  assert.ok(hudSource.includes('weapon.levelUpgradeLabel'))
+  assert.ok(hudSource.includes('weapon.levelUpgradeDescription'))
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {

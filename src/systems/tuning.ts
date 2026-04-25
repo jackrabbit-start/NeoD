@@ -173,9 +173,56 @@ export function deriveEffectiveWeaponStats(
 
   if (playerStats.weaponSpecialTier > 0) {
     effectiveWeapon.weaponSpecialTier = playerStats.weaponSpecialTier
+    effectiveWeapon.visualPowerTier = playerStats.weaponSpecialTier
+    effectiveWeapon.levelUpgradeLabel = getWeaponLevelUpgradeLabel(weapon, playerStats)
+    effectiveWeapon.levelUpgradeDescription = getWeaponLevelUpgradeDescription(weapon, playerStats)
   }
 
   return effectiveWeapon
+}
+
+function getWeaponLevelUpgradeLabel(
+  weapon: WeaponDefinition,
+  playerStats: PlayerLevelCombatStats,
+): string {
+  const rangeLabel = playerStats.weaponRangeMultiplier > 1
+    ? `범위 +${Math.round((playerStats.weaponRangeMultiplier - 1) * 100)}%`
+    : '기본 범위'
+
+  switch (weapon.attackBehavior.kind) {
+    case 'single':
+      return `Lv.${playerStats.level} 공명 · 관통 ${playerStats.weaponSpecialTier + 1}회 · ${rangeLabel}`
+    case 'pierce':
+      return `Lv.${playerStats.level} 공명 · 관통 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
+    case 'chain':
+      return `Lv.${playerStats.level} 공명 · 연계 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
+    case 'spray-hazard':
+      return `Lv.${playerStats.level} 공명 · 탄막 +${playerStats.weaponSpecialTier} · 장판 강화`
+    case 'melee-cleave':
+      return `Lv.${playerStats.level} 공명 · 범위/타깃 강화 · ${rangeLabel}`
+    default:
+      return `Lv.${playerStats.level} 공명 · ${rangeLabel}`
+  }
+}
+
+function getWeaponLevelUpgradeDescription(
+  weapon: WeaponDefinition,
+  playerStats: PlayerLevelCombatStats,
+): string {
+  switch (weapon.attackBehavior.kind) {
+    case 'single':
+      return '캐릭터 레벨 공명으로 단발 탄이 관통탄처럼 진화했습니다.'
+    case 'pierce':
+      return '캐릭터 레벨 공명으로 관통 한계가 더 넓어졌습니다.'
+    case 'chain':
+      return '캐릭터 레벨 공명으로 전하가 더 멀리, 더 많이 이어집니다.'
+    case 'spray-hazard':
+      return '캐릭터 레벨 공명으로 탄막 수와 장판 위력이 커졌습니다.'
+    case 'melee-cleave':
+      return '캐릭터 레벨 공명으로 휘두르는 각도와 타깃 수가 확장됐습니다.'
+    default:
+      return `캐릭터 레벨 공명으로 무기 성능이 ${Math.round((playerStats.damageMultiplier - 1) * 100)}%만큼 증폭됐습니다.`
+  }
 }
 
 function applyPlayerLevelWeaponMilestones(

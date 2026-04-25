@@ -17,6 +17,7 @@ export interface HudControllerHandlers {
   onStageSelectionToggle: () => void
   onStageSelectionClose: () => void
   onStageSelect: (stageIndex: number) => void
+  onPassiveSelect: (passiveId: string) => void
 }
 
 export interface HudRenderMetrics {
@@ -68,11 +69,15 @@ export class HudController {
 
   private readonly stageModalLayer: HTMLDivElement
 
+  private readonly passiveModalLayer: HTMLDivElement
+
   private readonly resumeButton: HTMLButtonElement
 
   private readonly stageResumeButton: HTMLButtonElement
 
   private readonly stageList: HTMLDivElement
+
+  private readonly passiveList: HTMLDivElement
 
   private readonly equippedWeaponList: HTMLDivElement
 
@@ -85,6 +90,8 @@ export class HudController {
   private summaryMarkup = ''
 
   private stageSignature = ''
+
+  private passiveSignature = ''
 
   private renderMetrics: HudRenderMetrics = {
     summaryAssignments: 0,
@@ -99,6 +106,7 @@ export class HudController {
     onStageSelectionToggle: () => undefined,
     onStageSelectionClose: () => undefined,
     onStageSelect: () => undefined,
+    onPassiveSelect: () => undefined,
   }
 
   constructor(private readonly element: HTMLElement) {
@@ -153,12 +161,36 @@ export class HudController {
       </section>
     `
 
+    this.passiveModalLayer = document.createElement('div')
+    this.passiveModalLayer.className = 'hud-modal-layer'
+    this.passiveModalLayer.innerHTML = `
+      <div class="hud-modal__backdrop"></div>
+      <section class="hud-modal hud-modal--stage" role="dialog" aria-modal="true" aria-label="레벨업 패시브 선택">
+        <header class="hud-modal__header">
+          <div>
+            <p class="hud-modal__eyebrow">LEVEL UP</p>
+            <h2>패시브 카드를 선택하세요</h2>
+          </div>
+        </header>
+        <div class="hud-modal__list hud-modal__list--stage" data-region="passives"></div>
+      </section>
+    `
+
     const resumeButton = this.modalLayer.querySelector<HTMLButtonElement>('button[data-action="inventory-close"]')
     const equippedWeaponList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="equipped-weapons"]')
     const weaponList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="weapons"]')
     const characterStatsList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="character-stats"]')
     const stageResumeButton = this.stageModalLayer.querySelector<HTMLButtonElement>('button[data-action="stage-close"]')
     const stageList = this.stageModalLayer.querySelector<HTMLDivElement>('[data-region="stages"]')
+    const passiveList =
+      this.passiveModalLayer.querySelector<HTMLDivElement>('[data-region="passives"]') ??
+      (() => {
+        const fallback = document.createElement('div')
+        fallback.className = 'hud-modal__list hud-modal__list--stage'
+        fallback.dataset.region = 'passives'
+        this.passiveModalLayer.append(fallback)
+        return fallback
+      })()
 
     if (
       !resumeButton ||
@@ -174,11 +206,12 @@ export class HudController {
     this.resumeButton = resumeButton
     this.stageResumeButton = stageResumeButton
     this.stageList = stageList
+    this.passiveList = passiveList
     this.equippedWeaponList = equippedWeaponList
     this.weaponList = weaponList
     this.characterStatsList = characterStatsList
 
-    this.element.replaceChildren(this.summaryElement, this.modalLayer, this.stageModalLayer)
+    this.element.replaceChildren(this.summaryElement, this.modalLayer, this.stageModalLayer, this.passiveModalLayer)
     this.element.addEventListener('click', this.handleClick)
   }
 
@@ -193,6 +226,7 @@ export class HudController {
     this.renderSummary(state)
     this.updateModal(state.modal)
     this.updateStageSelection(state.stageSelection)
+    this.updatePassiveSelection(state.passiveSelection ?? { isOpen: false, level: 1, choices: [] })
   }
 
   getRenderMetrics(): HudRenderMetrics {
@@ -204,6 +238,7 @@ export class HudController {
     this.summaryMarkup = ''
     this.modalSignature = ''
     this.stageSignature = ''
+    this.passiveSignature = ''
     this.element.innerHTML = ''
   }
 
@@ -245,6 +280,11 @@ export class HudController {
         }
         break
       }
+      case 'passive-select':
+        if (actionTarget.dataset.passiveId) {
+          this.handlers.onPassiveSelect(actionTarget.dataset.passiveId)
+        }
+        break
       default:
         break
     }
@@ -268,6 +308,7 @@ export class HudController {
         </header>
         <div class="hud-summary__grid">
           ${renderSummarySection('능력치', renderList(state.stats), 'hud-summary__section--stats')}
+          ${renderSummarySection('패시브', renderList(state.passives ?? []), 'hud-summary__section--stats')}
           ${state.pachinko ? renderSummarySection('파친코', renderList([
             `보상 레벨: Lv.${state.pachinko.level} · 누적 토큰 XP ${state.pachinko.totalTokenXp}`,
             `바닥 토큰: ${state.pachinko.droppedTokens}개 · 투입 중: ${state.pachinko.activeTokens}개 · 대기: ${state.pachinko.queuedTokens}개`,
@@ -348,6 +389,22 @@ export class HudController {
     }
   }
 
+  private updatePassiveSelection(passiveSelection: HudState['passiveSelection']): void {
+    this.passiveModalLayer.classList.toggle('is-open', passiveSelection.isOpen)
+
+    if (!passiveSelection.isOpen) {
+      this.passiveSignature = ''
+      this.passiveList.replaceChildren()
+      return
+    }
+
+    const nextSignature = JSON.stringify(passiveSelection)
+    if (nextSignature !== this.passiveSignature) {
+      this.passiveSignature = nextSignature
+      this.passiveList.replaceChildren(...this.createPassiveButtons(passiveSelection.choices))
+    }
+  }
+
   private renderModalCollections(modal: HudModalState): void {
     this.equippedWeaponList.replaceChildren(...this.createEquippedWeaponRows(modal.weapons))
     this.weaponList.replaceChildren(...this.createOwnedWeaponRows(modal.weapons))
@@ -404,7 +461,9 @@ export class HudController {
     const countText = weapon.count != null ? ` × ${weapon.count}` : ''
     title.textContent = `${weapon.name}${starText ? ` · ${starText}` : ''}${countText}`
     const description = document.createElement('small')
-    description.textContent = weapon.description
+    description.textContent = weapon.levelUpgradeDescription
+      ? `${weapon.description} · ${weapon.levelUpgradeDescription}`
+      : weapon.description
     textGroup.append(title, description)
 
     const left = document.createElement('div')
@@ -441,11 +500,42 @@ export class HudController {
   private createWeaponStats(weapon: HudOwnedWeaponView, variant: 'equipped' | 'owned'): HTMLElement {
     const stats = document.createElement('small')
     stats.className = `hud-modal__weapon-meta hud-modal__weapon-stats hud-modal__weapon-stats--${variant}`
-    stats.textContent = `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · 탄속 ${weapon.projectileSpeed}`
+    const upgradeText = weapon.levelUpgradeLabel ? ` · ${weapon.levelUpgradeLabel}` : ''
+    stats.textContent = `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · 탄속 ${weapon.projectileSpeed}${upgradeText}`
     if (weapon.accentColor != null) {
       stats.style.color = `#${weapon.accentColor.toString(16).padStart(6, '0')}`
     }
     return stats
+  }
+
+  private createPassiveButtons(choices: HudState['passiveSelection']['choices']): HTMLElement[] {
+    if (choices.length === 0) {
+      return [this.createEmptyText('선택 가능한 패시브가 없습니다.')]
+    }
+
+    return choices.map((choice) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'hud-modal__item hud-modal__item--action'
+      button.dataset.action = 'passive-select'
+      button.dataset.passiveId = choice.id
+
+      const textGroup = document.createElement('span')
+      textGroup.className = 'hud-modal__content'
+
+      const title = document.createElement('strong')
+      title.textContent = choice.name
+
+      const summary = document.createElement('small')
+      summary.textContent = choice.effectSummary
+
+      const description = document.createElement('small')
+      description.textContent = choice.description
+
+      textGroup.append(title, summary, description)
+      button.append(textGroup)
+      return button
+    })
   }
 
   private createStageButtons(stages: HudStageView[]): HTMLElement[] {
