@@ -8,7 +8,7 @@ export const MAX_PACHINKO_REWARD_STAR = 5 as const
 export const MAX_ACTIVE_PACHINKO_TOKENS = 30 as const
 export const PACHINKO_SLOT_COUNT = 10 as const
 export const PACHINKO_TOKEN_LAUNCH_INTERVAL_MS = 110 as const
-export const PACHINKO_REWARD_TABLE_REFRESH_MS = 850 as const
+export const PACHINKO_REWARD_TABLE_REFRESH_MS = 5000 as const
 
 export const PACHINKO_LEVEL_THRESHOLDS = [0, 6, 14, 26, 42] as const
 
@@ -76,6 +76,13 @@ export interface PachinkoSlotReward extends PachinkoRewardResult {
   sampleRatio: number
   iconKey: string
   modifier?: PachinkoSlotModifier
+}
+
+export interface PachinkoWeaponOddsRow {
+  weaponId: WeaponId
+  iconKey: string
+  probability: number
+  percentLabel: string
 }
 
 export interface PachinkoTokenProgressState {
@@ -188,6 +195,28 @@ export function resolveWeaponReward(random: RandomSource = Math.random): WeaponI
   return WEAPON_IDS[index]
 }
 
+export function resolveWeightedWeaponReward(
+  random: RandomSource = Math.random,
+  activeWeaponId?: WeaponId,
+  activeWeaponWeightMultiplier = 1,
+): WeaponId {
+  const weights = WEAPON_IDS.map((weaponId) => ({
+    weaponId,
+    weight: weaponId === activeWeaponId ? Math.max(1, activeWeaponWeightMultiplier) : 1,
+  }))
+  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0)
+  let roll = random() * totalWeight
+
+  for (const entry of weights) {
+    roll -= entry.weight
+    if (roll <= 0) {
+      return entry.weaponId
+    }
+  }
+
+  return weights.at(-1)?.weaponId ?? WEAPON_IDS[0]
+}
+
 const WEAPON_FAMILY_BY_ID: Record<WeaponId, PachinkoWeaponFamily> = {
   'starter-blaster': 'starter',
   'acid-sprayer': 'spray',
@@ -252,9 +281,11 @@ export function resolvePachinkoReward(
   level: number,
   random: RandomSource = Math.random,
   starRange: PachinkoStarRange = getPachinkoStarRangeForPlayerLevel(1),
+  activeWeaponId?: WeaponId,
+  activeWeaponWeightMultiplier = 1,
 ): PachinkoRewardResult {
   return {
-    weaponId: resolveWeaponReward(random),
+    weaponId: resolveWeightedWeaponReward(random, activeWeaponId, activeWeaponWeightMultiplier),
     star: resolveStarForLevel(level, random, starRange),
   }
 }
@@ -274,6 +305,7 @@ export function buildPachinkoSlotRewards(
   tableSeed = 0,
   playerLevel = 1,
   activeWeaponId?: WeaponId,
+  activeWeaponWeightMultiplier = 1,
 ): PachinkoSlotReward[] {
   const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
   const level = getPachinkoRewardLevel(totalTokenXp)
@@ -290,6 +322,8 @@ export function buildPachinkoSlotRewards(
       level,
       createSeededRandomSource(getPachinkoSlotRewardSeed(totalTokenXp, slotIndex, tableSeed)),
       starRange,
+      activeWeaponId,
+      activeWeaponWeightMultiplier,
     )
     const modifierKind = modifiers.get(slotIndex)
     const modifier = modifierKind ? PACHINKO_SLOT_MODIFIERS[modifierKind] : undefined
@@ -367,9 +401,50 @@ export function resolvePachinkoSlotReward(
   tableSeed = 0,
   playerLevel = 1,
   activeWeaponId?: WeaponId,
+  activeWeaponWeightMultiplier = 1,
 ): PachinkoSlotReward {
-  const slotRewards = buildPachinkoSlotRewards(totalTokenXp, slotCount, tableSeed, playerLevel, activeWeaponId)
+  const slotRewards = buildPachinkoSlotRewards(
+    totalTokenXp,
+    slotCount,
+    tableSeed,
+    playerLevel,
+    activeWeaponId,
+    activeWeaponWeightMultiplier,
+  )
   return slotRewards[resolvePachinkoSlotIndex(landingRatio, slotRewards.length)] ?? slotRewards[0]
+}
+
+export function getPachinkoWeaponOddsRows(
+  totalTokenXp: number,
+  slotCount: number = PACHINKO_SLOT_COUNT,
+  tableSeed = 0,
+  playerLevel = 1,
+  activeWeaponId?: WeaponId,
+  activeWeaponWeightMultiplier = 1,
+): PachinkoWeaponOddsRow[] {
+  const slotRewards = buildPachinkoSlotRewards(
+    totalTokenXp,
+    slotCount,
+    tableSeed,
+    playerLevel,
+    activeWeaponId,
+    activeWeaponWeightMultiplier,
+  )
+  const counts = new Map<WeaponId, number>()
+
+  for (const reward of slotRewards) {
+    counts.set(reward.weaponId, (counts.get(reward.weaponId) ?? 0) + 1)
+  }
+
+  return WEAPON_IDS.map((weaponId) => {
+    const probability = slotRewards.length > 0 ? (counts.get(weaponId) ?? 0) / slotRewards.length : 0
+    return {
+      weaponId,
+      iconKey: `weapon-${weaponId}`,
+      probability,
+      percentLabel: `${Math.round(probability * 100)}%`,
+    }
+  })
 }
 
 export function canLaunchPachinkoToken({
