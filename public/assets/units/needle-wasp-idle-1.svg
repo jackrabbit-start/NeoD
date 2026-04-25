@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="28" viewBox="0 0 32 28" role="img" aria-label="needle wasp idle 1">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <path d="M7 5 C2 3 1 9 6 12 C10 15 13 12 13 9 C12 7 10 6 7 5Z" fill="#ffe0a3" opacity="0.5"/>
+  <path d="M25 5 C30 3 31 9 26 12 C22 15 19 12 19 9 C20 7 22 6 25 5Z" fill="#ffe0a3" opacity="0.5"/>
+  <path d="M6 21 C2 23 5 27 10 24 C13 22 14 19 12 18 C10 17 8 19 6 21Z" fill="#ffc178" opacity="0.32"/>
+  <path d="M26 21 C30 23 27 27 22 24 C19 22 18 19 20 18 C22 17 24 19 26 21Z" fill="#ffc178" opacity="0.32"/>
+  <path d="M16 3 L19.5 8 L18.2 21 L16 26 L13.8 21 L12.5 8 Z" fill="#4f2514" stroke="#ffe0a3" stroke-width="1.4" filter="url(#glow)"/>
+  <path d="M13.2 8 H18.8 M13.5 13 H18.5 M13.9 18 H18.1" stroke="#ff9f43" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="14.3" cy="6.4" r="1.45" fill="#fff1b8"/>
+  <circle cx="17.7" cy="6.4" r="1.45" fill="#fff1b8"/>
+  <path d="M13 3 L8.5 2 M19 3 L23.5 2" stroke="#ffc168" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M16 25 L16 28" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round"/>
+</svg>

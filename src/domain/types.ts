@@ -7,6 +7,7 @@ export type EnemyAnimationKey =
   | 'spark-slime-idle'
   | 'dash-slime-idle'
   | 'orbit-slime-idle'
+  | 'needle-wasp-idle'
   | 'slime-boss-idle'
 
 export interface ItemDefinition {
@@ -142,7 +143,25 @@ export interface EnemyTelegraphedAoeAttackBehavior {
   tint: number
 }
 
-export type EnemyAttackBehavior = EnemyContactAttackBehavior | EnemyTelegraphedAoeAttackBehavior
+export interface EnemySpreadBurstAttackBehavior {
+  kind: 'spread-burst'
+  cooldownMs: number
+  windupMs: number
+  range: number
+  projectileCount: number
+  spreadDegrees: number
+  projectileSpeed: number
+  projectileLifetimeMs: number
+  projectileRadius: number
+  damage: number
+  tint: number
+  projectileTextureKey: string
+}
+
+export type EnemyAttackBehavior =
+  | EnemyContactAttackBehavior
+  | EnemyTelegraphedAoeAttackBehavior
+  | EnemySpreadBurstAttackBehavior
 
 export interface EnemyVisualDefinition {
   portraitKey?: string
