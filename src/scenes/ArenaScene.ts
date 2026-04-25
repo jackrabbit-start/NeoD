@@ -101,6 +101,7 @@ import {
   canLaunchPachinkoToken,
   getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
+  getPachinkoWeaponSynergySummary,
   getTokenXpForEnemy,
   resolvePachinkoSlotIndex,
   resolvePachinkoSlotReward,
@@ -269,6 +270,7 @@ interface PachinkoSlotVisualEntity {
   icon: Phaser.GameObjects.Image
   weaponLabel: Phaser.GameObjects.Text
   starLabel: Phaser.GameObjects.Text
+  modifierLabel: Phaser.GameObjects.Text
 }
 
 interface PachinkoLightEntity {
@@ -2575,8 +2577,12 @@ export class ArenaScene extends Phaser.Scene {
     return this.pachinkoTokenPickups.filter((pickup) => pickup.sprite.active).length
   }
 
+  private getActiveWeaponId(): WeaponStack['weaponId'] {
+    return getWeaponIdFromStackKey(this.activeWeaponKey)
+  }
+
   private updateHud(): void {
-    const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
+    const weaponId = this.getActiveWeaponId()
     const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
     const activeStar = activeStack?.star ?? 1
     const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar, this.playerProgression.level)
@@ -2628,6 +2634,7 @@ export class ArenaScene extends Phaser.Scene {
         queuedTokens: this.pachinkoTokenQueue.length,
         isTokenInFlight: this.activePachinkoTokens.length > 0,
         latestReward: this.latestPachinkoReward,
+        synergy: getPachinkoWeaponSynergySummary(weaponId),
       },
       modal: {
         isOpen: this.isInventoryOpen,
@@ -2794,6 +2801,7 @@ export class ArenaScene extends Phaser.Scene {
       PACHINKO_SLOT_COUNT,
       this.pachinkoRewardTableSeed,
       this.playerProgression.level,
+      this.getActiveWeaponId(),
     )
     const fusionResult = addWeaponStackWithAutoFusion(
       { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
@@ -2808,8 +2816,9 @@ export class ArenaScene extends Phaser.Scene {
     const fusionLabel = lastFusion
       ? ` · 자동 합성: ${WEAPON_DEFINITIONS[lastFusion.weaponId].name} ${formatWeaponStarLabel(lastFusion.resultStar)}`
       : ''
-    this.latestPachinkoReward = `${rewardLabel}${fusionLabel}`
-    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}${fusionLabel}`
+    const modifierLabel = reward.modifier ? ` · ${reward.modifier.label} 보너스` : ''
+    this.latestPachinkoReward = `${rewardLabel}${modifierLabel}${fusionLabel}`
+    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}${modifierLabel}${fusionLabel}`
     this.destroyActivePachinkoToken(token)
     this.launchAvailablePachinkoTokens()
   }
@@ -3018,11 +3027,13 @@ export class ArenaScene extends Phaser.Scene {
       PACHINKO_SLOT_COUNT,
       this.pachinkoRewardTableSeed,
       this.playerProgression.level,
+      this.getActiveWeaponId(),
     )) {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
+      const strokeColor = reward.modifier?.color ?? WEAPON_DEFINITIONS[reward.weaponId].visual.accentColor
       const frame = this.add.rectangle(centerX, centerY, rect.width / reward.slotCount - 3, PACHINKO_SLOT_VISUAL_HEIGHT - 8, 0x07111f, 0.96)
-        .setStrokeStyle(1, WEAPON_DEFINITIONS[reward.weaponId].visual.accentColor, 0.82)
+        .setStrokeStyle(reward.modifier ? 2 : 1, strokeColor, reward.modifier ? 0.95 : 0.82)
         .setDepth(61)
       const icon = this.add.image(centerX, centerY - 7, reward.iconKey)
         .setDepth(62)
@@ -3039,13 +3050,20 @@ export class ArenaScene extends Phaser.Scene {
         fontSize: '8px',
         fontStyle: '900',
       }).setOrigin(0.5).setDepth(63)
+      const modifierLabel = this.add.text(centerX, centerY - 20, reward.modifier?.label ?? '', {
+        color: reward.modifier ? `#${reward.modifier.color.toString(16).padStart(6, '0')}` : '#dbeafe',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '7px',
+        fontStyle: '900',
+      }).setOrigin(0.5).setDepth(64)
       this.pachinkoSlotVisuals.push({
         frame,
         icon,
         weaponLabel,
         starLabel,
+        modifierLabel,
       })
-      this.pachinkoVisuals.push(frame, icon, weaponLabel, starLabel)
+      this.pachinkoVisuals.push(frame, icon, weaponLabel, starLabel, modifierLabel)
     }
   }
 
@@ -3055,6 +3073,7 @@ export class ArenaScene extends Phaser.Scene {
       PACHINKO_SLOT_COUNT,
       this.pachinkoRewardTableSeed,
       this.playerProgression.level,
+      this.getActiveWeaponId(),
     )
     for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
       const visual = this.pachinkoSlotVisuals[index]
@@ -3066,10 +3085,11 @@ export class ArenaScene extends Phaser.Scene {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
       const slotWidth = rect.width / reward.slotCount - 3
+      const strokeColor = reward.modifier?.color ?? WEAPON_DEFINITIONS[reward.weaponId].visual.accentColor
       visual.frame
         .setPosition(centerX, centerY)
         .setDisplaySize(slotWidth, PACHINKO_SLOT_VISUAL_HEIGHT - 8)
-        .setStrokeStyle(1, WEAPON_DEFINITIONS[reward.weaponId].visual.accentColor, 0.82)
+        .setStrokeStyle(reward.modifier ? 2 : 1, strokeColor, reward.modifier ? 0.95 : 0.82)
       visual.icon
         .setTexture(reward.iconKey)
         .setPosition(centerX, centerY - 7)
@@ -3081,6 +3101,10 @@ export class ArenaScene extends Phaser.Scene {
         .setPosition(centerX, centerY + 18)
         .setText(formatWeaponStarLabel(reward.star))
         .setFontSize(8)
+      visual.modifierLabel
+        .setPosition(centerX, centerY - 20)
+        .setText(reward.modifier?.label ?? '')
+        .setColor(reward.modifier ? `#${reward.modifier.color.toString(16).padStart(6, '0')}` : '#dbeafe')
     }
   }
 

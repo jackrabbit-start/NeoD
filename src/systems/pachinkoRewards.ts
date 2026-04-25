@@ -1,4 +1,5 @@
 import { ENEMY_IDS, WEAPON_IDS, type EnemyId, type WeaponId } from '../data/contentIds.js'
+import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import type { WeaponStar } from '../domain/types.js'
 
 export type RandomSource = () => number
@@ -44,6 +45,26 @@ export interface PachinkoStarRange {
   maxStar: WeaponStar
 }
 
+export type PachinkoWeaponFamily =
+  | 'starter'
+  | 'spray'
+  | 'pierce'
+  | 'heavy'
+  | 'chain'
+  | 'rapid'
+  | 'zone'
+  | 'melee'
+  | 'precision'
+
+export type PachinkoSlotModifierKind = 'family' | 'bonus' | 'jackpot'
+
+export interface PachinkoSlotModifier {
+  kind: PachinkoSlotModifierKind
+  label: string
+  color: number
+  description: string
+}
+
 export interface PachinkoSlotReward extends PachinkoRewardResult {
   slotIndex: number
   slotCount: number
@@ -51,6 +72,7 @@ export interface PachinkoSlotReward extends PachinkoRewardResult {
   ratioEnd: number
   sampleRatio: number
   iconKey: string
+  modifier?: PachinkoSlotModifier
 }
 
 export interface PachinkoTokenProgressState {
@@ -163,6 +185,66 @@ export function resolveWeaponReward(random: RandomSource = Math.random): WeaponI
   return WEAPON_IDS[index]
 }
 
+const WEAPON_FAMILY_BY_ID: Record<WeaponId, PachinkoWeaponFamily> = {
+  'starter-blaster': 'starter',
+  'acid-sprayer': 'spray',
+  'frost-lance': 'pierce',
+  'storm-cannon': 'heavy',
+  'arc-loom': 'chain',
+  'spark-carbine': 'rapid',
+  'mist-vortex': 'zone',
+  'slime-glaive': 'melee',
+  'prism-cutter': 'precision',
+  'needle-fan': 'spray',
+}
+
+const PACHINKO_FAMILY_LABELS: Record<PachinkoWeaponFamily, string> = {
+  starter: '기본',
+  spray: '분사',
+  pierce: '관통',
+  heavy: '중화력',
+  chain: '연쇄',
+  rapid: '속사',
+  zone: '구역',
+  melee: '근접',
+  precision: '절단',
+}
+
+const PACHINKO_SLOT_MODIFIERS: Record<PachinkoSlotModifierKind, PachinkoSlotModifier> = {
+  family: {
+    kind: 'family',
+    label: '계열',
+    color: 0x8fe4ff,
+    description: '현재 무기 계열 보너스: 활성 무기 보상이 등장합니다.',
+  },
+  bonus: {
+    kind: 'bonus',
+    label: '+별',
+    color: 0xffd866,
+    description: '보너스 슬롯: 별 등급이 1단계 상승합니다.',
+  },
+  jackpot: {
+    kind: 'jackpot',
+    label: 'JACK',
+    color: 0xff7ac8,
+    description: '잭팟 슬롯: 활성 무기 보상과 높은 별 등급을 노립니다.',
+  },
+}
+
+export function getPachinkoWeaponFamily(weaponId: WeaponId): PachinkoWeaponFamily {
+  return WEAPON_FAMILY_BY_ID[weaponId]
+}
+
+export function getPachinkoWeaponFamilyLabel(family: PachinkoWeaponFamily): string {
+  return PACHINKO_FAMILY_LABELS[family]
+}
+
+export function getPachinkoWeaponSynergySummary(activeWeaponId: WeaponId): string {
+  const family = getPachinkoWeaponFamily(activeWeaponId)
+  const weaponName = WEAPON_DEFINITIONS[activeWeaponId].name
+  return `${getPachinkoWeaponFamilyLabel(family)} 계열: ${weaponName} 보너스 슬롯 등장`
+}
+
 export function resolvePachinkoReward(
   level: number,
   random: RandomSource = Math.random,
@@ -188,10 +270,14 @@ export function buildPachinkoSlotRewards(
   slotCount: number = PACHINKO_SLOT_COUNT,
   tableSeed = 0,
   playerLevel = 1,
+  activeWeaponId?: WeaponId,
 ): PachinkoSlotReward[] {
   const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
   const level = getPachinkoRewardLevel(totalTokenXp)
   const starRange = getPachinkoStarRangeForPlayerLevel(playerLevel)
+  const modifiers = activeWeaponId
+    ? buildPachinkoSlotModifiers(activeWeaponId, level, normalizedSlotCount)
+    : new Map<number, PachinkoSlotModifierKind>()
 
   return Array.from({ length: normalizedSlotCount }, (_, slotIndex) => {
     const ratioStart = slotIndex / normalizedSlotCount
@@ -202,17 +288,73 @@ export function buildPachinkoSlotRewards(
       createSeededRandomSource(getPachinkoSlotRewardSeed(totalTokenXp, slotIndex, tableSeed)),
       starRange,
     )
+    const modifierKind = modifiers.get(slotIndex)
+    const modifier = modifierKind ? PACHINKO_SLOT_MODIFIERS[modifierKind] : undefined
+    const modifiedReward = modifier && activeWeaponId
+      ? applyPachinkoSlotModifier(reward, modifier.kind, activeWeaponId)
+      : reward
 
     return {
-      ...reward,
+      ...modifiedReward,
       slotIndex,
       slotCount: normalizedSlotCount,
       ratioStart,
       ratioEnd,
       sampleRatio,
-      iconKey: `weapon-${reward.weaponId}`,
+      iconKey: `weapon-${modifiedReward.weaponId}`,
+      ...(modifier ? { modifier } : {}),
     }
   })
+}
+
+export function buildPachinkoSlotModifiers(
+  activeWeaponId: WeaponId,
+  level: number,
+  slotCount: number = PACHINKO_SLOT_COUNT,
+): Map<number, PachinkoSlotModifierKind> {
+  const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
+  const activeIndex = Math.max(0, WEAPON_IDS.indexOf(activeWeaponId))
+  const normalizedLevel = Math.max(1, Math.min(5, Math.floor(level)))
+  const familySlot = activeIndex % normalizedSlotCount
+  let bonusSlot = (activeIndex + normalizedLevel * 2) % normalizedSlotCount
+  if (bonusSlot === familySlot) {
+    bonusSlot = (bonusSlot + 1) % normalizedSlotCount
+  }
+  let jackpotSlot = (activeIndex + normalizedLevel + Math.ceil(normalizedSlotCount / 2)) % normalizedSlotCount
+  while (jackpotSlot === familySlot || jackpotSlot === bonusSlot) {
+    jackpotSlot = (jackpotSlot + 1) % normalizedSlotCount
+  }
+
+  return new Map<number, PachinkoSlotModifierKind>([
+    [familySlot, 'family'],
+    [bonusSlot, 'bonus'],
+    [jackpotSlot, 'jackpot'],
+  ])
+}
+
+export function applyPachinkoSlotModifier(
+  reward: PachinkoRewardResult,
+  modifier: PachinkoSlotModifierKind,
+  activeWeaponId: WeaponId,
+): PachinkoRewardResult {
+  if (modifier === 'family') {
+    return {
+      weaponId: activeWeaponId,
+      star: reward.star,
+    }
+  }
+
+  if (modifier === 'bonus') {
+    return {
+      weaponId: reward.weaponId,
+      star: Math.min(MAX_PACHINKO_REWARD_STAR, reward.star + 1) as WeaponStar,
+    }
+  }
+
+  return {
+    weaponId: activeWeaponId,
+    star: Math.min(MAX_PACHINKO_REWARD_STAR, reward.star + 2) as WeaponStar,
+  }
 }
 
 export function resolvePachinkoSlotReward(
@@ -221,8 +363,9 @@ export function resolvePachinkoSlotReward(
   slotCount: number = PACHINKO_SLOT_COUNT,
   tableSeed = 0,
   playerLevel = 1,
+  activeWeaponId?: WeaponId,
 ): PachinkoSlotReward {
-  const slotRewards = buildPachinkoSlotRewards(totalTokenXp, slotCount, tableSeed, playerLevel)
+  const slotRewards = buildPachinkoSlotRewards(totalTokenXp, slotCount, tableSeed, playerLevel, activeWeaponId)
   return slotRewards[resolvePachinkoSlotIndex(landingRatio, slotRewards.length)] ?? slotRewards[0]
 }
 
@@ -294,6 +437,7 @@ export function resolvePachinkoLandingReward(
   landingRatio: number,
   tableSeed = 0,
   playerLevel = 1,
+  activeWeaponId?: WeaponId,
 ): PachinkoRewardResult {
   const { weaponId, star } = resolvePachinkoSlotReward(
     totalTokenXp,
@@ -301,6 +445,7 @@ export function resolvePachinkoLandingReward(
     PACHINKO_SLOT_COUNT,
     tableSeed,
     playerLevel,
+    activeWeaponId,
   )
   return { weaponId, star }
 }
