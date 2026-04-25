@@ -13,6 +13,13 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     size: 20,
     textureKey: 'slime',
     animationKey: 'slime-idle',
+    movementBehavior: {
+      kind: 'direct-chase',
+    },
+    attackBehavior: {
+      kind: 'contact',
+    },
+    behaviorSummary: '직선으로 추적하며 몸통 박치기로 압박합니다.',
     visual: {
       portraitKey: 'slime',
     },
@@ -34,6 +41,23 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     size: 22,
     textureKey: 'spark-slime',
     animationKey: 'spark-slime-idle',
+    movementBehavior: {
+      kind: 'orbit',
+      preferredDistance: 152,
+      distanceTolerance: 28,
+      orbitDirection: 1,
+    },
+    attackBehavior: {
+      kind: 'telegraphed-aoe',
+      cooldownMs: 1700,
+      telegraphMs: 700,
+      radius: 54,
+      damage: 12,
+      range: 230,
+      anchor: 'player',
+      tint: 0xffdb6e,
+    },
+    behaviorSummary: '거리를 유지하며 선회한 뒤 예고된 충격 범위를 터뜨립니다.',
     visual: {
       portraitKey: 'spark-slime',
     },
@@ -55,6 +79,13 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     size: 30,
     textureKey: 'spark-slime',
     animationKey: 'spark-slime-idle',
+    movementBehavior: {
+      kind: 'direct-chase',
+    },
+    attackBehavior: {
+      kind: 'contact',
+    },
+    behaviorSummary: '빠르게 추적하며 튜닝 캡슐을 노리는 엘리트 압박 역할입니다.',
     visual: {
       portraitKey: 'spark-slime',
     },
@@ -72,6 +103,20 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     size: 44,
     textureKey: 'slime-boss',
     animationKey: 'slime-boss-idle',
+    movementBehavior: {
+      kind: 'direct-chase',
+    },
+    attackBehavior: {
+      kind: 'telegraphed-aoe',
+      cooldownMs: 2400,
+      telegraphMs: 900,
+      radius: 88,
+      damage: 18,
+      range: 190,
+      anchor: 'self',
+      tint: 0xd3a0ff,
+    },
+    behaviorSummary: '직선 추적 후 제자리 강타를 크게 예고합니다.',
     visual: {
       portraitKey: 'slime-boss',
     },
