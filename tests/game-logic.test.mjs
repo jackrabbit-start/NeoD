@@ -157,6 +157,9 @@ import {
   PACHINKO_FEVER_CHARGE_MAX,
   PACHINKO_FEVER_DURATION_TOKENS,
   PACHINKO_PITY_THRESHOLD,
+  DOUBLE_TOKEN_DROP_START_MS,
+  PACHINKO_STAR_20_TARGET_TOKEN_XP,
+  RARE_TOKEN_XP_MULTIPLIER,
   MAX_ACTIVE_PACHINKO_TOKENS,
   PACHINKO_SLOT_COUNT,
   PACHINKO_LEVEL_THRESHOLDS,
@@ -170,9 +173,11 @@ import {
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
   createInitialPachinkoMomentumState,
+  getEnemyPachinkoTokenDropCount,
   getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
   getPachinkoStarRangeForPlayerLevel,
+  getPachinkoStarRangeForTokenXp,
   getPachinkoMomentumLabel,
   getPachinkoWeaponFamily,
   getPachinkoWeaponFamilyLabel,
@@ -181,6 +186,7 @@ import {
   isPachinkoFeverActive,
   resolvePachinkoLandingReward,
   resolvePachinkoReward,
+  resolveEnemyPachinkoTokenXpMultiplier,
   resolvePachinkoSlotIndex,
   resolvePachinkoSlotReward,
   resolveStarForLevel,
@@ -478,9 +484,10 @@ test('player level raises pachinko star range before live table rolls stars', ()
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(1), { minStar: 1, maxStar: 2 })
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(5), { minStar: 1, maxStar: 3 })
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(9), { minStar: 2, maxStar: 4 })
-  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(17), { minStar: 3, maxStar: 5 })
-  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(25), { minStar: 4, maxStar: 5 })
-  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(33), { minStar: 5, maxStar: 5 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(17), { minStar: 3, maxStar: 6 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(25), { minStar: 4, maxStar: 8 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(33), { minStar: 5, maxStar: 10 })
+  assert.deepEqual(getPachinkoStarRangeForTokenXp(PACHINKO_STAR_20_TARGET_TOKEN_XP, 1), { minStar: 16, maxStar: 20 })
 
   const lowLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 1).map((slot) => slot.star)
   const midLevelStars = buildPachinkoSlotRewards(1200, PACHINKO_SLOT_COUNT, 0, 9).map((slot) => slot.star)
@@ -492,6 +499,18 @@ test('player level raises pachinko star range before live table rolls stars', ()
   assert.equal(Math.max(...midLevelStars), 4)
   assert.equal(Math.min(...highLevelStars), 4)
   assert.equal(Math.max(...highLevelStars), 5)
+})
+
+test('enemy token drops scale by time while rare tokens can appear before the late double-drop mark', () => {
+  assert.equal(getEnemyPachinkoTokenDropCount('slime', DOUBLE_TOKEN_DROP_START_MS - 1), 1)
+  assert.equal(getEnemyPachinkoTokenDropCount('slime', DOUBLE_TOKEN_DROP_START_MS), 2)
+  assert.equal(getEnemyPachinkoTokenDropCount('slime', 20 * 60_000), 20)
+  assert.equal(getEnemyPachinkoTokenDropCount('slime-boss', DOUBLE_TOKEN_DROP_START_MS), 0)
+  assert.equal(resolveEnemyPachinkoTokenXpMultiplier(() => 0), RARE_TOKEN_XP_MULTIPLIER)
+  assert.equal(resolveEnemyPachinkoTokenXpMultiplier(() => 0.99), 1)
+
+  const earlyRareProgress = applyEnemyPachinkoTokenProgress({ totalTokenXp: 0, queuedTokenXp: [] }, 'needle-wasp', RARE_TOKEN_XP_MULTIPLIER)
+  assert.equal(earlyRareProgress.grantedTokenXp, getTokenXpForEnemy('needle-wasp') * RARE_TOKEN_XP_MULTIPLIER)
 })
 
 test('enemy defeat token progress feeds the same landing reward resolver as the scene', () => {
@@ -692,7 +711,7 @@ test('pachinko slot modifiers never punish the base reward', () => {
   })
   assert.deepEqual(applyPachinkoSlotModifier(baseReward, 'jackpot', 'spark-carbine'), {
     weaponId: 'spark-carbine',
-    star: 5,
+    star: 6,
   })
 
   const familyLanding = resolvePachinkoLandingReward(1400, 0.75, 0, 1, 'slime-glaive')

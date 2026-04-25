@@ -97,7 +97,7 @@ test('passives modify hazard, burst, impact, and melee behavior safely with roll
   assert.ok(modifiedSprayer.attackBehavior.projectileCount > baseSprayer.attackBehavior.projectileCount)
   assert.ok(modifiedSprayer.attackBehavior.hazardRadius > baseSprayer.attackBehavior.hazardRadius)
 
-  const baseBurst = WEAPON_DEFINITIONS['spark-carbine']
+  const baseBurst = WEAPON_DEFINITIONS['starter-blaster']
   const modifiedBurst = applyPassiveWeaponEffects(baseBurst, state)
   assert.equal(modifiedBurst.attackBehavior.kind, 'burst-fire')
   assert.ok(modifiedBurst.attackBehavior.shotsPerBurst > baseBurst.attackBehavior.shotsPerBurst)
@@ -109,7 +109,7 @@ test('passives modify hazard, burst, impact, and melee behavior safely with roll
   assert.equal(modifiedGlaive.attackBehavior.kind, 'melee-cleave')
   assert.ok(modifiedGlaive.attackBehavior.range > baseGlaive.attackBehavior.range)
 
-  const baseStorm = WEAPON_DEFINITIONS['storm-cannon']
+  const baseStorm = WEAPON_DEFINITIONS['frost-lance']
   const modifiedStorm = applyPassiveWeaponEffects(baseStorm, state)
   assert.equal(modifiedStorm.attackBehavior.kind, 'impact-aoe')
   assert.equal(modifiedStorm.attackBehavior.explosionRadius, baseStorm.attackBehavior.explosionRadius)

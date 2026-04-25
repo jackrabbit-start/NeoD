@@ -143,7 +143,9 @@ import {
   getPachinkoMomentumLabel,
   getPachinkoWeaponOddsRows,
   getPachinkoWeaponSynergySummary,
+  getEnemyPachinkoTokenDropCount,
   getTokenXpForEnemy,
+  resolveEnemyPachinkoTokenXpMultiplier,
   isPachinkoFeverActive,
   type PachinkoMomentumState,
   type PachinkoTokenProgressResult,
@@ -329,6 +331,8 @@ interface PachinkoTokenPickupEntity {
   aura: Phaser.GameObjects.Arc
   auraTween: Phaser.Tweens.Tween
   enemyId: EnemyDefinition['id']
+  tokenXpMultiplier: number
+  isRare: boolean
   isAttracting: boolean
 }
 
@@ -2369,9 +2373,10 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    pickup.sprite.setScale(0.74)
-    pickup.sprite.setTint(PACHINKO_TOKEN_COLOR)
-    pickup.aura.setStrokeStyle(2, PACHINKO_TOKEN_COLOR, 0.82)
+    const tokenColor = pickup.isRare ? 0xff66ff : PACHINKO_TOKEN_COLOR
+    pickup.sprite.setScale(pickup.isRare ? 0.94 : 0.74)
+    pickup.sprite.setTint(tokenColor)
+    pickup.aura.setStrokeStyle(pickup.isRare ? 4 : 2, tokenColor, pickup.isRare ? 0.96 : 0.82)
   }
 
   private syncPachinkoTokenAura(pickup: PachinkoTokenPickupEntity): void {
@@ -2382,11 +2387,12 @@ export class ArenaScene extends Phaser.Scene {
 
   private collectPachinkoTokenPickup(pickup: PachinkoTokenPickupEntity): void {
     const playerXpResult = this.grantPlayerXpForEnemy(pickup.enemyId)
-    const tokenProgress = this.enqueuePachinkoToken(pickup.enemyId)
+    const tokenProgress = this.enqueuePachinkoToken(pickup.enemyId, pickup.tokenXpMultiplier)
     const xpMessage = playerXpResult.grantedXp > 0 ? ` · 캐릭터 XP +${playerXpResult.grantedXp}` : ''
     const levelMessage = playerXpResult.didLevelUp ? ` · Lv.${playerXpResult.level}!` : ''
     if (tokenProgress) {
-      this.statusMessage = `토큰 획득: 파친코 +${tokenProgress.grantedTokenXp} XP · 보상 Lv.${tokenProgress.rewardLevel}${xpMessage}${levelMessage}`
+      const rareMessage = pickup.isRare ? ' · 희귀 토큰 ×10!' : ''
+      this.statusMessage = `토큰 획득: 파친코 +${tokenProgress.grantedTokenXp} XP · 보상 Lv.${tokenProgress.rewardLevel}${rareMessage}${xpMessage}${levelMessage}`
     }
     this.destroyPachinkoTokenPickup(pickup)
   }
@@ -2407,21 +2413,24 @@ export class ArenaScene extends Phaser.Scene {
     x: number,
     y: number,
     enemyId: EnemyDefinition['id'],
+    tokenXpMultiplier = 1,
   ): void {
-    const tokenXp = getTokenXpForEnemy(enemyId)
+    const tokenXp = getTokenXpForEnemy(enemyId) * Math.max(0, tokenXpMultiplier)
     if (tokenXp <= 0) {
       return
     }
 
-    const aura = this.add.circle(x, y, 16, PACHINKO_TOKEN_COLOR, 0.18)
-    aura.setStrokeStyle(2, PACHINKO_TOKEN_COLOR, 0.82)
+    const isRare = tokenXpMultiplier >= 10
+    const tokenColor = isRare ? 0xff66ff : PACHINKO_TOKEN_COLOR
+    const aura = this.add.circle(x, y, isRare ? 21 : 16, tokenColor, isRare ? 0.26 : 0.18)
+    aura.setStrokeStyle(isRare ? 4 : 2, tokenColor, isRare ? 0.96 : 0.82)
     aura.setBlendMode(Phaser.BlendModes.ADD)
     aura.setDepth(3)
     const auraTween = this.tweens.add({
       targets: aura,
       scale: { from: 0.86, to: 1.26 },
-      alpha: { from: 0.48, to: 0.88 },
-      duration: 620,
+      alpha: { from: isRare ? 0.62 : 0.48, to: isRare ? 1 : 0.88 },
+      duration: isRare ? 460 : 620,
       ease: 'Sine.easeInOut',
       yoyo: true,
       repeat: -1,
@@ -2430,8 +2439,8 @@ export class ArenaScene extends Phaser.Scene {
     const sprite = this.physics.add.image(x, y, 'tuning-capsule')
     sprite.setCircle(9)
     sprite.setDepth(4)
-    sprite.setScale(0.74)
-    sprite.setTint(PACHINKO_TOKEN_COLOR)
+    sprite.setScale(isRare ? 0.94 : 0.74)
+    sprite.setTint(tokenColor)
     sprite.setVelocity(Phaser.Math.Between(-42, 42), Phaser.Math.Between(-34, 18))
     sprite.setDrag(420, 420)
 
@@ -2440,6 +2449,8 @@ export class ArenaScene extends Phaser.Scene {
       aura,
       auraTween,
       enemyId,
+      tokenXpMultiplier,
+      isRare,
       isAttracting: false,
     })
   }
@@ -2787,8 +2798,25 @@ export class ArenaScene extends Phaser.Scene {
     const defeatOutcome = getDefeatedEnemyRunOutcome(enemy.config.id)
     const didDropPachinkoToken = defeatOutcome === 'continue' && shouldEnemyGrantPachinkoToken(enemy.config.id)
     if (didDropPachinkoToken) {
-      this.spawnPachinkoTokenPickup(enemy.sprite.x, enemy.sprite.y, enemy.config.id)
-      this.statusMessage = `${enemy.config.name} 처치. 토큰이 떨어졌습니다. 캐릭터로 먹으면 XP와 파친코 보상이 적용됩니다.`
+      const tokenDropCount = getEnemyPachinkoTokenDropCount(enemy.config.id, this.runElapsedMs)
+      let rareTokenCount = 0
+      for (let tokenIndex = 0; tokenIndex < tokenDropCount; tokenIndex += 1) {
+        const tokenXpMultiplier = resolveEnemyPachinkoTokenXpMultiplier(Math.random)
+        if (tokenXpMultiplier >= 10) {
+          rareTokenCount += 1
+        }
+        const spreadAngle = (Math.PI * 2 * tokenIndex) / Math.max(1, tokenDropCount)
+        const spreadRadius = tokenDropCount > 1 ? 18 : 0
+        this.spawnPachinkoTokenPickup(
+          enemy.sprite.x + Math.cos(spreadAngle) * spreadRadius,
+          enemy.sprite.y + Math.sin(spreadAngle) * spreadRadius,
+          enemy.config.id,
+          tokenXpMultiplier,
+        )
+      }
+      const tokenCountMessage = tokenDropCount > 1 ? `토큰 ${tokenDropCount}개가` : '토큰이'
+      const rareMessage = rareTokenCount > 0 ? ` 희귀 ×10 ${rareTokenCount}개 포함!` : ''
+      this.statusMessage = `${enemy.config.name} 처치. ${tokenCountMessage} 떨어졌습니다.${rareMessage} 캐릭터로 먹으면 XP와 파친코 보상이 적용됩니다.`
     }
     if (enemy.telegraph?.visual.active) {
       enemy.telegraph.visual.destroy()
@@ -4118,8 +4146,8 @@ export class ArenaScene extends Phaser.Scene {
     return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${formatWeaponStarLabel(stack.star)}` : ''}`
   }
 
-  private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): PachinkoTokenProgressResult | null {
-    const tokenMultiplier = getPassiveTokenXpMultiplier(this.passiveState)
+  private enqueuePachinkoToken(enemyId: EnemyDefinition['id'], pickupTokenXpMultiplier = 1): PachinkoTokenProgressResult | null {
+    const tokenMultiplier = getPassiveTokenXpMultiplier(this.passiveState) * Math.max(0, pickupTokenXpMultiplier)
     const nextProgress = applyEnemyPachinkoTokenProgress(
       {
         totalTokenXp: this.pachinkoTokenXp,
