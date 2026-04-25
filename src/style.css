@@ -864,6 +864,64 @@ button {
   min-width: 190px;
 }
 
+.hud-modal__weapon-group {
+  display: grid;
+  gap: 10px;
+}
+
+.hud-modal__weapon-variants {
+  display: grid;
+  gap: 8px;
+  padding: 0 4px 2px 6px;
+}
+
+.hud-modal__weapon-variants-label {
+  color: #9fb0e6;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hud-modal__weapon-variants-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 60px));
+  gap: 8px;
+}
+
+.hud-modal__weapon-variant {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-height: 60px;
+  padding: 8px 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(151, 191, 255, 0.14);
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.08), rgba(143, 228, 255, 0.02) 72%),
+    rgba(14, 26, 54, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.hud-modal__weapon-variant.is-equipped {
+  border-color: rgba(166, 255, 208, 0.38);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.hud-modal__weapon-variant-star {
+  color: #f7fbff;
+  font-size: 11px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.hud-modal__weapon-variant-count {
+  color: #9fb0e6;
+  font-size: 10px;
+}
+
 .hud-modal__weapon-stats {
   text-align: right;
   transition: opacity 140ms ease, transform 140ms ease;

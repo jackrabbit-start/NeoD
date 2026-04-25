@@ -387,6 +387,7 @@ export interface HudPassiveChoiceView {
   effectSummary: string
   grade: 'common' | 'rare' | 'epic' | 'legendary'
   gradeLabel: string
+  iconKey?: string
 }
 
 export interface HudModalState {

@@ -669,11 +669,11 @@ test('pachinko slot modifiers never punish the base reward', () => {
 })
 
 test('pachinko slot index clamps boundaries and live table timing', () => {
-  assert.equal(PACHINKO_REWARD_TABLE_REFRESH_MS, 850)
+  assert.equal(PACHINKO_REWARD_TABLE_REFRESH_MS, 5000)
   assert.equal(getPachinkoRewardTableSeed(0), 0)
-  assert.equal(getPachinkoRewardTableSeed(849), 0)
-  assert.equal(getPachinkoRewardTableSeed(850), 1)
-  assert.equal(getPachinkoRewardTableSeed(1700), 2)
+  assert.equal(getPachinkoRewardTableSeed(4999), 0)
+  assert.equal(getPachinkoRewardTableSeed(5000), 1)
+  assert.equal(getPachinkoRewardTableSeed(1700), 0)
 
   assert.equal(resolvePachinkoSlotIndex(-1), 0)
   assert.equal(resolvePachinkoSlotIndex(0), 0)
@@ -1119,11 +1119,14 @@ test('equipping an owned weapon only changes the active weapon id', () => {
 
 test('run progression advances by elapsed time instead of enemy clear state', () => {
   const firstPhase = getRunPhaseByElapsedMs(0)
+  const firstHalfMinute = getRunPhaseByElapsedMs(30_000)
   const secondMinute = getRunPhaseByElapsedMs(60_000)
   const finale = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
 
   assert.equal(firstPhase.minuteIndex, 0)
   assert.equal(firstPhase.healthMultiplier, 1.15)
+  assert.equal(firstHalfMinute.minuteIndex, 0)
+  assert.equal(firstHalfMinute.id, 'minute-01-b')
   assert.equal(secondMinute.minuteIndex, 1)
   assert.equal(secondMinute.stageIndex, 1)
   assert.equal(finale.isFinale, true)
@@ -1135,10 +1138,14 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
 })
 
-test('run progression exposes per-enemy spawn chance rows for the current minute', () => {
+test('run progression exposes per-enemy spawn chance rows for the current half-minute phase', () => {
   const firstPhase = getRunPhaseByElapsedMs(0)
+  const thirdMinuteFront = getRunPhaseByElapsedMs(2 * 60_000)
+  const thirdMinuteBack = getRunPhaseByElapsedMs(2 * 60_000 + 30_000)
   const latePhase = getRunPhaseByElapsedMs(24 * 60_000)
   const firstRows = getRunEnemySpawnChanceRows(firstPhase)
+  const thirdMinuteFrontRows = getRunEnemySpawnChanceRows(thirdMinuteFront)
+  const thirdMinuteBackRows = getRunEnemySpawnChanceRows(thirdMinuteBack)
   const lateRows = getRunEnemySpawnChanceRows(latePhase)
 
   assert.deepEqual(firstRows, [
@@ -1150,6 +1157,7 @@ test('run progression exposes per-enemy spawn chance rows for the current minute
       percentLabel: '100%',
     },
   ])
+  assert.notDeepEqual(thirdMinuteFrontRows, thirdMinuteBackRows)
   assert.ok(lateRows.length > 4)
   assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
   assert.ok(lateRows.some((row) => row.enemyId === 'void-orb'))
@@ -1424,10 +1432,11 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
 })
 
 test('game title and title control hints stay aligned with playable keyboard shortcuts', () => {
-  assert.equal(GAME_TITLE, '김동성의 살아남기')
+  assert.equal(GAME_TITLE, '김동성에게 살아남기')
   assert.deepEqual([...GAME_HEADER_CONTROL_HINTS], ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'])
   assert.match(GAMEPLAY_CONTROL_TIP, /I 인벤토리/)
   assert.match(GAMEPLAY_CONTROL_TIP, /Q 코덱스/)
+  assert.match(GAMEPLAY_CONTROL_TIP, /끝까지 버티기/)
 })
 
 test('stage selection views expose readable time-stage choices and current marker', () => {
@@ -1926,11 +1935,12 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
     })
 
     const weaponList = controller.weaponList
-    const firstWeaponRow = weaponList.children[0]
+    const firstWeaponGroup = weaponList.children[0]
+    const firstWeaponRow = firstWeaponGroup.children[0]
     const actions = firstWeaponRow.children[1]
     const meta = actions.children[0]
 
-    assert.equal(meta.textContent, '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사')
+    assert.equal(meta.textContent, '오버드라이브 카빈 · ★×2 × 1')
   } finally {
     if (previousDocument === undefined) {
       delete globalThis.document
