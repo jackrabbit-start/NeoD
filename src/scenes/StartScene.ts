@@ -78,7 +78,7 @@ export class StartScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setPadding(4, 8, 6, 8)
       .setShadow(0, 3, '#020713', 8)
-    const titleAvatar = this.createKimRunnerPortrait(24, 0)
+    const titleAvatar = this.createPlayerTitleIcon(24, 0)
     const titleGroupWidth = 58 + titleText.width
     this.add.container(width / 2 - titleGroupWidth / 2, titleY, [titleAvatar, titleText])
 
@@ -167,19 +167,24 @@ export class StartScene extends Phaser.Scene {
     })
   }
 
-  private createKimRunnerPortrait(x: number, y: number): Phaser.GameObjects.Container {
+  private createPlayerTitleIcon(x: number, y: number): Phaser.GameObjects.Container {
     const container = this.add.container(x, y)
-    const glow = this.add.circle(0, 0, 31, 0xffd966, 0.18).setStrokeStyle(2, 0x8fe4ff, 0.42)
-    const body = this.add.rectangle(0, 11, 23, 26, 0x1f5f4a, 0.96).setStrokeStyle(2, 0x79ffb2, 0.9)
-    const head = this.add.circle(0, -15, 13, 0xffd6a0, 1).setStrokeStyle(2, 0xf8fbff, 0.9)
-    const hair = this.add.ellipse(0, -22, 24, 10, 0x141414, 1)
-    const eyeLeft = this.add.circle(-5, -15, 1.7, 0x07111f, 1)
-    const eyeRight = this.add.circle(5, -15, 1.7, 0x07111f, 1)
-    const armLeft = this.add.rectangle(-17, 9, 7, 23, 0x8fe4ff, 0.92).setAngle(-32)
-    const armRight = this.add.rectangle(17, 7, 7, 23, 0xffd966, 0.92).setAngle(32)
-    const legLeft = this.add.rectangle(-8, 30, 7, 22, 0xd8e2ff, 0.92).setAngle(24)
-    const legRight = this.add.rectangle(12, 29, 7, 22, 0xd8e2ff, 0.92).setAngle(-28)
-    container.add([glow, armLeft, armRight, legLeft, legRight, body, head, hair, eyeLeft, eyeRight])
+    const glow = this.add.circle(0, 0, 31, 0xffd966, 0.16).setStrokeStyle(2, 0x8fe4ff, 0.36)
+    const playerIcon = this.add.sprite(0, 0, 'player-walk-0')
+    playerIcon.setScale(1.85)
+    playerIcon.play('player-move')
+    playerIcon.setAngle(-4)
+    container.add([glow, playerIcon])
+    this.tweens.add({
+      targets: playerIcon,
+      y: -4,
+      angle: 5,
+      duration: 360,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
     return container
   }
+
 }

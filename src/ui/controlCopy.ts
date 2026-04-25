@@ -5,6 +5,8 @@ export const KIM_COMMUNITY_NARRATIONS = [
   '김동성 근황) 오늘도 파친코 앞에서 달리기 연습 중이라 함',
   '목격담: 토큰 소리만 나면 뛰던 사람이 이제는 출구 쪽으로 뛴다',
   '빚쟁이보다 빠르면 인생도 리셋된다는 김동성식 공략법',
+  '커뮤썰: 잭팟보다 빠른 건 김동성의 도주 각성이라더라',
+  '속보) 파친코 버튼 누르던 손으로 이제는 달려라 버튼 누르는 중',
 ] as const
 
 export const GAME_HEADER_CONTROL_HINTS = ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'] as const

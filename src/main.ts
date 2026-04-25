@@ -3,12 +3,12 @@ import { createGameConfig } from './game/config.js'
 import './style.css'
 import { CodexController } from './ui/Codex.js'
 import { HudController } from './ui/Hud.js'
-import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE, KIM_COMMUNITY_NARRATIONS } from './ui/controlCopy.js'
+import { GAMEPLAY_CONTROL_TIP, GAME_TITLE, KIM_COMMUNITY_NARRATIONS } from './ui/controlCopy.js'
 
 const app = document.querySelector<HTMLDivElement>('#app')
 
-const headerControlMarkup = GAME_HEADER_CONTROL_HINTS.map((hint) => `<span>${hint}</span>`).join('')
-const headerNarration = KIM_COMMUNITY_NARRATIONS[new Date().getDate() % KIM_COMMUNITY_NARRATIONS.length]
+const getHeaderNarration = (index: number): string => KIM_COMMUNITY_NARRATIONS[index % KIM_COMMUNITY_NARRATIONS.length]
+let headerNarrationIndex = new Date().getSeconds() % KIM_COMMUNITY_NARRATIONS.length
 
 if (!app) {
   throw new Error('#app 루트 요소가 필요합니다.')
@@ -17,17 +17,15 @@ if (!app) {
 app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
-      <div class="game-header__brand game-header__brand--narration">
-        <p class="game-header__narration" aria-label="김동성의 오늘">
-          “${headerNarration}”
-        </p>
-        <div class="game-header__controls" aria-label="조작 방법">
-          ${headerControlMarkup}
+      <div class="game-header__narration-strip" data-region="kim-narration-strip">
+        <div class="game-header__mood-icons" aria-hidden="true">
+          <span>😤</span>
+          <span>🎰</span>
+          <span>🏃</span>
         </div>
-      </div>
-      <div class="game-header__rails" aria-hidden="true">
-        <span></span>
-        <span></span>
+        <p class="game-header__narration" data-region="kim-narration" aria-live="polite" aria-label="김동성 커뮤니티 드립">
+          “${getHeaderNarration(headerNarrationIndex)}”
+        </p>
       </div>
     </header>
     <section class="game-stage-shell">
@@ -98,7 +96,23 @@ const game = new Phaser.Game(createGameConfig('game-root'))
 game.registry.set('hud', hud)
 game.registry.set('codex', codex)
 
+const narrationElement = document.querySelector<HTMLElement>('[data-region="kim-narration"]')
+const narrationStripElement = document.querySelector<HTMLElement>('[data-region="kim-narration-strip"]')
+const narrationTimer = window.setInterval(() => {
+  if (!narrationElement || !narrationStripElement) {
+    return
+  }
+
+  headerNarrationIndex += 1
+  narrationStripElement.classList.remove('is-rolling')
+  void narrationStripElement.offsetWidth
+  narrationElement.textContent = `“${getHeaderNarration(headerNarrationIndex)}”`
+  narrationStripElement.classList.add('is-rolling')
+  window.setTimeout(() => narrationStripElement.classList.remove('is-rolling'), 520)
+}, 5000)
+
 window.addEventListener('beforeunload', () => {
+  window.clearInterval(narrationTimer)
   hud.destroy()
   codex.destroy()
   game.destroy(true)
