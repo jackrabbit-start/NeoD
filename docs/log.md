@@ -87,3 +87,9 @@
 - Added `docs/wiki/pachinko-token-rewards.md` to preserve the token pickup → right-side physics pachinko → random weapon/star → manual same-star fusion loop.
 - Updated `docs/index.md` so future agents can find the pachinko reward guidance.
 - Source artifacts: `.omx/specs/deep-interview-pachinko-token-weapons.md`, `.omx/interviews/pachinko-token-weapons-20260425T122020Z.md`, `.omx/context/post-interview-pachinko-token-rewards-20260425T143344Z.md`, PR #42, and PR #46.
+
+## [2026-04-25] gameplay-ui | Captured pachinko machine capacity visuals
+
+- Updated `docs/wiki/pachinko-token-rewards.md` with the 15-active-token cap, queued-overflow badge, exact live reward-slot table, and Phaser board chrome synchronization rules.
+- Added `.omx/context/post-interview-pachinko-machine-capacity-visuals-20260425T161614Z.md` to preserve the implementation, verification, architect rejection/fix, and residual visual-test gap.
+- Source artifacts: `.omx/specs/deep-interview-pachinko-machine-capacity-visuals.md`, `.omx/interviews/pachinko-machine-capacity-visuals-20260425T152330Z.md`, commits `362618b` and `bba27bc`.
