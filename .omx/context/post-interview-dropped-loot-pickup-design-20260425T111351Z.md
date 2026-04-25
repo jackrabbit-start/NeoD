@@ -1,0 +1,33 @@
+# Post-Interview Context — Dropped Loot Pickup Design
+
+- Source spec: `.omx/specs/deep-interview-dropped-loot-pickup-design.md`
+- Source transcript/context: `.omx/interviews/dropped-loot-pickup-design-20260425T100726Z.md`, `.omx/context/dropped-loot-pickup-design-20260425T095127Z.md`, `.omx/plans/prd-dropped-loot-pickup-design.md`, `.omx/plans/test-spec-dropped-loot-pickup-design.md`
+- Branch/worktree: captured on `ai-dev` after PR #30 merge; implementation commit `cc35ec5`, merge commit `25eaa22`
+- Summary: The interview resolved “dropped weapons/cores” to mean the existing enemy-death `LootId` drops, not true floor-dropped `WeaponId` entities. The shipped V1 improves readability and pickup feel for current loot only by enlarging/refreshing loot SVGs, adding scene-level aura/magnet feedback, and centralizing pickup phase math.
+- Lessons:
+  - Future agents should distinguish current `LootId` enemy drops from actual `WeaponId` floor drops before changing progression semantics.
+  - Readability and pickup feel can be improved locally in `ArenaScene` plus assets/manifest without changing drop tables, recipes, inventory, tuning, or owned weapons.
+  - Keep pickup tuning testable through pure radius/phase helpers; Phaser scene code should remain responsible for presentation and cleanup.
+  - Pickup feedback needs lifecycle handling: companion aura/tweens must pause with interaction blocking and be destroyed with the loot entity.
+- New files:
+  - `src/systems/lootPickup.ts` — pure pickup constants and helpers: legacy 20px distance, 72px attraction radius, 32px collect radius, `idle | attract | collect` phase, and attraction step sizing.
+- Modified files:
+  - `src/scenes/ArenaScene.ts` — adds `LootEntity` aura/tween/attraction state, updates loot drops each frame, applies magnet movement and aura styling, pauses aura tweening during interaction blocks, and destroys companion visuals on collection/reset.
+  - `src/game/visualManifest.ts` — updates loot manifest metadata to larger 22x22 assets with fallback radius 10.
+  - `public/assets/loot/*.svg` — refreshes six current loot visuals with larger silhouettes/glow/outline/internal symbol treatment while preserving texture keys.
+  - `tests/game-logic.test.mjs` — adds deterministic pickup helper tests and locks updated loot visual metadata while preserving inventory/combine/tuning regressions.
+  - `docs/wiki/dropped-loot-pickup-ux.md`, `docs/index.md`, `docs/log.md` — durable synthesis added by this post-interview capture.
+- Decisions / constraints:
+  - V1 remains current `LootId` drops only: `gel-shard`, `acid-core`, `frost-mote`, `spark-knot`, `mist-bead`, `tuning-capsule`.
+  - Do not add true `WeaponId` floor drops, direct owned-weapon pickup, drop table rebalance, inventory/combine/tuning changes, audio, or dependencies under this scope.
+  - `applyLootPickup` remains the inventory mutation/message path for collected loot.
+  - Texture keys stay stable so data definitions and manifest tests remain meaningful.
+- Verification:
+  - Post-rebase verification after resolving `origin/ai-dev` conflict: `pnpm run typecheck` PASS, `pnpm test` PASS (94 tests), `pnpm build` PASS with existing Vite chunk-size warning, `git diff --check` PASS.
+  - Ralph controlled Chrome evidence in `.omx/state/sessions/019dc402-476f-7ca1-87e4-ee95469607e3/ralph-progress.json`: readable forced drop, attraction movement toward player, inventory pickup/status, unchanged owned weapon list, pause-safe aura tween, tuning-capsule pickup.
+  - PR #30 was merged into `ai-dev`.
+- Residual risks:
+  - Human subjective visual/tuning feel should still be revisited during broader playtest because automated/browser-controlled checks cannot fully prove readability under all combat clutter.
+  - Future true weapon-drop work still needs a separate design pass for drop tables, ownership semantics, and pickup UI.
+  - `pnpm` reports a Node engine warning in this environment (`node 25.x` vs project `22.x`), but verification commands passed.
+- Next recommended use: When touching loot progression, start from `docs/wiki/dropped-loot-pickup-ux.md` and this note to preserve current-loot semantics; run a new deep-interview before adding real `WeaponId` floor drops.

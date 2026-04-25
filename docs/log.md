@@ -31,3 +31,9 @@
 - Updated `docs/wiki/game-requirements.md` to record that moment-to-moment survival feedback should be visible in the gameplay canvas when it affects dodging/positioning.
 - Recorded the shipped player health bar as a compact Phaser canvas overlay with deterministic placement/fill helpers.
 - Source artifacts: `.omx/specs/deep-interview-health-bar-bottom.md`, `.omx/interviews/health-bar-bottom-20260425T013800Z.md`, `.omx/context/post-interview-health-bar-bottom-20260425T110701Z.md`, and PR #28.
+
+## [2026-04-25] gameplay-ui | Captured dropped loot pickup UX boundary
+
+- Added `docs/wiki/dropped-loot-pickup-ux.md` to preserve the current-loot-only interpretation, pickup radii, magnet feedback, and true-weapon-drop non-goal.
+- Updated `docs/index.md` so future agents can find the dropped loot pickup guidance.
+- Source artifacts: `.omx/specs/deep-interview-dropped-loot-pickup-design.md`, `.omx/interviews/dropped-loot-pickup-design-20260425T100726Z.md`, `.omx/context/post-interview-dropped-loot-pickup-design-20260425T111351Z.md`, and PR #30.
