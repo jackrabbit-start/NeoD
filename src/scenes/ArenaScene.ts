@@ -9,13 +9,11 @@ import type {
   WeaponStackKey,
 } from '../domain/types.js'
 import {
-  COMBAT_RECT,
   ENEMY_CONTACT_PADDING,
   PACHINKO_DIVIDER_X,
   PACHINKO_RECT,
   PLAYER_COLLISION_RADIUS,
   PROJECTILE_HIT_PADDING,
-  clampPointToRect,
 } from '../game/combatGeometry.js'
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { CodexController } from '../ui/Codex.js'
@@ -23,23 +21,67 @@ import type { HudController } from '../ui/Hud.js'
 import { getCodexState } from '../systems/codex.js'
 import {
   advanceEnemyCooldown,
+  createEnemySpreadBurstProjectiles,
   createEnemyRuntimeState,
   createEnemyTelegraph,
   getDistanceBetween,
   isPointInsideCircle,
   resolveEnemyVelocityStep,
+  shouldEnemyStartSpreadBurst,
   shouldEnemyStartTelegraph,
   type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
+import {
+  advanceEnemyProjectileState,
+  createEnemyProjectileState,
+  type EnemyProjectileSpawnSpec,
+  type EnemyProjectileState,
+} from '../systems/enemyProjectiles.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import {
+  getLootAttractionStep,
+  getLootPickupPhase,
+  LOOT_COLLECT_RADIUS,
+} from '../systems/lootPickup.js'
+import {
+  createMapLayout,
+  selectHeartItemSpawnPoint,
+  selectEnemySpawnPoint,
+  type MapLayout,
+} from '../systems/mapLayout.js'
+import {
+  HEART_PICKUP_COLOR,
+  HEART_PICKUP_HEAL_AMOUNT,
+  HEART_PICKUP_TEXTURE_KEY,
+  getHealedPlayerHealth,
+  getInitialHeartPickupSpawnAt,
+  getNextHeartPickupSpawnAt,
+  shouldSpawnHeartPickup,
+} from '../systems/healthPickups.js'
+import {
+  getTopRightMiniMapBounds,
+  projectWorldPointToMiniMap,
+  projectWorldRectToMiniMap,
+  type MiniMapBounds,
+} from '../systems/minimap.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
+import {
+  canStartPlayerDash,
+  createReadyPlayerDashState,
+  isPlayerDashActive,
+  isPlayerDashInvulnerable,
+  PLAYER_DASH_SPEED,
+  resolvePlayerDashDirection,
+  startPlayerDash,
+  type PlayerDashState,
+} from '../systems/playerDash.js'
+import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import {
   applyEnemyPachinkoTokenProgress,
   getPachinkoRewardLevel,
   resolvePachinkoLandingReward,
   shouldEnemyGrantPachinkoToken,
 } from '../systems/pachinkoRewards.js'
-import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
 import {
   advanceKnockbackState,
@@ -56,12 +98,15 @@ import {
   collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
+  getWeaponAttackRange,
   getWeaponSummary,
   isAttackPlanActionable,
+  isPointWithinRadius,
   isProjectileOutOfBounds,
+  resolveProjectileRangeStep,
   selectChainTargets,
 } from '../systems/weaponBehaviors.js'
-import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
+import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import { deriveEffectiveWeaponStats } from '../systems/tuning.js'
 import {
   addWeaponStack,
@@ -101,12 +146,25 @@ interface PlayerHealthBar {
   height: number
 }
 
+interface MiniMapDisplay {
+  graphics: Phaser.GameObjects.Graphics
+  label: Phaser.GameObjects.Text
+  bounds: MiniMapBounds
+}
+
 interface EnemyTelegraph {
   visual: Phaser.GameObjects.Arc
   x: number
   y: number
   radius: number
   damage: number
+  remainingMs: number
+  totalMs: number
+}
+
+interface EnemySpreadBurstCharge {
+  visual: Phaser.GameObjects.Graphics
+  projectiles: EnemyProjectileSpawnSpec[]
   remainingMs: number
   totalMs: number
 }
@@ -122,10 +180,18 @@ interface EnemyEntity {
   attackCooldownMs: number
   knockback?: KnockbackState
   telegraph?: EnemyTelegraph
+  spreadBurst?: EnemySpreadBurstCharge
 }
 
 interface PachinkoTokenEntity {
   sprite: PhysicsImage
+}
+
+interface HealthPickupEntity {
+  sprite: PhysicsImage
+  aura: Phaser.GameObjects.Arc
+  auraTween: Phaser.Tweens.Tween
+  isAttracting: boolean
 }
 
 interface ProjectileEntity {
@@ -136,11 +202,17 @@ interface ProjectileEntity {
   remainingLifetimeMs: number
   remainingHits: number
   hitEnemyIds: Set<number>
+  origin: Point
   direction: ProjectileSpawnSpec['direction']
+  maxTravelDistance: number
   knockback: ProjectileSpawnSpec['knockback']
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
+}
+
+interface EnemyProjectileEntity extends EnemyProjectileState {
+  sprite: PhysicsImage
 }
 
 interface HazardZoneEntity {
@@ -155,6 +227,8 @@ interface HazardZoneEntity {
   tickCountdownMs: number
 }
 
+const MINI_MAP_SYNC_INTERVAL_MS = 100
+
 export class ArenaScene extends Phaser.Scene {
   private hud!: HudController
 
@@ -168,15 +242,31 @@ export class ArenaScene extends Phaser.Scene {
 
   private enemySpacingCollider?: Phaser.Physics.Arcade.Collider
 
+  private mapVisuals: Phaser.GameObjects.GameObject[] = []
+
+  private miniMap?: MiniMapDisplay
+
+  private nextMiniMapSyncAt = 0
+
+  private readonly mapLayout: MapLayout = createMapLayout()
+
   private cursors!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
 
   private inventoryKey!: Phaser.Input.Keyboard.Key
 
   private codexKey!: Phaser.Input.Keyboard.Key
 
+  private dashKey!: Phaser.Input.Keyboard.Key
+
   private enemies: EnemyEntity[] = []
 
+  private healthPickups: HealthPickupEntity[] = []
+
+  private nextHeartPickupAt = 0
+
   private projectiles: ProjectileEntity[] = []
+
+  private enemyProjectiles: EnemyProjectileEntity[] = []
 
   private hazardZones: HazardZoneEntity[] = []
 
@@ -196,6 +286,12 @@ export class ArenaScene extends Phaser.Scene {
 
   private playerSpeed = 220
 
+  private playerDashState: PlayerDashState = createReadyPlayerDashState()
+
+  private playerDashDirection = new Phaser.Math.Vector2(1, 0)
+
+  private lastPlayerMoveDirection = new Phaser.Math.Vector2(1, 0)
+
   private nextFireAt = 0
 
   private remainingSpawns = 0
@@ -210,7 +306,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private statusMessage = 'WASD로 이동하고 회피하는 동안 무기가 자동으로 발사됩니다.'
+  private statusMessage = 'WASD로 이동하고 J 대시로 회피하는 동안 무기가 자동으로 발사됩니다.'
 
   private lastPlayerHitAt = 0
 
@@ -246,33 +342,38 @@ export class ArenaScene extends Phaser.Scene {
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
-    this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT)
-
-    const arena = this.add.rectangle(
-      COMBAT_RECT.x + COMBAT_RECT.width / 2,
-      COMBAT_RECT.y + COMBAT_RECT.height / 2,
-      COMBAT_RECT.width - 24,
-      COMBAT_RECT.height - 48,
-      0x0d1d33,
-      1,
+    const { worldBounds, playerStart } = this.mapLayout
+    this.physics.world.setBounds(
+      worldBounds.x,
+      worldBounds.y,
+      worldBounds.width,
+      worldBounds.height,
     )
-    arena.setStrokeStyle(2, 0x214266, 0.9)
-
+    this.cameras.main.setBounds(
+      worldBounds.x,
+      worldBounds.y,
+      worldBounds.width,
+      worldBounds.height,
+    )
+    this.createMapVisuals()
     this.createPachinkoBoard()
 
-    this.player = this.physics.add.sprite(COMBAT_RECT.width / 2, COMBAT_RECT.height / 2, 'player')
+    this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'player')
     this.player.setCircle(PLAYER_COLLISION_RADIUS)
-    this.player.setCollideWorldBounds(false)
+    this.player.setCollideWorldBounds(true)
     this.player.play('player-idle')
+    this.cameras.main.startFollow(this.player, true, 0.09, 0.09)
     this.playerHealthBar = this.createPlayerHealthBar()
     this.syncPlayerHealthBar()
 
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
+    this.createMiniMap()
+    this.nextHeartPickupAt = getInitialHeartPickupSpawnAt(this.time.now)
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
-      throw new Error('NeoD 프로토타입에는 키보드 입력이 필요합니다.')
+      throw new Error('NeoD에는 키보드 입력이 필요합니다.')
     }
 
     this.cursors = keyboard.addKeys({
@@ -283,8 +384,10 @@ export class ArenaScene extends Phaser.Scene {
     }) as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
     this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
+    this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
 
     this.startWave(0)
+    this.syncMiniMap(this.time.now, true)
     this.updateHud()
     this.updateCodex()
   }
@@ -296,13 +399,32 @@ export class ArenaScene extends Phaser.Scene {
 
     this.handleInventoryToggle()
     this.handleCodexToggle()
-    this.handlePlayerMovement()
+    this.handlePlayerMovement(time)
     this.handleFiring(time)
     this.updateEnemies(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.updateProjectiles(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
+    this.updateEnemyProjectiles(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.updatePachinko()
+    this.updateHealthPickups(time, delta)
     this.updateHazards(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.cleanupDestroyedEntities()
+    this.syncMiniMap(time)
 
     if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
       this.advanceWave()
@@ -314,6 +436,114 @@ export class ArenaScene extends Phaser.Scene {
 
   private isInteractionBlocked(): boolean {
     return this.isInventoryOpen || this.isCodexOpen
+  }
+
+  private createMapVisuals(): void {
+    const { worldBounds } = this.mapLayout
+    const arena = this.add.rectangle(
+      worldBounds.x + worldBounds.width / 2,
+      worldBounds.y + worldBounds.height / 2,
+      worldBounds.width,
+      worldBounds.height,
+      0x0d1d33,
+      1,
+    )
+    arena.setStrokeStyle(3, 0x214266, 0.9)
+    arena.setDepth(-20)
+    this.mapVisuals.push(arena)
+
+    const grid = this.add.graphics()
+    grid.lineStyle(1, 0x173150, 0.28)
+    for (let x = worldBounds.x; x <= worldBounds.x + worldBounds.width; x += 160) {
+      grid.lineBetween(x, worldBounds.y, x, worldBounds.y + worldBounds.height)
+    }
+    for (let y = worldBounds.y; y <= worldBounds.y + worldBounds.height; y += 135) {
+      grid.lineBetween(worldBounds.x, y, worldBounds.x + worldBounds.width, y)
+    }
+    grid.setDepth(-19)
+    this.mapVisuals.push(grid)
+  }
+
+
+  private createMiniMap(): void {
+    const bounds = getTopRightMiniMapBounds(GAME_WIDTH)
+    const graphics = this.add
+      .graphics()
+      .setDepth(48)
+      .setScrollFactor(0)
+
+    const label = this.add
+      .text(bounds.x + bounds.padding, bounds.y + 4, 'MAP', {
+        color: '#dbeafe',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '10px',
+        fontStyle: '700',
+      })
+      .setDepth(49)
+      .setScrollFactor(0)
+      .setShadow(0, 1, '#020713', 2)
+
+    this.miniMap = {
+      graphics,
+      label,
+      bounds,
+    }
+  }
+
+  private syncMiniMap(time = this.time.now, force = false): void {
+    if (!this.miniMap || !this.player?.active) {
+      return
+    }
+
+    if (!force && time < this.nextMiniMapSyncAt) {
+      return
+    }
+    this.nextMiniMapSyncAt = time + MINI_MAP_SYNC_INTERVAL_MS
+
+    const { graphics, bounds } = this.miniMap
+    const { worldBounds } = this.mapLayout
+    graphics.clear()
+    graphics.fillStyle(0x020713, 0.72)
+    graphics.fillRoundedRect(bounds.x, bounds.y, bounds.width, bounds.height, 10)
+    graphics.lineStyle(1, 0x93c5fd, 0.52)
+    graphics.strokeRoundedRect(bounds.x, bounds.y, bounds.width, bounds.height, 10)
+
+    const viewport = projectWorldRectToMiniMap(
+      {
+        x: this.cameras.main.worldView.x,
+        y: this.cameras.main.worldView.y,
+        width: this.cameras.main.worldView.width,
+        height: this.cameras.main.worldView.height,
+      },
+      worldBounds,
+      bounds,
+    )
+    graphics.lineStyle(1, 0xffffff, 0.46)
+    graphics.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height)
+
+    for (const pickup of this.healthPickups) {
+      if (!pickup.sprite.active) {
+        continue
+      }
+      const dot = projectWorldPointToMiniMap(pickup.sprite, worldBounds, bounds)
+      graphics.fillStyle(HEART_PICKUP_COLOR, 0.95)
+      graphics.fillCircle(dot.x, dot.y, 2.4)
+    }
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active) {
+        continue
+      }
+      const dot = projectWorldPointToMiniMap(enemy.sprite, worldBounds, bounds)
+      graphics.fillStyle(enemy.config.tint, 0.9)
+      graphics.fillCircle(dot.x, dot.y, enemy.config.id === 'slime-boss' ? 3.3 : 2.2)
+    }
+
+    const playerDot = projectWorldPointToMiniMap(this.player, worldBounds, bounds)
+    graphics.fillStyle(0x66d9ef, 1)
+    graphics.fillCircle(playerDot.x, playerDot.y, 3)
+    graphics.lineStyle(1, 0xffffff, 0.9)
+    graphics.strokeCircle(playerDot.x, playerDot.y, 3.8)
   }
 
   private handleInventoryToggle(): void {
@@ -338,32 +568,55 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handlePlayerMovement(): void {
+  private handlePlayerMovement(time: number): void {
     if (this.isInteractionBlocked()) {
       this.player.setVelocity(0, 0)
       this.setPlayerAnimation(false)
       return
     }
 
-    const velocity = new Phaser.Math.Vector2(
+    const inputVelocity = new Phaser.Math.Vector2(
       Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
       Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
     )
 
-    const isMoving = velocity.lengthSq() > 0
+    const isMoving = inputVelocity.lengthSq() > 0
     if (isMoving) {
-      velocity.normalize().scale(this.playerSpeed)
+      inputVelocity.normalize()
+      this.lastPlayerMoveDirection.set(inputVelocity.x, inputVelocity.y)
     }
 
-    this.player.setVelocity(velocity.x, velocity.y)
-    const clampedPlayer = clampPointToRect(this.player, COMBAT_RECT, PLAYER_COLLISION_RADIUS)
-    this.player.setPosition(clampedPlayer.x, clampedPlayer.y)
+    if (
+      Phaser.Input.Keyboard.JustDown(this.dashKey) &&
+      canStartPlayerDash(time, this.playerDashState, false)
+    ) {
+      const dashDirection = resolvePlayerDashDirection(inputVelocity, this.lastPlayerMoveDirection)
+      this.playerDashDirection.set(dashDirection.x, dashDirection.y)
+      this.playerDashState = startPlayerDash(time)
+      this.statusMessage = 'J 대시! 짧은 무적 시간으로 보스 예고 공격을 피하세요.'
+    }
+
+    if (isPlayerDashActive(time, this.playerDashState)) {
+      this.player.setVelocity(
+        this.playerDashDirection.x * PLAYER_DASH_SPEED,
+        this.playerDashDirection.y * PLAYER_DASH_SPEED,
+      )
+      this.setPlayerAnimation(true)
+      return
+    }
+
+    if (isMoving) {
+      inputVelocity.scale(this.playerSpeed)
+    }
+
+    this.player.setVelocity(inputVelocity.x, inputVelocity.y)
     this.setPlayerAnimation(isMoving)
   }
 
   private handleFiring(time: number): void {
     const activeStack = parseWeaponStackKey(this.activeWeaponKey)
     const weapon = deriveEffectiveWeaponStats(activeStack?.weaponId ?? getWeaponIdFromStackKey(this.activeWeaponKey), {}, activeStack?.star ?? 1)
+    const weaponRange = getWeaponAttackRange(weapon)
     const target = resolveAutoAttackShot(
       {
         x: this.player.x,
@@ -372,12 +625,14 @@ export class ArenaScene extends Phaser.Scene {
       this.enemies.map((enemy) => ({
         x: enemy.sprite.x,
         y: enemy.sprite.y,
+        radius: enemy.config.size / 2,
         isActive: enemy.sprite.active,
       })),
       {
         isInteractionBlocked: this.isInteractionBlocked(),
         time,
         nextFireAt: this.nextFireAt,
+        maxRange: weaponRange,
       },
     )
 
@@ -440,11 +695,41 @@ export class ArenaScene extends Phaser.Scene {
             )
           ) {
             this.damagePlayer(enemy.telegraph.damage)
+            if (this.isRunEnding) {
+              return
+            }
           }
 
           enemy.telegraph.visual.destroy()
           enemy.telegraph = undefined
           if (enemy.config.attackBehavior.kind === 'telegraphed-aoe') {
+            enemy.attackCooldownMs = enemy.config.attackBehavior.cooldownMs
+          }
+        }
+
+        enemy.sprite.setVelocity(0, 0)
+        this.syncEnemyHealthBar(enemy)
+        continue
+      }
+
+      if (enemy.spreadBurst) {
+        enemy.knockback = clearKnockbackForTelegraph()
+        enemy.spreadBurst.remainingMs -= delta
+        enemy.spreadBurst.visual.setAlpha(
+          Math.max(0.2, 0.86 * (1 - enemy.spreadBurst.remainingMs / enemy.spreadBurst.totalMs)),
+        )
+
+        if (enemy.spreadBurst.remainingMs <= 0) {
+          for (const projectileSpec of enemy.spreadBurst.projectiles) {
+            this.spawnEnemyProjectile(
+              { x: enemy.sprite.x, y: enemy.sprite.y },
+              projectileSpec,
+            )
+          }
+
+          enemy.spreadBurst.visual.destroy()
+          enemy.spreadBurst = undefined
+          if (enemy.config.attackBehavior.kind === 'spread-burst') {
             enemy.attackCooldownMs = enemy.config.attackBehavior.cooldownMs
           }
         }
@@ -494,6 +779,35 @@ export class ArenaScene extends Phaser.Scene {
         }
       }
 
+      const attackBehavior = enemy.config.attackBehavior
+      if (
+        attackBehavior.kind === 'spread-burst' &&
+        shouldEnemyStartSpreadBurst(
+          attackBehavior,
+          distanceToPlayer,
+          enemy.attackCooldownMs,
+        )
+      ) {
+        const projectiles = createEnemySpreadBurstProjectiles(
+          { x: enemy.sprite.x, y: enemy.sprite.y },
+          { x: this.player.x, y: this.player.y },
+          attackBehavior,
+        )
+
+        if (projectiles.length > 0) {
+          enemy.spreadBurst = {
+            visual: this.createSpreadBurstWarning(enemy, projectiles),
+            projectiles,
+            remainingMs: attackBehavior.windupMs,
+            totalMs: attackBehavior.windupMs,
+          }
+          enemy.knockback = clearKnockbackForTelegraph()
+          enemy.sprite.setVelocity(0, 0)
+          this.syncEnemyHealthBar(enemy)
+          continue
+        }
+      }
+
       const movementStep = resolveEnemyVelocityStep(
         { x: enemy.sprite.x, y: enemy.sprite.y },
         { x: this.player.x, y: this.player.y },
@@ -507,13 +821,14 @@ export class ArenaScene extends Phaser.Scene {
       enemy.knockback = knockbackStep.state
       const nextVelocity = combineMovementWithKnockback(movementStep.velocity, knockbackStep.velocity)
       enemy.sprite.setVelocity(nextVelocity.x, nextVelocity.y)
-      const clampedEnemy = clampPointToRect(enemy.sprite, COMBAT_RECT, enemy.config.size / 2)
-      enemy.sprite.setPosition(clampedEnemy.x, clampedEnemy.y)
       enemy.sprite.play(enemy.config.animationKey, true)
 
       const touchingPlayer = distanceToPlayer < enemy.config.size / 2 + ENEMY_CONTACT_PADDING
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
+        if (this.isRunEnding) {
+          return
+        }
       }
 
       this.syncEnemyHealthBar(enemy)
@@ -530,6 +845,16 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
+      const rangeStep = resolveProjectileRangeStep(
+        projectile.origin,
+        { x: projectile.sprite.x, y: projectile.sprite.y },
+        projectile.maxTravelDistance,
+      )
+      const didExpireAtRange = rangeStep.expired
+      if (rangeStep.expired) {
+        projectile.sprite.setPosition(rangeStep.point.x, rangeStep.point.y)
+      }
+
       projectile.remainingLifetimeMs -= delta
       if (projectile.remainingLifetimeMs <= 0) {
         this.destroyProjectile(projectile, projectile.hazardOnExpire)
@@ -539,8 +864,7 @@ export class ArenaScene extends Phaser.Scene {
       if (
         isProjectileOutOfBounds(
           { x: projectile.sprite.x, y: projectile.sprite.y },
-          COMBAT_RECT.width,
-          COMBAT_RECT.height,
+          this.mapLayout.worldBounds,
         )
       ) {
         this.destroyProjectile(projectile, projectile.hazardOnExpire)
@@ -554,12 +878,11 @@ export class ArenaScene extends Phaser.Scene {
 
         const hitDistance = enemy.config.size / 2 + Math.max(projectile.radius, PROJECTILE_HIT_PADDING)
         if (
-          Phaser.Math.Distance.Between(
-            projectile.sprite.x,
-            projectile.sprite.y,
-            enemy.sprite.x,
-            enemy.sprite.y,
-          ) <= hitDistance
+          isPointWithinRadius(
+            { x: projectile.sprite.x, y: projectile.sprite.y },
+            { x: enemy.sprite.x, y: enemy.sprite.y },
+            hitDistance,
+          )
         ) {
           const hitStep = applyProjectileHitState(
             projectile.hitEnemyIds,
@@ -595,10 +918,246 @@ export class ArenaScene extends Phaser.Scene {
           }
         }
       }
-    }
 
+      if (didExpireAtRange && projectile.sprite.active) {
+        this.destroyProjectile(projectile, projectile.hazardOnExpire)
+      }
+    }
   }
 
+  private createSpreadBurstWarning(
+    enemy: EnemyEntity,
+    projectiles: EnemyProjectileSpawnSpec[],
+  ): Phaser.GameObjects.Graphics {
+    const behavior = enemy.config.attackBehavior
+    const range =
+      behavior.kind === 'spread-burst'
+        ? Math.min(
+            behavior.range,
+            behavior.projectileSpeed * (behavior.projectileLifetimeMs / 1000),
+          )
+        : 140
+    const visual = this.add.graphics().setDepth(0.65)
+    visual.lineStyle(2, enemy.config.tint, 0.82)
+
+    for (const projectile of projectiles) {
+      visual.lineBetween(
+        enemy.sprite.x,
+        enemy.sprite.y,
+        enemy.sprite.x + projectile.direction.x * range,
+        enemy.sprite.y + projectile.direction.y * range,
+      )
+    }
+
+    visual.fillStyle(enemy.config.tint, 0.12)
+    visual.fillCircle(enemy.sprite.x, enemy.sprite.y, enemy.config.size * 0.62)
+    visual.setAlpha(0.28)
+    return visual
+  }
+
+  private updateEnemyProjectiles(delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    for (const projectile of this.enemyProjectiles) {
+      if (!projectile.sprite.active) {
+        continue
+      }
+
+      const step = advanceEnemyProjectileState(
+        projectile,
+        delta,
+        { width: GAME_WIDTH, height: GAME_HEIGHT },
+        { x: this.player.x, y: this.player.y, radius: PLAYER_COLLISION_RADIUS },
+      )
+
+      projectile.x = step.projectile.x
+      projectile.y = step.projectile.y
+      projectile.remainingLifetimeMs = step.projectile.remainingLifetimeMs
+      projectile.sprite.setPosition(projectile.x, projectile.y)
+
+      if (step.hitPlayer) {
+        this.damagePlayer(projectile.damage)
+        this.destroyEnemyProjectile(projectile)
+        if (this.isRunEnding) {
+          return
+        }
+        continue
+      }
+
+      if (step.destroyed) {
+        this.destroyEnemyProjectile(projectile)
+      }
+    }
+  }
+
+  private spawnEnemyProjectile(origin: { x: number; y: number }, spec: EnemyProjectileSpawnSpec): void {
+    const projectileState = createEnemyProjectileState(origin, spec)
+    const projectile = this.physics.add.image(origin.x, origin.y, spec.textureKey)
+    projectile.setTint(spec.tint)
+    projectile.setCircle(spec.radius)
+    projectile.setDepth(4)
+    projectile.setRotation(Math.atan2(spec.direction.y, spec.direction.x))
+
+    this.enemyProjectiles.push({
+      ...projectileState,
+      sprite: projectile,
+    })
+  }
+
+  private destroyEnemyProjectile(projectile: EnemyProjectileEntity): void {
+    if (projectile.sprite.active) {
+      projectile.sprite.destroy()
+    }
+  }
+
+
+  private updateHealthPickups(time: number, delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    const activePickups = this.healthPickups.filter((pickup) => pickup.sprite.active).length
+    if (shouldSpawnHeartPickup(time, this.nextHeartPickupAt, activePickups)) {
+      this.spawnHeartPickup()
+      this.nextHeartPickupAt = getNextHeartPickupSpawnAt(time)
+    }
+
+    for (const pickup of this.healthPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyHealthPickup(pickup)
+        continue
+      }
+
+      const distance = Phaser.Math.Distance.Between(
+        pickup.sprite.x,
+        pickup.sprite.y,
+        this.player.x,
+        this.player.y,
+      )
+      const pickupPhase = getLootPickupPhase(distance)
+
+      if (pickupPhase === 'collect') {
+        this.collectHeartPickup(pickup)
+        continue
+      }
+
+      if (pickupPhase === 'attract') {
+        this.applyHealthPickupAttraction(pickup, distance, delta)
+        continue
+      }
+
+      this.setHealthPickupAttractionStyle(pickup, false)
+      this.syncHealthPickupAura(pickup)
+    }
+  }
+
+
+  private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number): void {
+    this.setHealthPickupAttractionStyle(pickup, true)
+
+    const attractionStep = getLootAttractionStep(distance, delta)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    if (distance <= 0 || travelDistance <= 0) {
+      this.syncHealthPickupAura(pickup)
+      return
+    }
+
+    const travelRatio = travelDistance / distance
+    pickup.sprite.setPosition(
+      pickup.sprite.x + (this.player.x - pickup.sprite.x) * travelRatio,
+      pickup.sprite.y + (this.player.y - pickup.sprite.y) * travelRatio,
+    )
+    this.syncHealthPickupAura(pickup)
+  }
+
+  private setHealthPickupAttractionStyle(pickup: HealthPickupEntity, isAttracting: boolean): void {
+    if (pickup.isAttracting === isAttracting) {
+      return
+    }
+
+    pickup.isAttracting = isAttracting
+
+    if (isAttracting) {
+      pickup.sprite.setScale(1.2)
+      pickup.sprite.setTint(0xffffff)
+      pickup.aura.setStrokeStyle(3, 0xffffff, 0.95)
+      return
+    }
+
+    pickup.sprite.setScale(1.08)
+    pickup.sprite.clearTint()
+    pickup.aura.setStrokeStyle(2, HEART_PICKUP_COLOR, 0.82)
+  }
+
+
+  private syncHealthPickupAura(pickup: HealthPickupEntity): void {
+    if (pickup.aura.active) {
+      pickup.aura.setPosition(pickup.sprite.x, pickup.sprite.y)
+    }
+  }
+
+
+  private collectHeartPickup(pickup: HealthPickupEntity): void {
+    const previousHealth = this.playerHealth
+    this.playerHealth = getHealedPlayerHealth(
+      this.playerHealth,
+      this.playerMaxHealth,
+      HEART_PICKUP_HEAL_AMOUNT,
+    )
+    this.syncPlayerHealthBar()
+    const healedAmount = this.playerHealth - previousHealth
+    this.statusMessage = healedAmount > 0
+      ? `하트 아이템으로 체력 ${healedAmount} 회복.`
+      : '체력이 이미 가득합니다.'
+    this.destroyHealthPickup(pickup)
+  }
+
+  private destroyHealthPickup(pickup: HealthPickupEntity): void {
+    pickup.auraTween.stop()
+
+    if (pickup.aura.active) {
+      pickup.aura.destroy()
+    }
+
+    if (pickup.sprite.active) {
+      pickup.sprite.destroy()
+    }
+  }
+
+
+  private spawnHeartPickup(): void {
+    const spawn = selectHeartItemSpawnPoint(this.mapLayout.heartItemSpawns, Math.random)
+    if (!spawn) {
+      return
+    }
+
+    const aura = this.add.circle(spawn.x, spawn.y, 18, HEART_PICKUP_COLOR, 0.2)
+    aura.setStrokeStyle(2, HEART_PICKUP_COLOR, 0.82)
+    aura.setBlendMode(Phaser.BlendModes.ADD)
+    aura.setDepth(3)
+    const auraTween = this.tweens.add({
+      targets: aura,
+      scale: { from: 0.86, to: 1.22 },
+      alpha: { from: 0.5, to: 0.9 },
+      duration: 680,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    })
+
+    const sprite = this.physics.add.image(spawn.x, spawn.y, HEART_PICKUP_TEXTURE_KEY)
+    sprite.setCircle(11)
+    sprite.setDepth(4)
+    sprite.setScale(1.08)
+    this.healthPickups.push({
+      sprite,
+      aura,
+      auraTween,
+      isAttracting: false,
+    })
+  }
 
   private updateHazards(delta: number): void {
     if (this.isInteractionBlocked()) {
@@ -643,6 +1202,9 @@ export class ArenaScene extends Phaser.Scene {
           this.damageEnemy(enemy, hazard.damage, {
             ignoreRecentHit: true,
           })
+          if (this.isRunEnding) {
+            return
+          }
         }
       }
 
@@ -666,7 +1228,16 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.enemies = this.enemies.filter((enemy) => enemy.sprite.active)
+    this.destroyPachinkoBoard()
+
+    for (const pickup of this.healthPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyHealthPickup(pickup)
+      }
+    }
+    this.healthPickups = this.healthPickups.filter((pickup) => pickup.sprite.active)
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
+    this.enemyProjectiles = this.enemyProjectiles.filter((projectile) => projectile.sprite.active)
     this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
   }
 
@@ -703,24 +1274,17 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnEnemy(enemyId: EnemyDefinition['id']): void {
     const config = ENEMY_DEFINITIONS[enemyId]
-    const left = COMBAT_RECT.x + 48
-    const right = COMBAT_RECT.x + COMBAT_RECT.width - 48
-    const top = COMBAT_RECT.y + 48
-    const bottom = COMBAT_RECT.y + COMBAT_RECT.height - 48
-    const x = Math.random() < 0.5
-      ? Phaser.Math.Between(left, right)
-      : Math.random() < 0.5
-        ? left
-        : right
-    const y = x === left || x === right
-      ? Phaser.Math.Between(top, bottom)
-      : Math.random() < 0.5
-        ? top
-        : bottom
+    const spawnPoint = selectEnemySpawnPoint(
+      { x: this.player.x, y: this.player.y },
+      this.mapLayout.worldBounds,
+      this.mapLayout.obstacles,
+      Math.random,
+      config.size / 2,
+    )
 
-    const sprite = this.physics.add.sprite(x, y, config.textureKey)
+    const sprite = this.physics.add.sprite(spawnPoint.x, spawnPoint.y, config.textureKey)
     sprite.setCircle(config.size / 2)
-    sprite.setCollideWorldBounds(false)
+    sprite.setCollideWorldBounds(true)
     sprite.setBounce(0)
     sprite.play(config.animationKey)
     this.enemySprites.add(sprite)
@@ -733,10 +1297,9 @@ export class ArenaScene extends Phaser.Scene {
       currentHealth: config.maxHealth,
       healthBar: this.createEnemyHealthBar(sprite, config),
       lastHitAt: 0,
-      attackCooldownMs:
-        config.attackBehavior.kind === 'telegraphed-aoe'
-          ? Math.round(config.attackBehavior.cooldownMs * 0.35)
-          : 0,
+      attackCooldownMs: 'cooldownMs' in config.attackBehavior
+        ? Math.round(config.attackBehavior.cooldownMs * 0.35)
+        : 0,
     }
 
     this.nextEnemyRuntimeId += 1
@@ -778,6 +1341,10 @@ export class ArenaScene extends Phaser.Scene {
       enemy.telegraph.visual.destroy()
       enemy.telegraph = undefined
     }
+    if (enemy.spreadBurst?.visual.active) {
+      enemy.spreadBurst.visual.destroy()
+      enemy.spreadBurst = undefined
+    }
     enemy.knockback = undefined
     this.destroyEnemyHealthBar(enemy)
     enemy.sprite.destroy()
@@ -787,13 +1354,20 @@ export class ArenaScene extends Phaser.Scene {
       return true
     }
 
-    this.statusMessage = `${enemy.config.name} 처치. 토큰이 파친코로 이동합니다.`
+    this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
     return true
   }
 
   private damagePlayer(damage: number): void {
     const now = this.time.now
-    if (!shouldApplyPlayerDamage(now, this.lastPlayerHitAt, this.isInteractionBlocked())) {
+    if (
+      !shouldApplyPlayerDamage(
+        now,
+        this.lastPlayerHitAt,
+        this.isInteractionBlocked(),
+        isPlayerDashInvulnerable(now, this.playerDashState),
+      )
+    ) {
       return
     }
 
@@ -862,9 +1436,22 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     setSpawnLoopPaused(this.spawnTimer, shouldPause)
+    this.setHealthPickupPulsePaused(shouldPause)
+
     this.freezeCombat(shouldPause)
   }
 
+
+  private setHealthPickupPulsePaused(shouldPause: boolean): void {
+    for (const pickup of this.healthPickups) {
+      if (shouldPause) {
+        pickup.auraTween.pause()
+        continue
+      }
+
+      pickup.auraTween.resume()
+    }
+  }
 
 
   private handleWeaponEquip(weaponKey: WeaponStackKey): void {
@@ -916,6 +1503,7 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
+
   private freezeCombat(shouldFreeze: boolean): void {
     if (this.enemySpacingCollider) {
       this.enemySpacingCollider.active = !shouldFreeze
@@ -926,7 +1514,9 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const enemy of this.enemies) {
-      enemy.sprite.setVelocity(0, 0)
+      if (enemy.sprite.active) {
+        enemy.sprite.setVelocity(0, 0)
+      }
     }
   }
 
@@ -994,11 +1584,13 @@ export class ArenaScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setStrokeStyle(1, 0x9cb5ff, 0.36)
       .setDepth(depth)
+      .setScrollFactor(0)
 
     const fill = this.add
       .rectangle(x + 2, y, width - 4, height - 4, 0x43ef9a, 0.92)
       .setOrigin(0, 0.5)
       .setDepth(depth + 1)
+      .setScrollFactor(0)
 
     const label = this.add
       .text(GAME_WIDTH / 2, y - 1, '', {
@@ -1009,6 +1601,7 @@ export class ArenaScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(depth + 2)
+      .setScrollFactor(0)
       .setShadow(0, 1, '#020713', 2)
 
     return {
@@ -1056,19 +1649,36 @@ export class ArenaScene extends Phaser.Scene {
     this.playerHealthBar = undefined
   }
 
+  private destroyMiniMap(): void {
+    if (!this.miniMap) {
+      return
+    }
+
+    const { graphics, label } = this.miniMap
+    if (graphics.active) {
+      graphics.destroy()
+    }
+    if (label.active) {
+      label.destroy()
+    }
+
+    this.miniMap = undefined
+  }
+
   private resetRunState(): void {
     this.destroyRunEntities()
     this.physics.world.resume()
 
     const initialState = createInitialArenaRunState()
-    this.weaponStacks = initialState.weaponStacks
-    this.activeWeaponKey = initialState.activeWeaponKey
     this.isInventoryOpen = initialState.isInventoryOpen
     this.isCodexOpen = initialState.isCodexOpen
     this.isRunEnding = initialState.isRunEnding
     this.playerHealth = initialState.playerHealth
     this.playerMaxHealth = initialState.playerMaxHealth
     this.playerSpeed = initialState.playerSpeed
+    this.playerDashState = createReadyPlayerDashState()
+    this.playerDashDirection.set(1, 0)
+    this.lastPlayerMoveDirection.set(1, 0)
     this.nextFireAt = initialState.nextFireAt
     this.remainingSpawns = initialState.remainingSpawns
     this.currentWaveIndex = initialState.currentWaveIndex
@@ -1078,10 +1688,7 @@ export class ArenaScene extends Phaser.Scene {
     this.statusMessage = initialState.statusMessage
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
-    this.pachinkoTokenXp = initialState.pachinkoTokenXp
-    this.pachinkoTokenQueue = []
-    this.pachinkoTokenInFlight = null
-    this.latestPachinkoReward = null
+    this.nextHeartPickupAt = 0
   }
 
   private destroyRunEntities(): void {
@@ -1090,6 +1697,7 @@ export class ArenaScene extends Phaser.Scene {
     this.enemySpacingCollider?.destroy()
     this.enemySpacingCollider = undefined
     this.destroyPlayerHealthBar()
+    this.destroyMiniMap()
 
     if (this.player?.active) {
       this.player.destroy()
@@ -1099,6 +1707,9 @@ export class ArenaScene extends Phaser.Scene {
       if (enemy.telegraph?.visual.active) {
         enemy.telegraph.visual.destroy()
       }
+      if (enemy.spreadBurst?.visual.active) {
+        enemy.spreadBurst.visual.destroy()
+      }
       this.destroyEnemyHealthBar(enemy)
       if (enemy.sprite.active) {
         enemy.sprite.destroy()
@@ -1107,7 +1718,17 @@ export class ArenaScene extends Phaser.Scene {
 
     this.destroyPachinkoBoard()
 
+    for (const pickup of this.healthPickups) {
+      this.destroyHealthPickup(pickup)
+    }
+
     for (const projectile of this.projectiles) {
+      if (projectile.sprite.active) {
+        projectile.sprite.destroy()
+      }
+    }
+
+    for (const projectile of this.enemyProjectiles) {
       if (projectile.sprite.active) {
         projectile.sprite.destroy()
       }
@@ -1123,11 +1744,20 @@ export class ArenaScene extends Phaser.Scene {
       this.enemySprites.clear(true, true)
     }
 
+    for (const visual of this.mapVisuals) {
+      if ('active' in visual && visual.active) {
+        visual.destroy()
+      }
+    }
+
     this.enemies = []
-    this.projectiles = []
-    this.hazardZones = []
+    this.healthPickups = []
     this.pachinkoTokenQueue = []
     this.pachinkoTokenInFlight = null
+    this.projectiles = []
+    this.enemyProjectiles = []
+    this.hazardZones = []
+    this.mapVisuals = []
   }
 
   private endRun(outcome: RunOutcome): void {
@@ -1163,8 +1793,8 @@ export class ArenaScene extends Phaser.Scene {
     const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar)
 
     this.hud.update({
-      title: 'NeoD 프로토타입',
-      subtitle: this.activeWaveLabel || '아레나 준비 중',
+      title: 'NeoD',
+      subtitle: this.activeWaveLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `무기: ${weapon.name} ${'★'.repeat(activeStar)} · ${getWeaponSummary(weapon)}`,
@@ -1174,9 +1804,9 @@ export class ArenaScene extends Phaser.Scene {
       inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `토큰 큐 ${this.pachinkoTokenQueue.length}개`],
       recipes: this.getFusionSummaryLines(),
       objective: this.isBossActive
-        ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
-        : '적을 처치해 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
-      tip: 'WASD 이동 · 자동 사격 · 토큰은 파친코에 자동 투입 · 인벤토리에서 같은 별 무기 합성 · Q 코덱스',
+        ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
+        : '웨이브를 돌파하며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
+      tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 토큰은 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen,
@@ -1227,7 +1857,6 @@ export class ArenaScene extends Phaser.Scene {
       this.isBossActive = isBossActive
     }
   }
-
 
   private getOwnedWeaponViews(): HudOwnedWeaponView[] {
     return sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).map((stack) => {
@@ -1333,7 +1962,8 @@ export class ArenaScene extends Phaser.Scene {
     sprite.setCircle(9)
     sprite.setScale(0.8)
     sprite.setTint(0xffd866)
-    sprite.setDepth(8)
+    sprite.setDepth(48)
+    sprite.setScrollFactor(0)
     sprite.setBounce(0.68, 0.52)
     sprite.setVelocity(Phaser.Math.Between(-80, 80), 0)
     sprite.setGravityY(360)
@@ -1365,18 +1995,20 @@ export class ArenaScene extends Phaser.Scene {
       0.94,
     )
     board.setStrokeStyle(2, 0xffd866, 0.78)
-    board.setDepth(1)
+    board.setDepth(46)
+    board.setScrollFactor(0)
 
     const divider = this.add.rectangle(PACHINKO_DIVIDER_X, GAME_HEIGHT / 2, 6, GAME_HEIGHT, 0x050b14, 0.95)
       .setStrokeStyle(1, 0x9bb5ff, 0.4)
-      .setDepth(2)
+      .setDepth(47)
+      .setScrollFactor(0)
     const title = this.add.text(PACHINKO_RECT.x + 12, PACHINKO_RECT.y + 10, 'TOKEN\nPACHINKO', {
       color: '#ffd866',
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '11px',
       fontStyle: '700',
       align: 'left',
-    }).setDepth(9)
+    }).setDepth(49).setScrollFactor(0)
     this.pachinkoVisuals.push(board, divider, title)
 
     this.pachinkoPins = this.physics.add.staticGroup()
@@ -1390,14 +2022,17 @@ export class ArenaScene extends Phaser.Scene {
         pin.setCircle(5)
         pin.setScale(0.55)
         pin.setTint(0x9bb5ff)
-        pin.setDepth(7)
+        pin.setDepth(48)
+        pin.setScrollFactor(0)
         pin.refreshBody()
       }
     }
 
     for (let lane = 1; lane < 5; lane += 1) {
       const x = PACHINKO_RECT.x + (PACHINKO_RECT.width / 5) * lane
-      const divider = this.add.rectangle(x, PACHINKO_RECT.y + PACHINKO_RECT.height - 30, 2, 42, 0x9bb5ff, 0.55).setDepth(7)
+      const divider = this.add.rectangle(x, PACHINKO_RECT.y + PACHINKO_RECT.height - 30, 2, 42, 0x9bb5ff, 0.55)
+        .setDepth(48)
+        .setScrollFactor(0)
       this.pachinkoVisuals.push(divider)
     }
   }
@@ -1436,7 +2071,9 @@ export class ArenaScene extends Phaser.Scene {
       remainingLifetimeMs: projectileSpec.lifetimeMs,
       remainingHits: projectileSpec.maxHits,
       hitEnemyIds: new Set<number>(),
+      origin: { x: this.player.x, y: this.player.y },
       direction: projectileSpec.direction,
+      maxTravelDistance: projectileSpec.maxTravelDistance,
       knockback: projectileSpec.knockback,
       chain: projectileSpec.chain,
       hazardOnHit: projectileSpec.hazardOnHit,

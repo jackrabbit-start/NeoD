@@ -2,7 +2,9 @@ import type {
   EnemyAttackBehavior,
   EnemyDefinition,
   EnemyMovementBehavior,
+  EnemySpreadBurstAttackBehavior,
 } from '../domain/types.js'
+import type { EnemyProjectileSpawnSpec } from './enemyProjectiles.js'
 
 export interface Point {
   x: number
@@ -61,6 +63,17 @@ const add = (left: Point, right: Point): Point => ({
   x: left.x + right.x,
   y: left.y + right.y,
 })
+
+const rotate = (vector: Point, degrees: number): Point => {
+  const radians = (degrees * Math.PI) / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+
+  return {
+    x: vector.x * cos - vector.y * sin,
+    y: vector.x * sin + vector.y * cos,
+  }
+}
 
 const seekVelocity = (source: Point, target: Point, speed: number): Point =>
   scale(
@@ -240,6 +253,18 @@ export function shouldEnemyStartTelegraph(
   )
 }
 
+export function shouldEnemyStartSpreadBurst(
+  attackBehavior: EnemyAttackBehavior,
+  distanceToPlayer: number,
+  cooldownRemainingMs: number,
+): boolean {
+  return (
+    attackBehavior.kind === 'spread-burst' &&
+    cooldownRemainingMs <= 0 &&
+    distanceToPlayer <= attackBehavior.range
+  )
+}
+
 export function createEnemyTelegraph(
   enemyPosition: Point,
   playerPosition: Point,
@@ -258,6 +283,39 @@ export function createEnemyTelegraph(
     durationMs: attackBehavior.telegraphMs,
     tint: attackBehavior.tint,
   }
+}
+
+export function createEnemySpreadBurstProjectiles(
+  enemyPosition: Point,
+  playerPosition: Point,
+  attackBehavior: EnemySpreadBurstAttackBehavior,
+): EnemyProjectileSpawnSpec[] {
+  const baseDirection = normalize({
+    x: playerPosition.x - enemyPosition.x,
+    y: playerPosition.y - enemyPosition.y,
+  })
+
+  if (baseDirection.x === 0 && baseDirection.y === 0) {
+    return []
+  }
+
+  const projectileCount = Math.max(0, Math.floor(attackBehavior.projectileCount))
+  const centerIndex = (projectileCount - 1) / 2
+
+  return Array.from({ length: projectileCount }, (_, index) => {
+    const offsetDegrees = (index - centerIndex) * attackBehavior.spreadDegrees
+    const direction = normalize(rotate(baseDirection, offsetDegrees))
+
+    return {
+      direction,
+      speed: attackBehavior.projectileSpeed,
+      damage: attackBehavior.damage,
+      radius: attackBehavior.projectileRadius,
+      lifetimeMs: attackBehavior.projectileLifetimeMs,
+      tint: attackBehavior.tint,
+      textureKey: attackBehavior.projectileTextureKey,
+    }
+  })
 }
 
 export function isPointInsideCircle(point: Point, center: Point, radius: number): boolean {

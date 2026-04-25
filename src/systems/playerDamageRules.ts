@@ -4,6 +4,7 @@ export function shouldApplyPlayerDamage(
   nowMs: number,
   lastHitAtMs: number,
   isInteractionBlocked: boolean,
+  isInvulnerable = false,
 ): boolean {
-  return !isInteractionBlocked && nowMs - lastHitAtMs >= PLAYER_HIT_COOLDOWN_MS
+  return !isInteractionBlocked && !isInvulnerable && nowMs - lastHitAtMs >= PLAYER_HIT_COOLDOWN_MS
 }

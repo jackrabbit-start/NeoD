@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,6 +25,38 @@ import {
   LOOT_COLLECT_RADIUS,
   LEGACY_LOOT_PICKUP_DISTANCE,
 } from '../.tmp-test/src/systems/lootPickup.js'
+import {
+  AMBIENT_ITEM_RADIUS,
+  ARENA_WORLD_BOUNDS,
+  ENEMY_SPAWN_MIN_DISTANCE,
+  HEART_ITEM_RADIUS,
+  PLAYER_SAFE_RADIUS,
+  createMapLayout,
+  getAmbientItemSpawnPoints,
+  getHeartItemSpawnPoints,
+  getWorldCenter,
+  isCircleClearOfObstacles,
+  isPointWithinWorld,
+  selectAmbientItemSpawnPoint,
+  selectHeartItemSpawnPoint,
+  selectEnemySpawnPoint,
+} from '../.tmp-test/src/systems/mapLayout.js'
+import {
+  HEART_PICKUP_HEAL_AMOUNT,
+  HEART_PICKUP_INITIAL_DELAY_MS,
+  HEART_PICKUP_INTERVAL_MS,
+  HEART_PICKUP_MAX_ACTIVE,
+  HEART_PICKUP_TEXTURE_KEY,
+  getHealedPlayerHealth,
+  getInitialHeartPickupSpawnAt,
+  getNextHeartPickupSpawnAt,
+  shouldSpawnHeartPickup,
+} from '../.tmp-test/src/systems/healthPickups.js'
+import {
+  getTopRightMiniMapBounds,
+  projectWorldPointToMiniMap,
+  projectWorldRectToMiniMap,
+} from '../.tmp-test/src/systems/minimap.js'
 import { createInitialArenaRunState } from '../.tmp-test/src/systems/runState.js'
 import {
   describeAvailableRecipes,
@@ -38,6 +70,7 @@ import {
   deriveEffectiveWeaponStats,
   resolveTuningSelection,
 } from '../.tmp-test/src/systems/tuning.js'
+import { getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.js'
 import {
   STARTER_WEAPON_STACK_KEY,
   addWeaponStack,
@@ -74,6 +107,7 @@ import {
 import {
   createRunResultHudState,
   createRunResultPresentation,
+  isRunResultRestartKey,
 } from '../.tmp-test/src/systems/runResult.js'
 import {
   PACHINKO_LEVEL_THRESHOLDS,
@@ -87,6 +121,7 @@ import {
   resolveWeaponReward,
   shouldEnemyGrantPachinkoToken,
 } from '../.tmp-test/src/systems/pachinkoRewards.js'
+import { HudController } from '../.tmp-test/src/ui/Hud.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -175,6 +210,23 @@ test('melee weapon recipes resolve from unused material pairings', () => {
   assert.ok(getAvailableRecipes(cutterInventory).some(({ recipe }) => recipe.id === 'prism-cutter-recipe'))
   assert.equal(resolveCombine(glaiveInventory, 'slime-glaive-recipe')?.weaponId, 'slime-glaive')
   assert.equal(resolveCombine(cutterInventory, 'prism-cutter-recipe')?.weaponId, 'prism-cutter')
+})
+
+test('needle fan recipe resolves from insect loot and spark drops', () => {
+  let inventory = {}
+  inventory = addItem(inventory, 'chitin-needle')
+  inventory = addItem(inventory, 'spark-knot')
+
+  const availableRecipes = getAvailableRecipes(inventory)
+  assert.ok(availableRecipes.some(({ recipe }) => recipe.id === 'needle-fan-recipe'))
+
+  const actionableRecipes = getActionableRecipes(inventory, ['starter-blaster'])
+  assert.ok(actionableRecipes.some(({ recipe }) => recipe.id === 'needle-fan-recipe'))
+
+  const combined = resolveCombine(inventory, 'needle-fan-recipe')
+  assert.ok(combined)
+  assert.equal(combined?.weaponId, 'needle-fan')
+  assert.deepEqual(combined?.nextInventory, {})
 })
 
 test('invalid combine attempts do not produce upgrades', () => {
@@ -316,7 +368,7 @@ test('pachinko reward levels and enemy token xp follow the approved thresholds',
 
 test('pachinko reward resolution keeps weapon random and star odds deterministic', () => {
   assert.equal(resolveWeaponReward(() => 0), 'starter-blaster')
-  assert.equal(resolveWeaponReward(() => 0.999), 'prism-cutter')
+  assert.equal(resolveWeaponReward(() => 0.999), 'needle-fan')
   assert.equal(resolveStarForLevel(1, () => 0.69), 1)
   assert.equal(resolveStarForLevel(1, () => 0.70), 1)
   assert.equal(resolveStarForLevel(1, () => 0.701), 2)
@@ -354,7 +406,7 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
   })
 
   assert.deepEqual(resolvePachinkoLandingReward(42, 0.999), {
-    weaponId: 'prism-cutter',
+    weaponId: 'needle-fan',
     star: 5,
   })
 })
@@ -396,6 +448,120 @@ test('combat and pachinko rectangles split the 960px canvas into play and reward
   assert.deepEqual(clampPointToRect({ x: 900, y: -10 }, COMBAT_RECT, 14), { x: 706, y: 14 })
 })
 
+test('map layout defines a larger scrolling world with a safe starting area', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const start = getWorldCenter(layout.worldBounds)
+
+  assert.equal(layout.worldBounds.width > 960, true)
+  assert.equal(layout.worldBounds.height > 540, true)
+  assert.deepEqual(layout.playerStart, start)
+  assert.deepEqual(layout.obstacles, [])
+
+  assert.equal(isCircleClearOfObstacles(start, PLAYER_SAFE_RADIUS, layout.obstacles), true)
+})
+
+test('ambient map item points stay clear and reuse existing loot ids', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawnPoints = getAmbientItemSpawnPoints(layout.worldBounds, layout.obstacles)
+
+  assert.equal(spawnPoints.length >= 5, true)
+  for (const spawn of spawnPoints) {
+    assert.equal(LOOT_IDS.includes(spawn.itemId), true)
+    assert.notEqual(spawn.itemId, 'tuning-capsule')
+    assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 48), true)
+    assert.equal(isCircleClearOfObstacles(spawn, AMBIENT_ITEM_RADIUS, layout.obstacles), true)
+  }
+
+  assert.deepEqual(selectAmbientItemSpawnPoint(spawnPoints, () => 0), spawnPoints[0])
+  assert.deepEqual(selectAmbientItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
+})
+
+test('heart item spawn points are sparse map pickups outside inventory loot', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawnPoints = getHeartItemSpawnPoints(layout.worldBounds, layout.obstacles)
+
+  assert.equal(spawnPoints.length >= 4, true)
+  assert.equal(LOOT_IDS.includes('heart-pickup'), false)
+  for (const spawn of spawnPoints) {
+    assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 56), true)
+    assert.equal(isCircleClearOfObstacles(spawn, HEART_ITEM_RADIUS, layout.obstacles), true)
+  }
+
+  assert.deepEqual(layout.heartItemSpawns, spawnPoints)
+  assert.deepEqual(selectHeartItemSpawnPoint(spawnPoints, () => 0), spawnPoints[0])
+  assert.deepEqual(selectHeartItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
+})
+
+test('enemy map spawn selection respects player distance, world bounds, and obstacle clearance', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawn = selectEnemySpawnPoint(
+    layout.playerStart,
+    layout.worldBounds,
+    layout.obstacles,
+    () => 0,
+    28,
+  )
+
+  assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 48), true)
+  assert.equal(isCircleClearOfObstacles(spawn, 28, layout.obstacles), true)
+  assert.equal(
+    Math.hypot(spawn.x - layout.playerStart.x, spawn.y - layout.playerStart.y) >= ENEMY_SPAWN_MIN_DISTANCE,
+    true,
+  )
+})
+
+test('heart pickup healing and intermittent spawn gates stay deterministic', () => {
+  assert.equal(HEART_PICKUP_HEAL_AMOUNT, 24)
+  assert.equal(HEART_PICKUP_MAX_ACTIVE, 3)
+  assert.equal(getHealedPlayerHealth(40, 100), 64)
+  assert.equal(getHealedPlayerHealth(90, 100), 100)
+  assert.equal(getHealedPlayerHealth(-5, 100), 24)
+  assert.equal(getInitialHeartPickupSpawnAt(1_000), 1_000 + HEART_PICKUP_INITIAL_DELAY_MS)
+  assert.equal(getNextHeartPickupSpawnAt(1_000, () => 0), 1_000 + HEART_PICKUP_INTERVAL_MS)
+  assert.equal(
+    getNextHeartPickupSpawnAt(1_000, () => 0.999),
+    1_000 + HEART_PICKUP_INTERVAL_MS + 3_996,
+  )
+  assert.equal(shouldSpawnHeartPickup(6_999, 7_000, 0), false)
+  assert.equal(shouldSpawnHeartPickup(7_000, 7_000, HEART_PICKUP_MAX_ACTIVE), false)
+  assert.equal(shouldSpawnHeartPickup(7_000, 7_000, HEART_PICKUP_MAX_ACTIVE - 1), true)
+})
+
+test('minimap projects world points and viewport into the top-right overlay', () => {
+  const miniMap = getTopRightMiniMapBounds(960)
+  assert.equal(miniMap.x > 960 / 2, true)
+  assert.equal(miniMap.y, 16)
+
+  const topLeft = projectWorldPointToMiniMap(
+    { x: ARENA_WORLD_BOUNDS.x, y: ARENA_WORLD_BOUNDS.y },
+    ARENA_WORLD_BOUNDS,
+    miniMap,
+  )
+  const bottomRight = projectWorldPointToMiniMap(
+    {
+      x: ARENA_WORLD_BOUNDS.x + ARENA_WORLD_BOUNDS.width,
+      y: ARENA_WORLD_BOUNDS.y + ARENA_WORLD_BOUNDS.height,
+    },
+    ARENA_WORLD_BOUNDS,
+    miniMap,
+  )
+
+  assert.deepEqual(topLeft, { x: miniMap.x + miniMap.padding, y: miniMap.y + miniMap.padding })
+  assert.deepEqual(bottomRight, {
+    x: miniMap.x + miniMap.width - miniMap.padding,
+    y: miniMap.y + miniMap.height - miniMap.padding,
+  })
+
+  const viewport = projectWorldRectToMiniMap(
+    { x: 0, y: 0, width: 960, height: 540 },
+    ARENA_WORLD_BOUNDS,
+    miniMap,
+  )
+
+  assert.equal(viewport.width < miniMap.width, true)
+  assert.equal(viewport.height < miniMap.height, true)
+})
+
 test('recipe presenter mirrors the actionable combine summary strings', () => {
   assert.deepEqual(describeAvailableRecipes([]), ['지금 바로 가능한 조합이 없습니다.'])
 
@@ -408,7 +574,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(acidRecipes), [
-    '매운맛 분무기 [부식 압박] → 피해 20 · 초당 4발 · 부식 압박 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
+    '매운맛 분무기 [부식 압박] → 피해 20 · 초당 4발 · 사거리 130 · 부식 압박 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
   ])
 
   const sparkRecipes = getActionableRecipes(
@@ -427,10 +593,21 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(sparkRecipes), [
-    '번쩍댓글 카빈 [고속 전격] → 피해 15 · 초당 7발 · 고속 전격 (안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.)',
+    '번쩍댓글 카빈 [고속 전격] → 피해 15 · 초당 7발 · 사거리 560 · 고속 전격 (안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.)',
   ])
   assert.deepEqual(describeAvailableRecipes(mistRecipes), [
-    '시야차단 안개팡 [안개 제어] → 피해 14 · 초당 4발 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
+    '시야차단 안개팡 [안개 제어] → 피해 14 · 초당 4발 · 사거리 190 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
+  ])
+
+  const needleRecipes = getActionableRecipes(
+    {
+      'chitin-needle': 1,
+      'spark-knot': 1,
+    },
+    ['starter-blaster'],
+  )
+  assert.deepEqual(describeAvailableRecipes(needleRecipes), [
+    '니들 팬 [산탄 견제] → 피해 16 · 초당 5발 · 사거리 360 · 산탄 견제 (벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.)',
   ])
 })
 
@@ -510,6 +687,21 @@ test('branch recipe selections add the new owned weapon paths', () => {
   assert.ok(mistResult)
   assert.deepEqual(mistResult?.ownedWeaponIds, ['starter-blaster', 'mist-vortex'])
   assert.equal(mistResult?.activeWeaponId, 'mist-vortex')
+
+  const needleResult = applyRecipeSelection(
+    {
+      inventory: {
+        'chitin-needle': 1,
+        'spark-knot': 1,
+      },
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'needle-fan-recipe',
+  )
+
+  assert.ok(needleResult)
+  assert.deepEqual(needleResult?.ownedWeaponIds, ['starter-blaster', 'needle-fan'])
+  assert.equal(needleResult?.activeWeaponId, 'needle-fan')
 })
 
 test('duplicate-output recipe selections do not consume inventory', () => {
@@ -552,6 +744,20 @@ test('duplicate-output branch recipe selections do not consume inventory', () =>
         ownedWeaponIds: ['starter-blaster', 'mist-vortex'],
       },
       'mist-vortex-recipe',
+    ),
+    null,
+  )
+
+  assert.equal(
+    applyRecipeSelection(
+      {
+        inventory: {
+          'chitin-needle': 1,
+          'spark-knot': 1,
+        },
+        ownedWeaponIds: ['starter-blaster', 'needle-fan'],
+      },
+      'needle-fan-recipe',
     ),
     null,
   )
@@ -691,6 +897,51 @@ test('auto-attack shot gating respects interaction pause, cooldown, and target a
   )
 })
 
+test('auto-attack target selection respects active weapon range and target radius', () => {
+  const origin = { x: 0, y: 0 }
+
+  assert.equal(
+    resolveNearestAutoAttackTarget(
+      origin,
+      [
+        { x: 80, y: 0, radius: 5, isActive: true },
+        { x: 50, y: 0, radius: 5, isActive: false },
+      ],
+      40,
+    ),
+    null,
+  )
+
+  assert.deepEqual(
+    resolveNearestAutoAttackTarget(
+      origin,
+      [
+        { x: 80, y: 0, radius: 5, isActive: true },
+        { x: 45, y: 0, radius: 10, isActive: true },
+        { x: 20, y: 0, radius: 5, isActive: false },
+      ],
+      40,
+    ),
+    {
+      x: 45,
+      y: 0,
+      directionX: 1,
+      directionY: 0,
+      distanceSq: 2025,
+    },
+  )
+
+  assert.equal(
+    resolveAutoAttackShot(origin, [{ x: 70, y: 0, radius: 5, isActive: true }], {
+      isInteractionBlocked: false,
+      time: 1000,
+      nextFireAt: 0,
+      maxRange: 40,
+    }),
+    null,
+  )
+})
+
 test('boss trigger stays behind the final regular wave', () => {
   assert.equal(isBossWaveReady(0), false)
   assert.equal(isBossWaveReady(1), false)
@@ -706,7 +957,7 @@ test('third wave still includes the existing spark slime sample enemy', () => {
   assert.ok(getWaveSpawnSequence(thirdWave).includes('spark-slime'))
 })
 
-test('enemy expansion keeps reward ids stable while adding regular enemy ids', () => {
+test('content id catalogs include scoped enemy and reward branches', () => {
   assert.deepEqual(LOOT_IDS, [
     'gel-shard',
     'acid-core',
@@ -714,6 +965,7 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'spark-knot',
     'mist-bead',
     'tuning-capsule',
+    'chitin-needle',
   ])
   assert.deepEqual(RECIPE_IDS, [
     'acid-sprayer-recipe',
@@ -724,6 +976,7 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'mist-vortex-recipe',
     'slime-glaive-recipe',
     'prism-cutter-recipe',
+    'needle-fan-recipe',
   ])
   assert.deepEqual(WEAPON_IDS, [
     'starter-blaster',
@@ -735,6 +988,7 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'mist-vortex',
     'slime-glaive',
     'prism-cutter',
+    'needle-fan',
   ])
   assert.deepEqual(ENEMY_IDS, [
     'slime',
@@ -742,6 +996,7 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'prism-slime',
     'dash-slime',
     'orbit-slime',
+    'needle-wasp',
     'slime-boss',
   ])
 })
@@ -766,9 +1021,10 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.deepEqual(
     flattenWaveEntries(thirdWave.entries),
     [
-      ...Array(12).fill('spark-slime'),
-      ...Array(9).fill('orbit-slime'),
-      ...Array(6).fill('dash-slime'),
+      ...Array(11).fill('spark-slime'),
+      ...Array(8).fill('orbit-slime'),
+      ...Array(3).fill('needle-wasp'),
+      ...Array(5).fill('dash-slime'),
     ],
   )
   assert.equal(getWaveSpawnCount(thirdWave), 27)
@@ -779,6 +1035,7 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(isBossEnemyId('dash-slime'), false)
   assert.equal(getDefeatedEnemyRunOutcome('slime-boss'), 'win')
   assert.equal(getDefeatedEnemyRunOutcome('dash-slime'), 'continue')
+  assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
 test('boss win result presentation is explicit and reward-neutral', () => {
@@ -807,6 +1064,29 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   assert.equal(hudState.modal.isOpen, false)
 })
 
+test('arena frame stops immediately after any run-ending combat step', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+
+  for (const step of ['updateEnemies(delta)', 'updateProjectiles(delta)', 'updateHazards(delta)']) {
+    assert.ok(
+      arenaSceneSource.includes(`this.${step}
+    if (this.isRunEnding) {
+      return
+    }`),
+      `${step} must be followed by an isRunEnding guard so boss defeat cannot leave a frozen arena frame`,
+    )
+  }
+
+  assert.ok(
+    arenaSceneSource.includes(`for (const enemy of this.enemies) {
+      if (enemy.sprite.active) {
+        enemy.sprite.setVelocity(0, 0)
+      }
+    }`),
+    'freezeCombat must skip destroyed enemy sprites because boss defeat destroys the boss before endRun freezes combat',
+  )
+})
+
 test('loss result presentation keeps restart guidance distinct from boss clear', () => {
   const presentation = createRunResultPresentation({
     outcome: 'loss',
@@ -820,6 +1100,15 @@ test('loss result presentation keeps restart guidance distinct from boss clear',
   assert.match(presentation.restartPrompt, /새 런/)
 })
 
+test('result restart key accepts physical R even when IME changes the produced key', () => {
+  assert.equal(isRunResultRestartKey({ code: 'KeyR', key: 'ㄱ', keyCode: 229 }), true)
+  assert.equal(isRunResultRestartKey({ key: 'r' }), true)
+  assert.equal(isRunResultRestartKey({ keyCode: 82 }), true)
+  assert.equal(isRunResultRestartKey({ which: 82 }), true)
+  assert.equal(isRunResultRestartKey({ code: 'KeyE', key: 'ㄷ', keyCode: 229 }), false)
+  assert.equal(isRunResultRestartKey({ code: 'KeyR', key: 'r', metaKey: true }), false)
+})
+
 test('elite wave appears before the boss wave', () => {
   assert.deepEqual(getWaveByIndex(3)?.entries, [{ enemyId: 'prism-slime', count: 1 }])
   assert.deepEqual(getWaveByIndex(4)?.entries, [{ enemyId: 'slime-boss', count: 1 }])
@@ -831,8 +1120,10 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
   assert.equal(codex.isOpen, true)
   assert.equal(codex.items.length, 0)
   assert.equal(codex.recipes.length, 0)
-  assert.equal(codex.enemies.length, 6)
+  assert.equal(codex.enemies.length, 7)
   assert.match(codex.hint, /토큰 파친코/)
+
+
 
   const voltSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
   assert.ok(voltSlime)
@@ -853,6 +1144,13 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
 
   const boss = codex.enemies.find((enemy) => enemy.id === 'slime-boss')
   assert.ok(boss?.stats.some((stat) => stat.includes('즉시 런을 종료')))
+
+  const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
+  assert.ok(needleWasp)
+  assert.ok(needleWasp?.description.includes('비-슬라임'))
+  assert.ok(needleWasp?.stats.some((stat) => stat.includes('부채꼴')))
+  assert.deepEqual(needleWasp?.drops, [])
+  assert.ok(needleWasp?.stats.some((stat) => stat.includes('보상 경험치 +3')))
 })
 
 test('recipe identity metadata stays aligned with known ids and weapon outputs', () => {
@@ -919,6 +1217,113 @@ test('codex controller preserves scroll across repeated open renders', () => {
   assert.equal(element.hidden, false)
   assert.match(element.innerHTML, /숨긴 재료/)
   assert.equal(element.assignments, 3)
+})
+
+test('hud controller skips summary DOM rewrites for identical frame-loop updates', () => {
+  class FakeClassList {
+    toggle() {}
+  }
+
+  class FakeElement {
+    children = []
+    classList = new FakeClassList()
+    dataset = {}
+    disabled = false
+    style = {}
+    textContent = ''
+    assignments = 0
+    #innerHTML = ''
+    #regions = new Map()
+
+    constructor(tagName = 'div') {
+      this.tagName = tagName.toUpperCase()
+    }
+
+    get innerHTML() {
+      return this.#innerHTML
+    }
+
+    set innerHTML(value) {
+      this.assignments += 1
+      this.#innerHTML = value
+
+      if (value.includes('data-region="items"')) {
+        this.#regions.set('button[data-action="inventory-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="items"]', new FakeElement('div'))
+        this.#regions.set('[data-region="item-detail"]', new FakeElement('div'))
+        this.#regions.set('[data-region="recipes"]', new FakeElement('div'))
+        this.#regions.set('[data-region="weapons"]', new FakeElement('div'))
+      }
+    }
+
+    addEventListener() {}
+
+    removeEventListener() {}
+
+    append(...nodes) {
+      this.children.push(...nodes)
+    }
+
+    replaceChildren(...nodes) {
+      this.children = nodes
+    }
+
+    querySelector(selector) {
+      return this.#regions.get(selector) ?? null
+    }
+
+    querySelectorAll() {
+      return []
+    }
+  }
+
+  const previousDocument = globalThis.document
+  globalThis.document = {
+    createElement: (tagName) => new FakeElement(tagName),
+  }
+
+  try {
+    const root = new FakeElement('section')
+    const controller = new HudController(root)
+    const state = {
+      title: 'NeoD 프로토타입',
+      subtitle: '1 웨이브',
+      stats: ['체력: 10/10', '무기: 기본'],
+      inventory: ['젤 파편 × 1'],
+      recipes: ['조합 대기'],
+      objective: '웨이브를 버티세요.',
+      tip: 'WASD 이동 · J 대시',
+      status: '전투 중입니다. 계속 움직이세요.',
+      inventoryButtonLabel: '인벤토리 열기',
+      inventoryButtonDisabled: false,
+      modal: {
+        isOpen: false,
+        items: [],
+        recipes: [],
+        weapons: [],
+      },
+    }
+
+    controller.update(state)
+    const summaryElement = root.children[0]
+    assert.equal(summaryElement.assignments, 1)
+    assert.match(summaryElement.innerHTML, /hud-summary__status-line/)
+
+    controller.update({ ...state, modal: { ...state.modal } })
+
+    assert.equal(summaryElement.assignments, 1)
+    assert.deepEqual(controller.getRenderMetrics(), {
+      summaryAssignments: 1,
+      summarySkips: 1,
+      modalClosedSkips: 1,
+    })
+  } finally {
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
 })
 
 test('elite drop table returns a tuning capsule', () => {
@@ -1078,6 +1483,7 @@ test('effective melee weapon tuning updates nested behavior immutably', () => {
   assert.equal(quick.fireRateMs, Math.round(baseWeapon.fireRateMs * 0.9))
   assert.equal(stabilized.attackBehavior.kind, 'melee-cleave')
   assert.equal(stabilized.attackBehavior.range, baseBehavior.range + 18)
+  assert.equal(getWeaponAttackRange(stabilized), baseBehavior.range + 18)
   assert.notEqual(stabilized.attackBehavior, baseBehavior)
   assert.deepEqual(WEAPON_DEFINITIONS['slime-glaive'], baseWeapon)
 })
@@ -1113,6 +1519,7 @@ test('enemy visual metadata keeps immutable gameplay geometry while adding art h
       'prism-slime': { size: 30, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
       'dash-slime': { size: 24, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
       'orbit-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
+      'needle-wasp': { size: 24, textureKey: 'needle-wasp', animationKey: 'needle-wasp-idle' },
       'slime-boss': { size: 44, textureKey: 'slime-boss', animationKey: 'slime-boss-idle' },
     },
   )
@@ -1197,6 +1604,7 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'spark-knot': 'spark-knot',
       'mist-bead': 'mist-bead',
       'tuning-capsule': 'tuning-capsule',
+      'chitin-needle': 'chitin-needle',
     },
   )
 
@@ -1213,7 +1621,15 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'spark-knot': { width: 22, height: 22, radius: 10 },
       'mist-bead': { width: 22, height: 22, radius: 10 },
       'tuning-capsule': { width: 22, height: 22, radius: 10 },
+      'chitin-needle': { width: 22, height: 22, radius: 10 },
     },
+  )
+
+  assert.deepEqual(
+    VECTOR_ASSETS
+      .filter((asset) => asset.key === HEART_PICKUP_TEXTURE_KEY)
+      .map((asset) => ({ key: asset.key, width: asset.width, height: asset.height, radius: asset.fallback?.radius })),
+    [{ key: 'heart-pickup', width: 24, height: 24, radius: 11 }],
   )
 
   assert.deepEqual(
@@ -1262,6 +1678,10 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'prism-cutter': {
         projectileTextureKey: 'frost-projectile',
         hudIconKey: 'weapon-prism-cutter',
+      },
+      'needle-fan': {
+        projectileTextureKey: 'needle-projectile',
+        hudIconKey: 'weapon-needle-fan',
       },
     },
   )

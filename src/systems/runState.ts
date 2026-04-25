@@ -48,7 +48,7 @@ export function createInitialArenaRunState(): ArenaRunState {
     activeWaveLabel: '',
     wavesCleared: 0,
     isBossActive: false,
-    statusMessage: 'WASD로 이동하고 회피하며 토큰을 파친코 보상으로 바꾸세요.',
+    statusMessage: 'WASD 이동과 J 대시로 회피하며 토큰을 파친코 보상으로 바꾸세요.',
     lastPlayerHitAt: 0,
     nextEnemyRuntimeId: 1,
   }

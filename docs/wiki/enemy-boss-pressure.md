@@ -85,6 +85,43 @@ Source artifacts:
 - `.omx/context/difficulty-near-miss-pressure-20260425T114145Z.md`
 - `.omx/context/post-interview-difficulty-near-miss-pressure-20260425T115729Z.md`
 
+
+## Boss Dash Dodge Follow-Up
+
+A later interview clarified that a large boss AOE should be avoidable through an explicit player action rather than by reducing overall pressure. The chosen V1 answer is **J-key dash with a short invulnerability window**. Space was avoided after browser page scrolling made it a poor default web input.
+
+Durable rules from this follow-up:
+
+- J dash is the intended player agency tool for dodging boss telegraphed AOE.
+- Preserve wave pressure and boss pressure; do not solve dodgeability by globally nerfing density, spawn cadence, or boss threat.
+- Keep dash tuning deterministic and test-covered: duration, cooldown, i-frame window, and the relationship between dash+walk distance and boss AOE radius/telegraph time should remain explicit.
+- The shared player damage gate may treat dash i-frames as temporary immunity, including contact damage, but only inside the short dash window.
+- Manual browser play-feel is still recommended after future dash or boss AOE tuning.
+
+Implementation notes from the first pass:
+
+- `src/systems/playerDash.ts`: pure dash constants and timing/direction helpers.
+- `src/scenes/ArenaScene.ts`: J-key input, dash velocity, and dash invulnerability wiring.
+- `src/systems/playerDamageRules.ts`: optional invulnerability gate for player damage.
+- `tests/player-dash.test.mjs`: deterministic dash timing and boss AOE escape-distance coverage.
+- `tests/player-damage-rules.test.mjs`: dash invulnerability damage-gate coverage.
+
+Verification recorded before this context capture:
+
+- `pnpm typecheck`
+- `pnpm test` — 104 passing tests
+- `pnpm build`
+- `git diff --check`
+
+Known caveat: no manual browser play-feel validation has proven the dash timing against the live boss fight yet.
+
+Source artifacts:
+
+- `.omx/specs/deep-interview-boss-dash-dodge.md`
+- `.omx/interviews/boss-dash-dodge-20260425T121731Z.md`
+- `.omx/context/boss-aoe-dodgeability-20260425T121010Z.md`
+- `.omx/context/post-interview-boss-dash-dodge-20260425T122704Z.md`
+
 ## Source Artifacts
 
 - `.omx/specs/deep-interview-enemy-boss-pressure.md`

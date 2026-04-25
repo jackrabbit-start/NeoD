@@ -56,7 +56,28 @@
 - Updated `docs/index.md` so future agents can find the melee architecture guidance.
 - Source artifacts: `.omx/specs/deep-interview-weapon-capsule-variety.md`, `.omx/plans/prd-melee-weapon-line.md`, `.omx/plans/test-spec-melee-weapon-line.md`, and `.omx/context/post-interview-melee-weapon-line-20260425T114954Z.md`.
 
+## [2026-04-25] gameplay | Captured map traversal and obstacle architecture
+
+- Added `docs/wiki/map-traversal-obstacles.md` to synthesize the larger scrolling map, sparse blocking obstacle, ambient item, and safe spawn rules.
+- Updated `docs/index.md` so future agents can find the traversal/obstacle guidance.
+- Source artifacts: `.omx/specs/deep-interview-map-traversal-obstacles-items.md`, `.omx/plans/prd-map-traversal-obstacles-items.md`, `.omx/plans/test-spec-map-traversal-obstacles-items.md`, and `.omx/context/post-interview-map-traversal-obstacles-items-20260425T123230Z.md`.
+
 ## [2026-04-25] gameplay | Captured near-miss difficulty follow-up
 
 - Updated `docs/wiki/enemy-boss-pressure.md` with the low-clear-rate near-miss follow-up: burst/group spawns, harder dash/AOE reach, and explicit readability non-goals.
 - Source artifacts: `.omx/specs/deep-interview-difficulty-near-miss-pressure.md`, `.omx/interviews/difficulty-near-miss-pressure-20260425T114801Z.md`, and `.omx/context/post-interview-difficulty-near-miss-pressure-20260425T115729Z.md`.
+
+## [2026-04-25] gameplay | Captured boss dash dodge follow-up
+
+- Updated `docs/wiki/enemy-boss-pressure.md` with the Space dash + short i-frame rule for avoiding boss telegraphed AOE without reducing wave or boss pressure.
+- Source artifacts: `.omx/specs/deep-interview-boss-dash-dodge.md`, `.omx/interviews/boss-dash-dodge-20260425T121731Z.md`, and `.omx/context/post-interview-boss-dash-dodge-20260425T122704Z.md`.
+
+## [2026-04-25] gameplay-ui | Switched dash input away from Space
+
+- Updated the boss dash guidance and player-facing control copy from Space to J because Space can scroll the browser page in the web prototype.
+- Preserved the existing short i-frame dash behavior and boss-pressure constraints.
+
+## [2026-04-25] gameplay-ui | Reworked traversal map toward minimap recovery flow
+
+- Updated `docs/wiki/map-traversal-obstacles.md` to record the follow-up direction: no blocking obstacles, top-right minimap, and intermittent health-only heart pickups.
+- Preserved larger-map traversal rules while marking blocking obstacles as reversed unless a later plan reopens terrain blockers.

@@ -19,6 +19,12 @@ export interface HudControllerHandlers {
   onWeaponFuse: (weaponKey: WeaponStackKey) => void
 }
 
+export interface HudRenderMetrics {
+  summaryAssignments: number
+  summarySkips: number
+  modalClosedSkips: number
+}
+
 const escapeHtml = (value: string) =>
   value
     .replaceAll('&', '&amp;')
@@ -42,6 +48,19 @@ const renderSummarySection = (title: string, content: string, className = '') =>
 const getHudIconSrc = (iconKey?: string) =>
   iconKey ? getHudWeaponAssetPath(iconKey) : null
 
+const renderStatusPanel = (state: HudState) => `
+  <section class="hud-summary__status" aria-label="현재 런 상태">
+    <div class="hud-summary__status-line">
+      <span>상태</span>
+      <strong>${escapeHtml(state.status)}</strong>
+    </div>
+    <div class="hud-summary__status-meta">
+      <p><span>목표</span>${escapeHtml(state.objective)}</p>
+      <p><span>팁</span>${escapeHtml(state.tip)}</p>
+    </div>
+  </section>
+`
+
 export class HudController {
   private readonly summaryElement: HTMLDivElement
 
@@ -62,6 +81,14 @@ export class HudController {
   private hoveredItemId: string | null = null
 
   private modalSignature = ''
+
+  private summaryMarkup = ''
+
+  private renderMetrics: HudRenderMetrics = {
+    summaryAssignments: 0,
+    summarySkips: 0,
+    modalClosedSkips: 0,
+  }
 
   private handlers: HudControllerHandlers = {
     onInventoryToggle: () => undefined,
@@ -143,10 +170,16 @@ export class HudController {
     this.updateModal(state.modal)
   }
 
+  getRenderMetrics(): HudRenderMetrics {
+    return { ...this.renderMetrics }
+  }
+
   destroy(): void {
     this.element.removeEventListener('click', this.handleClick)
     this.element.removeEventListener('mouseover', this.handleHover)
     this.element.removeEventListener('focusin', this.handleHover)
+    this.summaryMarkup = ''
+    this.modalSignature = ''
     this.element.innerHTML = ''
   }
 
@@ -226,17 +259,14 @@ export class HudController {
   }
 
   private renderSummary(state: HudState): void {
-    this.summaryElement.innerHTML = `
+    const nextMarkup = `
       <div class="hud-summary__shell">
         <header class="hud-summary__hero">
           <div class="hud-summary__title-block">
             <h1>${escapeHtml(state.title)}</h1>
             <p>${escapeHtml(state.subtitle)}</p>
           </div>
-          <div class="hud-summary__status">
-            <h2>상태</h2>
-            <p>${escapeHtml(state.status)}</p>
-          </div>
+          ${renderStatusPanel(state)}
         </header>
         <div class="hud-summary__grid">
           ${renderSummarySection('능력치', renderList(state.stats), 'hud-summary__section--stats')}
@@ -263,6 +293,15 @@ export class HudController {
         </div>
       </div>
     `
+
+    if (nextMarkup === this.summaryMarkup) {
+      this.renderMetrics.summarySkips += 1
+      return
+    }
+
+    this.summaryElement.innerHTML = nextMarkup
+    this.summaryMarkup = nextMarkup
+    this.renderMetrics.summaryAssignments += 1
   }
 
   private updateModal(modal: HudModalState): void {
@@ -271,8 +310,13 @@ export class HudController {
     this.resumeButton.disabled = !modal.isOpen
 
     if (!modal.isOpen) {
+      if (this.modalSignature === 'closed') {
+        this.renderMetrics.modalClosedSkips += 1
+        return
+      }
+
       this.hoveredItemId = null
-      this.modalSignature = ''
+      this.modalSignature = 'closed'
       this.itemList.replaceChildren()
       this.itemDetail.replaceChildren(this.createEmptyText('파친코 보상은 무기 스택으로 기록됩니다.'))
       this.recipeList.replaceChildren()

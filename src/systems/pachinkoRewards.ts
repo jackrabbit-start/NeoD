@@ -13,6 +13,7 @@ export const ENEMY_TOKEN_XP: Record<EnemyId, number> = {
   'prism-slime': 4,
   'dash-slime': 2,
   'orbit-slime': 2,
+  'needle-wasp': 3,
   'slime-boss': 0,
 }
 
