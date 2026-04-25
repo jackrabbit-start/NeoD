@@ -12,10 +12,13 @@ import {
   collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
+  getWeaponAttackRange,
   getWeaponIdentityLabel,
   getWeaponSummary,
   isAttackPlanActionable,
+  isPointWithinRadius,
   isProjectileOutOfBounds,
+  resolveProjectileRangeStep,
   shouldWeaponFire,
   selectChainTargets,
 } from '../.tmp-test/src/systems/weaponBehaviors.js'
@@ -30,9 +33,19 @@ test('acid sprayer fires a three-shot spray that leaves lingering hazards', () =
   assert.equal(center?.hazardOnHit?.damage, 6)
   assert.equal(center?.hazardOnExpire?.durationMs, 950)
   assert.equal(center?.lifetimeMs, 250)
+  assert.equal(center?.maxTravelDistance, getWeaponAttackRange(WEAPON_DEFINITIONS['acid-sprayer']))
   assert.ok((left?.direction.y ?? 0) < 0)
   assert.ok(Math.abs(center?.direction.y ?? 0) < 1e-9)
   assert.ok((right?.direction.y ?? 0) > 0)
+})
+
+test('weapon attack range helper uses ranged metadata and melee behavior authority', () => {
+  const starter = WEAPON_DEFINITIONS['starter-blaster']
+  const glaive = WEAPON_DEFINITIONS['slime-glaive']
+
+  assert.equal(getWeaponAttackRange(starter), starter.range)
+  assert.equal(getWeaponAttackRange(glaive), glaive.attackBehavior.range)
+  assert.equal(Object.hasOwn(glaive, 'range'), false)
 })
 
 test('frost lance plan preserves a piercing projectile', () => {
@@ -82,6 +95,7 @@ test('spark carbine is a fast single-shot electric branch', () => {
   assert.equal(plan.projectiles.length, 1)
   assert.equal(plan.projectiles[0]?.speed, spark.projectileSpeed)
   assert.equal(plan.projectiles[0]?.lifetimeMs, 820)
+  assert.equal(plan.projectiles[0]?.maxTravelDistance, getWeaponAttackRange(spark))
 })
 
 test('mist vortex is a distinct spray hazard control branch', () => {
@@ -137,6 +151,45 @@ test('melee weapon plans create actionable frontal cleave swings without project
   assert.notEqual(glaive.attackBehavior.arcDegrees, cutter.attackBehavior.arcDegrees)
   assert.notEqual(glaive.fireRateMs, cutter.fireRateMs)
   assert.match(getWeaponSummary(glaive), /범위/)
+})
+
+test('projectile range step clamps at the max travel boundary', () => {
+  assert.deepEqual(
+    resolveProjectileRangeStep({ x: 0, y: 0 }, { x: 30, y: 40 }, 60),
+    {
+      point: { x: 30, y: 40 },
+      distanceFromOrigin: 50,
+      expired: false,
+    },
+  )
+
+  assert.deepEqual(
+    resolveProjectileRangeStep({ x: 0, y: 0 }, { x: 80, y: 0 }, 50),
+    {
+      point: { x: 50, y: 0 },
+      distanceFromOrigin: 50,
+      expired: true,
+    },
+  )
+})
+
+test('range-clamped projectile collision cannot reach beyond max base range', () => {
+  const rangeStep = resolveProjectileRangeStep({ x: 0, y: 0 }, { x: 140, y: 0 }, 100)
+
+  assert.equal(rangeStep.expired, true)
+  assert.deepEqual(rangeStep.point, { x: 100, y: 0 })
+  assert.equal(isPointWithinRadius(rangeStep.point, { x: 108, y: 0 }, 10), true)
+  assert.equal(isPointWithinRadius(rangeStep.point, { x: 112, y: 0 }, 10), false)
+})
+
+test('expire hazards use the clamped in-range projectile point', () => {
+  const overshoot = { x: 160, y: 0 }
+  const rangeStep = resolveProjectileRangeStep({ x: 0, y: 0 }, overshoot, 100)
+  const expireHazardSpawnPoint = rangeStep.point
+
+  assert.equal(rangeStep.expired, true)
+  assert.deepEqual(expireHazardSpawnPoint, { x: 100, y: 0 })
+  assert.notDeepEqual(expireHazardSpawnPoint, overshoot)
 })
 
 test('frontal cleave target selection respects range, arc, radius, and deterministic order', () => {

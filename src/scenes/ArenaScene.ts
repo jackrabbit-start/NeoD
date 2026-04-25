@@ -95,12 +95,15 @@ import {
   collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
+  getWeaponAttackRange,
   getWeaponSummary,
   isAttackPlanActionable,
+  isPointWithinRadius,
   isProjectileOutOfBounds,
+  resolveProjectileRangeStep,
   selectChainTargets,
 } from '../systems/weaponBehaviors.js'
-import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
+import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import {
   deriveEffectiveWeaponStats,
   getTuningEffectLabel,
@@ -205,7 +208,9 @@ interface ProjectileEntity {
   remainingLifetimeMs: number
   remainingHits: number
   hitEnemyIds: Set<number>
+  origin: Point
   direction: ProjectileSpawnSpec['direction']
+  maxTravelDistance: number
   knockback: ProjectileSpawnSpec['knockback']
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
@@ -624,6 +629,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private handleFiring(time: number): void {
     const weapon = deriveEffectiveWeaponStats(this.activeWeaponId, this.tuningState)
+    const weaponRange = getWeaponAttackRange(weapon)
     const target = resolveAutoAttackShot(
       {
         x: this.player.x,
@@ -632,12 +638,14 @@ export class ArenaScene extends Phaser.Scene {
       this.enemies.map((enemy) => ({
         x: enemy.sprite.x,
         y: enemy.sprite.y,
+        radius: enemy.config.size / 2,
         isActive: enemy.sprite.active,
       })),
       {
         isInteractionBlocked: this.isInteractionBlocked(),
         time,
         nextFireAt: this.nextFireAt,
+        maxRange: weaponRange,
       },
     )
 
@@ -850,6 +858,16 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
+      const rangeStep = resolveProjectileRangeStep(
+        projectile.origin,
+        { x: projectile.sprite.x, y: projectile.sprite.y },
+        projectile.maxTravelDistance,
+      )
+      const didExpireAtRange = rangeStep.expired
+      if (rangeStep.expired) {
+        projectile.sprite.setPosition(rangeStep.point.x, rangeStep.point.y)
+      }
+
       projectile.remainingLifetimeMs -= delta
       if (projectile.remainingLifetimeMs <= 0) {
         this.destroyProjectile(projectile, projectile.hazardOnExpire)
@@ -873,12 +891,11 @@ export class ArenaScene extends Phaser.Scene {
 
         const hitDistance = enemy.config.size / 2 + Math.max(projectile.radius, PROJECTILE_HIT_PADDING)
         if (
-          Phaser.Math.Distance.Between(
-            projectile.sprite.x,
-            projectile.sprite.y,
-            enemy.sprite.x,
-            enemy.sprite.y,
-          ) <= hitDistance
+          isPointWithinRadius(
+            { x: projectile.sprite.x, y: projectile.sprite.y },
+            { x: enemy.sprite.x, y: enemy.sprite.y },
+            hitDistance,
+          )
         ) {
           const hitStep = applyProjectileHitState(
             projectile.hitEnemyIds,
@@ -913,6 +930,10 @@ export class ArenaScene extends Phaser.Scene {
             break
           }
         }
+      }
+
+      if (didExpireAtRange && projectile.sprite.active) {
+        this.destroyProjectile(projectile, projectile.hazardOnExpire)
       }
     }
   }
@@ -2070,7 +2091,9 @@ export class ArenaScene extends Phaser.Scene {
       remainingLifetimeMs: projectileSpec.lifetimeMs,
       remainingHits: projectileSpec.maxHits,
       hitEnemyIds: new Set<number>(),
+      origin: { x: this.player.x, y: this.player.y },
       direction: projectileSpec.direction,
+      maxTravelDistance: projectileSpec.maxTravelDistance,
       knockback: projectileSpec.knockback,
       chain: projectileSpec.chain,
       hazardOnHit: projectileSpec.hazardOnHit,
