@@ -87,6 +87,7 @@ const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value))
 
 const roundPercent = (value: number): number => Math.round(value * 100)
+const scaleRangeDelta = (value: number): number => Math.max(1, Math.round(value * 0.6))
 
 const getLevelTier = (level: number): number => Math.max(0, Math.floor((Math.max(1, level) - 1) / 5))
 
@@ -209,7 +210,7 @@ const PASSIVE_CARD_TEMPLATES = [
       return {
         effects: {
           projectileSpeedMultiplier: 1 + speed.value,
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: averageQuality(speed.quality, range.quality),
       }
@@ -227,7 +228,7 @@ const PASSIVE_CARD_TEMPLATES = [
       const range = rollNumber(random, 24 + tier * 4, 40 + tier * 6)
       return {
         effects: {
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: range.quality,
       }
@@ -268,7 +269,7 @@ const PASSIVE_CARD_TEMPLATES = [
       const range = rollNumber(random, 10 + rangeTier * 3, 20 + rangeTier * 4)
       return {
         effects: {
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
           hazardRadiusMultiplier: 1 + radius.value,
         },
         quality: averageQuality(radius.quality, range.quality),
@@ -888,7 +889,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
           fireRateMultiplier: 1 - fire.value,
           projectileLifetimeMultiplier: 1 + Math.max(0.05, fire.value * 0.9),
           projectileCountDelta: burst.value,
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: averageQuality(averageQuality(fire.quality, burst.quality), range.quality),
       }
@@ -912,7 +913,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
           hazardRadiusMultiplier: 1 + radius.value,
           hazardDurationMultiplier: 1 + Math.max(0.08, radius.value * 0.85),
           projectileCountDelta: extra.value,
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: averageQuality(averageQuality(radius.quality, extra.quality), range.quality),
       }
@@ -935,7 +936,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
         effects: {
           damageMultiplier: 1 + damage.value,
           projectileLifetimeMultiplier: 1 + Math.max(0.05, damage.value * 0.8),
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: averageQuality(damage.quality, range.quality),
       }
@@ -958,7 +959,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
         effects: {
           damageMultiplier: 1 + damage.value,
           projectileCountDelta: extra.value,
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: averageQuality(averageQuality(damage.quality, extra.quality), range.quality),
       }
@@ -981,7 +982,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
           projectileLifetimeMultiplier: 1 + Math.max(0.06, speed.value * 0.9),
           ricochetBouncesDelta: 1,
           ricochetRangeMultiplier: 1 + Math.max(0.08, speed.value * 1.1),
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: averageQuality(speed.quality, range.quality),
       }
@@ -1000,7 +1001,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       const extra = rollNumber(random, 1, 1)
       return {
         effects: {
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
           projectileCountDelta: extra.value,
           damageMultiplier: 1.12,
           turretDurationMultiplier: 1.22,
@@ -1029,7 +1030,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
           hazardRadiusMultiplier: 1 + radius.value,
           hazardDurationMultiplier: 1 + Math.max(0.08, radius.value * 0.8),
           damageMultiplier: 1 + damage.value,
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: averageQuality(averageQuality(radius.quality, damage.quality), range.quality),
       }
@@ -1050,7 +1051,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       return {
         effects: {
           damageMultiplier: 1 + damage.value,
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
           healOnHitDelta: 1,
         },
         quality: averageQuality(damage.quality, range.quality),
@@ -1075,7 +1076,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
         effects: {
           fireRateMultiplier: 1 - fire.value,
           damageMultiplier: 1 + damage.value,
-          rangeDelta: range.value,
+          rangeDelta: scaleRangeDelta(range.value),
         },
         quality: averageQuality(averageQuality(fire.quality, damage.quality), range.quality),
       }
