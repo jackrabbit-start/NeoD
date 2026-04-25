@@ -1677,6 +1677,23 @@ test('loss result presentation keeps restart guidance distinct from boss clear',
   assert.match(timeoutPresentation.status, /타임아웃/)
 })
 
+test('start screen gates arena entry behind an explicit button', () => {
+  const bootSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/BootScene.ts'), 'utf8')
+  const startSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/StartScene.ts'), 'utf8')
+  const configSource = readFileSync(resolve(TEST_DIR, '../src/game/config.ts'), 'utf8')
+
+  assert.ok(configSource.includes('StartScene'))
+  assert.ok(configSource.includes('scene: [BootScene, StartScene, ArenaScene, ResultScene]'))
+  assert.ok(bootSceneSource.includes("this.scene.start('start')"))
+  assert.ok(!bootSceneSource.includes("this.scene.start('arena')"))
+  assert.ok(startSceneSource.includes(".setName('start-run-button')"))
+  assert.ok(startSceneSource.includes('const startRun = (): void => {'))
+  assert.ok(startSceneSource.includes("this.scene.stop('arena')"))
+  assert.ok(startSceneSource.includes("this.scene.start('arena', { startElapsedMs: 0 })"))
+  assert.ok(startSceneSource.includes('this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)'))
+  assert.ok(startSceneSource.includes('Phaser.Input.Keyboard.KeyCodes.ENTER'))
+})
+
 test('result scene restart is button-driven instead of R-key driven', () => {
   const resultSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ResultScene.ts'), 'utf8')
 
@@ -1697,8 +1714,12 @@ test('result scene restart is button-driven instead of R-key driven', () => {
     'ResultScene should include a scene-level pointer fallback so button clicks restart even if game-object hit testing misses',
   )
   assert.ok(
-    resultSceneSource.includes(`this.scene.start('arena')`),
-    'ResultScene restart handler should start the arena scene',
+    resultSceneSource.includes(`this.scene.stop('arena')`),
+    'ResultScene restart handler should stop any stale arena scene before returning to a fresh start flow',
+  )
+  assert.ok(
+    resultSceneSource.includes(`this.scene.start('arena', { startElapsedMs: 0 })`),
+    'ResultScene restart handler should start a fresh arena run at 00:00',
   )
   assert.ok(
     resultSceneSource.includes(`const restartButtonY = Math.max(48, height - 48)`),

@@ -81,6 +81,6 @@ export class BootScene extends Phaser.Scene {
       registerLoopingAnimation(this, animation)
     }
 
-    this.scene.start('arena')
+    this.scene.start('start')
   }
 }
