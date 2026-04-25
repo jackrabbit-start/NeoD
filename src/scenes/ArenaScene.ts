@@ -243,7 +243,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private statusMessage = 'WASD로 이동하고 Space 대시로 회피하는 동안 무기가 자동으로 발사됩니다.'
+  private statusMessage = 'WASD로 이동하고 J 대시로 회피하는 동안 무기가 자동으로 발사됩니다.'
 
   private lastPlayerHitAt = 0
 
@@ -302,7 +302,7 @@ export class ArenaScene extends Phaser.Scene {
     }) as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
     this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
-    this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+    this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
 
     this.startWave(0)
     this.updateHud()
@@ -395,7 +395,7 @@ export class ArenaScene extends Phaser.Scene {
       const dashDirection = resolvePlayerDashDirection(inputVelocity, this.lastPlayerMoveDirection)
       this.playerDashDirection.set(dashDirection.x, dashDirection.y)
       this.playerDashState = startPlayerDash(time)
-      this.statusMessage = 'Space 대시! 짧은 무적 시간으로 보스 예고 공격을 피하세요.'
+      this.statusMessage = 'J 대시! 짧은 무적 시간으로 보스 예고 공격을 피하세요.'
     }
 
     if (isPlayerDashActive(time, this.playerDashState)) {
@@ -1402,7 +1402,7 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isBossActive
         ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
         : '웨이브를 버티고 드롭을 모아 인벤토리에서 업그레이드를 조합하세요.',
-      tip: 'WASD 이동 · Space 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스',
+      tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen,

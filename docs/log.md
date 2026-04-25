@@ -65,3 +65,9 @@
 
 - Updated `docs/wiki/enemy-boss-pressure.md` with the Space dash + short i-frame rule for avoiding boss telegraphed AOE without reducing wave or boss pressure.
 - Source artifacts: `.omx/specs/deep-interview-boss-dash-dodge.md`, `.omx/interviews/boss-dash-dodge-20260425T121731Z.md`, and `.omx/context/post-interview-boss-dash-dodge-20260425T122704Z.md`.
+
+
+## [2026-04-25] gameplay-ui | Switched dash input away from Space
+
+- Updated the boss dash guidance and player-facing control copy from Space to J because Space can scroll the browser page in the web prototype.
+- Preserved the existing short i-frame dash behavior and boss-pressure constraints.

@@ -52,7 +52,7 @@ hud.update({
   inventory: ['드롭 대기 중'],
   recipes: ['조합 상태 대기 중'],
   objective: '런을 시작하고 슬라임 보스를 쓰러뜨리세요.',
-  tip: 'WASD 이동 · Space 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합 · Q 코덱스',
+  tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합 · Q 코덱스',
   status: '시작 중',
   inventoryButtonLabel: '인벤토리 열기',
   inventoryButtonDisabled: false,

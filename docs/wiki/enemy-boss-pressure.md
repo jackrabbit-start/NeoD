@@ -88,11 +88,11 @@ Source artifacts:
 
 ## Boss Dash Dodge Follow-Up
 
-A later interview clarified that a large boss AOE should be avoidable through an explicit player action rather than by reducing overall pressure. The chosen V1 answer is **Space dash with a short invulnerability window**.
+A later interview clarified that a large boss AOE should be avoidable through an explicit player action rather than by reducing overall pressure. The chosen V1 answer is **J-key dash with a short invulnerability window**. Space was avoided after browser page scrolling made it a poor default web input.
 
 Durable rules from this follow-up:
 
-- Space dash is the intended player agency tool for dodging boss telegraphed AOE.
+- J dash is the intended player agency tool for dodging boss telegraphed AOE.
 - Preserve wave pressure and boss pressure; do not solve dodgeability by globally nerfing density, spawn cadence, or boss threat.
 - Keep dash tuning deterministic and test-covered: duration, cooldown, i-frame window, and the relationship between dash+walk distance and boss AOE radius/telegraph time should remain explicit.
 - The shared player damage gate may treat dash i-frames as temporary immunity, including contact damage, but only inside the short dash window.
@@ -101,7 +101,7 @@ Durable rules from this follow-up:
 Implementation notes from the first pass:
 
 - `src/systems/playerDash.ts`: pure dash constants and timing/direction helpers.
-- `src/scenes/ArenaScene.ts`: Space input, dash velocity, and dash invulnerability wiring.
+- `src/scenes/ArenaScene.ts`: J-key input, dash velocity, and dash invulnerability wiring.
 - `src/systems/playerDamageRules.ts`: optional invulnerability gate for player damage.
 - `tests/player-dash.test.mjs`: deterministic dash timing and boss AOE escape-distance coverage.
 - `tests/player-damage-rules.test.mjs`: dash invulnerability damage-gate coverage.

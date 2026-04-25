@@ -42,7 +42,7 @@ export function createInitialArenaRunState(): ArenaRunState {
     activeWaveLabel: '',
     wavesCleared: 0,
     isBossActive: false,
-    statusMessage: 'WASD로 이동하고 Space 대시로 회피하는 동안 무기가 자동으로 발사됩니다.',
+    statusMessage: 'WASD로 이동하고 J 대시로 회피하는 동안 무기가 자동으로 발사됩니다.',
     lastPlayerHitAt: 0,
     nextEnemyRuntimeId: 1,
   }
