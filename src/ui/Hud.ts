@@ -43,7 +43,6 @@ export class HudController {
 
   private readonly weaponList: HTMLDivElement
 
-
   private modalState: HudModalState | null = null
 
   private hoveredItemId: string | null = null
@@ -198,28 +197,40 @@ export class HudController {
 
   private renderSummary(state: HudState): void {
     this.summaryElement.innerHTML = `
-      <h1>${escapeHtml(state.title)}</h1>
-      <p>${escapeHtml(state.subtitle)}</p>
-      <h2>Status</h2>
-      <p>${escapeHtml(state.status)}</p>
-      <h2>Stats</h2>
-      ${renderList(state.stats)}
-      <div class="hud-summary__inventory-header">
-        <h2>Inventory</h2>
-        <button
-          type="button"
-          class="hud-button"
-          data-action="inventory-toggle"
-          ${state.inventoryButtonDisabled ? 'disabled' : ''}
-        >${escapeHtml(state.inventoryButtonLabel)}</button>
+      <div class="hud-summary__top">
+        <div class="hud-summary__title-block">
+          <p class="hud-summary__eyebrow">${escapeHtml(state.title)}</p>
+          <p class="hud-summary__subtitle">${escapeHtml(state.subtitle)}</p>
+          <p class="hud-summary__status"><strong>Status:</strong> ${escapeHtml(state.status)}</p>
+        </div>
+        <div class="hud-summary__action-block">
+          <button
+            type="button"
+            class="hud-button"
+            data-action="inventory-toggle"
+            ${state.inventoryButtonDisabled ? 'disabled' : ''}
+          >${escapeHtml(state.inventoryButtonLabel)}</button>
+          <p class="hud-tip">${escapeHtml(state.tip)}</p>
+        </div>
       </div>
-      ${renderList(state.inventory)}
-      <h2>Available combines</h2>
-      ${renderList(state.recipes)}
-      <h2>Objective</h2>
-      <p>${escapeHtml(state.objective)}</p>
-      <h2>Controls</h2>
-      <p class="hud-tip">${escapeHtml(state.tip)}</p>
+      <div class="hud-summary__grid">
+        <section class="hud-summary__section">
+          <h2>Stats</h2>
+          ${renderList(state.stats)}
+        </section>
+        <section class="hud-summary__section">
+          <h2>Inventory</h2>
+          ${renderList(state.inventory)}
+        </section>
+        <section class="hud-summary__section">
+          <h2>Available combines</h2>
+          ${renderList(state.recipes)}
+        </section>
+        <section class="hud-summary__section">
+          <h2>Objective</h2>
+          <p>${escapeHtml(state.objective)}</p>
+        </section>
+      </div>
     `
   }
 
