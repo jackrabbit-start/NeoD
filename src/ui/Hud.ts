@@ -655,13 +655,17 @@ export class HudController {
       grade.className = `hud-modal__passive-grade hud-modal__passive-grade--${choice.grade}`
       grade.textContent = choice.gradeLabel
 
+      const kind = document.createElement('small')
+      kind.className = `hud-modal__passive-kind hud-modal__passive-kind--${choice.kind}`
+      kind.textContent = choice.kindLabel
+
       const summary = document.createElement('small')
       summary.textContent = choice.effectSummary
 
       const description = document.createElement('small')
       description.textContent = choice.description
 
-      textGroup.append(title, grade, summary, description)
+      textGroup.append(title, grade, kind, summary, description)
       left.append(textGroup)
       button.append(left)
       return button
