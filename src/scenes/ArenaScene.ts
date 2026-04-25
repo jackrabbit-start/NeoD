@@ -45,6 +45,16 @@ import {
   type RectObstacle,
 } from '../systems/mapLayout.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
+import {
+  canStartPlayerDash,
+  createReadyPlayerDashState,
+  isPlayerDashActive,
+  isPlayerDashInvulnerable,
+  PLAYER_DASH_SPEED,
+  resolvePlayerDashDirection,
+  startPlayerDash,
+  type PlayerDashState,
+} from '../systems/playerDash.js'
 import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
 import {
@@ -202,6 +212,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private codexKey!: Phaser.Input.Keyboard.Key
 
+  private dashKey!: Phaser.Input.Keyboard.Key
+
   private enemies: EnemyEntity[] = []
 
   private lootDrops: LootEntity[] = []
@@ -230,6 +242,12 @@ export class ArenaScene extends Phaser.Scene {
 
   private playerSpeed = 220
 
+  private playerDashState: PlayerDashState = createReadyPlayerDashState()
+
+  private playerDashDirection = new Phaser.Math.Vector2(1, 0)
+
+  private lastPlayerMoveDirection = new Phaser.Math.Vector2(1, 0)
+
   private nextFireAt = 0
 
   private remainingSpawns = 0
@@ -244,7 +262,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private statusMessage = 'WASD로 이동하고 회피하는 동안 무기가 자동으로 발사됩니다.'
+  private statusMessage = 'WASD로 이동하고 J 대시로 회피하는 동안 무기가 자동으로 발사됩니다.'
 
   private lastPlayerHitAt = 0
 
@@ -309,6 +327,7 @@ export class ArenaScene extends Phaser.Scene {
     }) as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
     this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
+    this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
 
     this.startWave(0)
     this.updateHud()
@@ -322,12 +341,24 @@ export class ArenaScene extends Phaser.Scene {
 
     this.handleInventoryToggle()
     this.handleCodexToggle()
-    this.handlePlayerMovement()
+    this.handlePlayerMovement(time)
     this.handleFiring(time)
     this.updateEnemies(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.updateProjectiles(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.updateLootDrops(delta)
     this.updateHazards(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.cleanupDestroyedEntities()
 
     if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
@@ -427,24 +458,48 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handlePlayerMovement(): void {
+  private handlePlayerMovement(time: number): void {
     if (this.isInteractionBlocked()) {
       this.player.setVelocity(0, 0)
       this.setPlayerAnimation(false)
       return
     }
 
-    const velocity = new Phaser.Math.Vector2(
+    const inputVelocity = new Phaser.Math.Vector2(
       Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
       Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
     )
 
-    const isMoving = velocity.lengthSq() > 0
+    const isMoving = inputVelocity.lengthSq() > 0
     if (isMoving) {
-      velocity.normalize().scale(this.playerSpeed)
+      inputVelocity.normalize()
+      this.lastPlayerMoveDirection.set(inputVelocity.x, inputVelocity.y)
     }
 
-    this.player.setVelocity(velocity.x, velocity.y)
+    if (
+      Phaser.Input.Keyboard.JustDown(this.dashKey) &&
+      canStartPlayerDash(time, this.playerDashState, false)
+    ) {
+      const dashDirection = resolvePlayerDashDirection(inputVelocity, this.lastPlayerMoveDirection)
+      this.playerDashDirection.set(dashDirection.x, dashDirection.y)
+      this.playerDashState = startPlayerDash(time)
+      this.statusMessage = 'J 대시! 짧은 무적 시간으로 보스 예고 공격을 피하세요.'
+    }
+
+    if (isPlayerDashActive(time, this.playerDashState)) {
+      this.player.setVelocity(
+        this.playerDashDirection.x * PLAYER_DASH_SPEED,
+        this.playerDashDirection.y * PLAYER_DASH_SPEED,
+      )
+      this.setPlayerAnimation(true)
+      return
+    }
+
+    if (isMoving) {
+      inputVelocity.scale(this.playerSpeed)
+    }
+
+    this.player.setVelocity(inputVelocity.x, inputVelocity.y)
     this.setPlayerAnimation(isMoving)
   }
 
@@ -526,6 +581,9 @@ export class ArenaScene extends Phaser.Scene {
             )
           ) {
             this.damagePlayer(enemy.telegraph.damage)
+            if (this.isRunEnding) {
+              return
+            }
           }
 
           enemy.telegraph.visual.destroy()
@@ -598,6 +656,9 @@ export class ArenaScene extends Phaser.Scene {
       const touchingPlayer = distanceToPlayer < enemy.config.size / 2 + ENEMY_CONTACT_PADDING
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
+        if (this.isRunEnding) {
+          return
+        }
       }
 
       this.syncEnemyHealthBar(enemy)
@@ -847,6 +908,9 @@ export class ArenaScene extends Phaser.Scene {
           this.damageEnemy(enemy, hazard.damage, {
             ignoreRecentHit: true,
           })
+          if (this.isRunEnding) {
+            return
+          }
         }
       }
 
@@ -1000,7 +1064,14 @@ export class ArenaScene extends Phaser.Scene {
 
   private damagePlayer(damage: number): void {
     const now = this.time.now
-    if (!shouldApplyPlayerDamage(now, this.lastPlayerHitAt, this.isInteractionBlocked())) {
+    if (
+      !shouldApplyPlayerDamage(
+        now,
+        this.lastPlayerHitAt,
+        this.isInteractionBlocked(),
+        isPlayerDashInvulnerable(now, this.playerDashState),
+      )
+    ) {
       return
     }
 
@@ -1164,7 +1235,9 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const enemy of this.enemies) {
-      enemy.sprite.setVelocity(0, 0)
+      if (enemy.sprite.active) {
+        enemy.sprite.setVelocity(0, 0)
+      }
     }
   }
 
@@ -1312,6 +1385,9 @@ export class ArenaScene extends Phaser.Scene {
     this.playerHealth = initialState.playerHealth
     this.playerMaxHealth = initialState.playerMaxHealth
     this.playerSpeed = initialState.playerSpeed
+    this.playerDashState = createReadyPlayerDashState()
+    this.playerDashDirection.set(1, 0)
+    this.lastPlayerMoveDirection.set(1, 0)
     this.nextFireAt = initialState.nextFireAt
     this.remainingSpawns = initialState.remainingSpawns
     this.currentWaveIndex = initialState.currentWaveIndex
@@ -1431,7 +1507,7 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isBossActive
         ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
         : '웨이브를 버티고 드롭을 모아 인벤토리에서 업그레이드를 조합하세요.',
-      tip: 'WASD 이동 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리에서 조합 또는 무기 교체 · Q 코덱스',
+      tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen,

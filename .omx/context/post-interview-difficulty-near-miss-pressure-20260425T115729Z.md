@@ -1,0 +1,49 @@
+# Post-Interview Context — Difficulty Near-Miss Pressure
+
+- Source spec: `.omx/specs/deep-interview-difficulty-near-miss-pressure.md`
+- Source transcript/context:
+  - `.omx/interviews/difficulty-near-miss-pressure-20260425T114801Z.md`
+  - `.omx/context/difficulty-near-miss-pressure-20260425T114145Z.md`
+- Branch/worktree:
+  - Current branch: `ai-task/difficulty-near-miss-pressure`
+  - Status: post-interview plus post-implementation capture; implementation changes are present but not committed in this skill.
+- Summary:
+  - The interview clarified that the prior 3x density pass was still too easy; the next target is a low-clear-rate default balance, roughly under 20% clear rate before mastery.
+  - The required feel is near-miss pressure: enemy dashes and AOE ranges should barely miss when dodged correctly, while idle/static play should no longer survive regular waves.
+  - Implementation currently adds wave `burstSize`, burst-spawn runtime support, stronger enemy movement/attack stats, and a small starter weapon nerf.
+- Lessons:
+  - Density alone did not satisfy the user's difficulty goal; pressure also needs reach, timing, and grouped entry.
+  - Low clear rate is allowed, but the explicit non-goals still bind: no unreadable deaths, no opening instant deaths, and no literally unavoidable hitboxes.
+  - Prefer burst/group spawn metadata over only shrinking spawn intervals when the design needs several enemies to appear at once.
+  - Player hit cooldown was not selected as a tuning lever; avoid using it as the primary fix unless a later requirement reopens it.
+- New files:
+  - None in product code.
+  - This context note records the current post-implementation state.
+- Modified files:
+  - `src/domain/types.ts`: adds optional `WaveDefinition.burstSize`.
+  - `src/scenes/arena/waveRuntime.ts`: spawns up to `burstSize` enemies per immediate/timed spawn tick.
+  - `src/data/waves.ts`: adds burst sizes `2/3/4` for the first three waves and adjusts intervals to `700/620/560ms`.
+  - `src/data/enemies.ts`: raises enemy health/speed/damage, dash reach/speed/duration, orbit pressure, spark AOE, and boss AOE pressure.
+  - `src/data/weapons.ts`: lowers starter damage and fire cadence (`12 -> 10`, `280ms -> 320ms`).
+  - `tests/enemy-behaviors.test.mjs`: locks near-miss enemy constants and telegraph radii.
+  - `tests/game-logic.test.mjs`: locks burst-size data and longer dash charge test timing.
+  - `tests/wave-runtime.test.mjs`: locks burst spawn counts, cadence, and repeats.
+- Decisions / constraints:
+  - Target under 20% clear rate before mastery.
+  - Preserve readable near-miss play; do not make deaths invisible or impossible to dodge.
+  - Avoid opening instant deaths even while making idle play unsafe.
+  - Preserve boss-win/run-result flow and V1 safe-fiction constraints.
+  - No dependencies were added.
+- Verification:
+  - `pnpm typecheck` passed.
+  - `pnpm test` passed with 94/94 tests.
+  - `pnpm build` passed.
+  - `git diff --check` passed before this context capture.
+  - Known warnings: local Node `v25.5.0` does not match package engine `22.x`; Vite chunk-size warning remains.
+- Residual risks:
+  - No manual browser play-feel validation has been recorded for the near-miss pass.
+  - The <20% clear-rate target is a design intent, not proven by automated tests.
+  - Burst spawning may be too punishing on low-end devices or small screens; manual play should check readability and opening survivability.
+- Next recommended use:
+  - Before committing/merging this branch, preserve the explicit non-goals in PR notes and run the normal verification suite again if code changes further.
+  - After merge, run `$post-interview-context` again only if manual playtesting changes the tuning strategy.
