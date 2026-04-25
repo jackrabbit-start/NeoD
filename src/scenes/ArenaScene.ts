@@ -33,6 +33,11 @@ import {
   type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import {
+  getLootAttractionStep,
+  getLootPickupPhase,
+  LOOT_COLLECT_RADIUS,
+} from '../systems/lootPickup.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
 import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
@@ -125,6 +130,9 @@ interface EnemyEntity {
 interface LootEntity {
   sprite: PhysicsImage
   itemId: LootId
+  aura: Phaser.GameObjects.Arc
+  auraTween: Phaser.Tweens.Tween
+  isAttracting: boolean
 }
 
 interface ProjectileEntity {
@@ -291,6 +299,7 @@ export class ArenaScene extends Phaser.Scene {
     this.handleFiring(time)
     this.updateEnemies(delta)
     this.updateProjectiles(delta)
+    this.updateLootDrops(delta)
     this.updateHazards(delta)
     this.cleanupDestroyedEntities()
 
@@ -578,25 +587,98 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
 
+  }
+
+  private updateLootDrops(delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
     for (const loot of this.lootDrops) {
       if (!loot.sprite.active) {
+        this.destroyLootDrop(loot)
         continue
       }
 
-      const pickupDistance = 20
-      if (
-        Phaser.Math.Distance.Between(
-          loot.sprite.x,
-          loot.sprite.y,
-          this.player.x,
-          this.player.y,
-        ) <= pickupDistance
-      ) {
+      const distance = Phaser.Math.Distance.Between(
+        loot.sprite.x,
+        loot.sprite.y,
+        this.player.x,
+        this.player.y,
+      )
+      const pickupPhase = getLootPickupPhase(distance)
+
+      if (pickupPhase === 'collect') {
         const pickupResult = applyLootPickup(this.inventory, loot.itemId)
         this.inventory = pickupResult.nextInventory
         this.statusMessage = pickupResult.statusMessage
-        loot.sprite.destroy()
+        this.destroyLootDrop(loot)
+        continue
       }
+
+      if (pickupPhase === 'attract') {
+        this.applyLootAttraction(loot, distance, delta)
+        continue
+      }
+
+      this.setLootAttractionStyle(loot, false)
+      this.syncLootAura(loot)
+    }
+  }
+
+  private applyLootAttraction(loot: LootEntity, distance: number, delta: number): void {
+    this.setLootAttractionStyle(loot, true)
+
+    const attractionStep = getLootAttractionStep(distance, delta)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    if (distance <= 0 || travelDistance <= 0) {
+      this.syncLootAura(loot)
+      return
+    }
+
+    const travelRatio = travelDistance / distance
+    loot.sprite.setPosition(
+      loot.sprite.x + (this.player.x - loot.sprite.x) * travelRatio,
+      loot.sprite.y + (this.player.y - loot.sprite.y) * travelRatio,
+    )
+    this.syncLootAura(loot)
+  }
+
+  private setLootAttractionStyle(loot: LootEntity, isAttracting: boolean): void {
+    if (loot.isAttracting === isAttracting) {
+      return
+    }
+
+    loot.isAttracting = isAttracting
+    const itemColor = ITEM_DEFINITIONS[loot.itemId].color
+
+    if (isAttracting) {
+      loot.sprite.setScale(1.18)
+      loot.sprite.setTint(0xffffff)
+      loot.aura.setStrokeStyle(3, 0xffffff, 0.95)
+      return
+    }
+
+    loot.sprite.setScale(1.08)
+    loot.sprite.clearTint()
+    loot.aura.setStrokeStyle(2, itemColor, 0.78)
+  }
+
+  private syncLootAura(loot: LootEntity): void {
+    if (loot.aura.active) {
+      loot.aura.setPosition(loot.sprite.x, loot.sprite.y)
+    }
+  }
+
+  private destroyLootDrop(loot: LootEntity): void {
+    loot.auraTween.stop()
+
+    if (loot.aura.active) {
+      loot.aura.destroy()
+    }
+
+    if (loot.sprite.active) {
+      loot.sprite.destroy()
     }
   }
 
@@ -666,6 +748,11 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.enemies = this.enemies.filter((enemy) => enemy.sprite.active)
+    for (const loot of this.lootDrops) {
+      if (!loot.sprite.active) {
+        this.destroyLootDrop(loot)
+      }
+    }
     this.lootDrops = this.lootDrops.filter((loot) => loot.sprite.active)
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
     this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
@@ -773,11 +860,30 @@ export class ArenaScene extends Phaser.Scene {
       const droppedItem = resolveWeightedDrop(enemy.config.drops)
       if (droppedItem) {
         const itemDefinition = ITEM_DEFINITIONS[droppedItem]
+        const aura = this.add.circle(enemy.sprite.x, enemy.sprite.y, 16, itemDefinition.color, 0.18)
+        aura.setStrokeStyle(2, itemDefinition.color, 0.78)
+        aura.setBlendMode(Phaser.BlendModes.ADD)
+        aura.setDepth(3)
+        const auraTween = this.tweens.add({
+          targets: aura,
+          scale: { from: 0.88, to: 1.18 },
+          alpha: { from: 0.48, to: 0.86 },
+          duration: 720,
+          ease: 'Sine.easeInOut',
+          yoyo: true,
+          repeat: -1,
+        })
+
         const loot = this.physics.add.image(enemy.sprite.x, enemy.sprite.y, itemDefinition.textureKey)
-        loot.setCircle(7)
+        loot.setCircle(10)
+        loot.setDepth(4)
+        loot.setScale(1.08)
         this.lootDrops.push({
           sprite: loot,
           itemId: droppedItem,
+          aura,
+          auraTween,
+          isAttracting: false,
         })
       }
     }
@@ -871,8 +977,20 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     setSpawnLoopPaused(this.spawnTimer, shouldPause)
+    this.setLootPulsePaused(shouldPause)
 
     this.freezeCombat(shouldPause)
+  }
+
+  private setLootPulsePaused(shouldPause: boolean): void {
+    for (const loot of this.lootDrops) {
+      if (shouldPause) {
+        loot.auraTween.pause()
+        continue
+      }
+
+      loot.auraTween.resume()
+    }
   }
 
   private handleRecipeSelection(recipeId: RecipeId): void {
@@ -1132,9 +1250,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const loot of this.lootDrops) {
-      if (loot.sprite.active) {
-        loot.sprite.destroy()
-      }
+      this.destroyLootDrop(loot)
     }
 
     for (const projectile of this.projectiles) {

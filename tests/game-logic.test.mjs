@@ -18,6 +18,13 @@ import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../.tmp-test/src/systems/playerHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
+import {
+  getLootAttractionStep,
+  getLootPickupPhase,
+  LOOT_ATTRACTION_RADIUS,
+  LOOT_COLLECT_RADIUS,
+  LEGACY_LOOT_PICKUP_DISTANCE,
+} from '../.tmp-test/src/systems/lootPickup.js'
 import { createInitialArenaRunState } from '../.tmp-test/src/systems/runState.js'
 import {
   describeAvailableRecipes,
@@ -144,6 +151,24 @@ test('mist vortex recipe resolves from existing frost and mist drops', () => {
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
+})
+
+test('loot pickup phase uses a forgiving collect radius and attraction band', () => {
+  assert.equal(LOOT_COLLECT_RADIUS > LEGACY_LOOT_PICKUP_DISTANCE, true)
+  assert.equal(LOOT_ATTRACTION_RADIUS > LOOT_COLLECT_RADIUS, true)
+
+  assert.equal(getLootPickupPhase(LOOT_ATTRACTION_RADIUS + 0.01), 'idle')
+  assert.equal(getLootPickupPhase(LOOT_ATTRACTION_RADIUS), 'attract')
+  assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS + 0.01), 'attract')
+  assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS), 'collect')
+  assert.equal(getLootPickupPhase(Number.POSITIVE_INFINITY), 'idle')
+})
+
+test('loot attraction step is bounded to the attraction phase', () => {
+  assert.equal(getLootAttractionStep(LOOT_ATTRACTION_RADIUS + 1, 16), 0)
+  assert.equal(getLootAttractionStep(LOOT_COLLECT_RADIUS, 16), 0)
+  assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, 16) > 0, true)
+  assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, -16), 0)
 })
 
 test('loot pickup workflow updates inventory and reports the pickup message', () => {
@@ -1020,6 +1045,22 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'spark-knot': 'spark-knot',
       'mist-bead': 'mist-bead',
       'tuning-capsule': 'tuning-capsule',
+    },
+  )
+
+  assert.deepEqual(
+    Object.fromEntries(
+      VECTOR_ASSETS
+        .filter((asset) => Object.values(ITEM_DEFINITIONS).some((item) => item.textureKey === asset.key))
+        .map((asset) => [asset.key, { width: asset.width, height: asset.height, radius: asset.fallback?.radius }]),
+    ),
+    {
+      'gel-shard': { width: 22, height: 22, radius: 10 },
+      'acid-core': { width: 22, height: 22, radius: 10 },
+      'frost-mote': { width: 22, height: 22, radius: 10 },
+      'spark-knot': { width: 22, height: 22, radius: 10 },
+      'mist-bead': { width: 22, height: 22, radius: 10 },
+      'tuning-capsule': { width: 22, height: 22, radius: 10 },
     },
   )
 
