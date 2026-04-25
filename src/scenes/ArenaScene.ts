@@ -424,6 +424,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private pendingPassiveChoices: PassiveCardDefinition[] = []
 
+  private isInteractionPauseApplied = false
+
   private playerDashState: PlayerDashState = createReadyPlayerDashState()
 
   private playerDashDirection = new Phaser.Math.Vector2(1, 0)
@@ -1229,7 +1231,7 @@ export class ArenaScene extends Phaser.Scene {
             canCrit: true,
             baseDamage: projectile.baseDamage,
           })
-          if (this.isRunEnding) {
+          if (this.isRunEnding || this.isInteractionBlocked()) {
             return
           }
 
@@ -1486,7 +1488,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private destroyHealthPickup(pickup: HealthPickupEntity): void {
-    pickup.auraTween.stop()
+    pickup.auraTween?.stop()
 
     if (pickup.aura.active) {
       pickup.aura.destroy()
@@ -1584,7 +1586,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private destroyPachinkoTokenPickup(pickup: PachinkoTokenPickupEntity): void {
-    pickup.auraTween.stop()
+    pickup.auraTween?.stop()
 
     if (pickup.aura.active) {
       pickup.aura.destroy()
@@ -1714,7 +1716,7 @@ export class ArenaScene extends Phaser.Scene {
             canCrit: true,
             baseDamage: hazard.baseDamage,
           })
-          if (this.isRunEnding) {
+          if (this.isRunEnding || this.isInteractionBlocked()) {
             return
           }
         }
@@ -2082,6 +2084,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private openPassiveSelection(level: number): void {
+    if (this.isPassiveSelectionOpen) {
+      return
+    }
+
     this.pendingPassiveChoices = getPassiveCardChoices(level, this.passiveState)
     this.isPassiveSelectionOpen = true
     this.applyInteractionPause(true)
@@ -2109,18 +2115,24 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private applyInteractionPause(shouldPause: boolean): void {
+    if (this.isInteractionPauseApplied === shouldPause) {
+      return
+    }
+
+    this.isInteractionPauseApplied = shouldPause
+
     if (shouldPause) {
       this.player.setVelocity(0, 0)
       this.physics.world.pause()
-      this.player.anims.pause()
+      this.player.anims?.pause()
       for (const enemy of this.enemies) {
-        enemy.sprite.anims.pause()
+        enemy.sprite.anims?.pause()
       }
     } else {
       this.physics.world.resume()
-      this.player.anims.resume()
+      this.player.anims?.resume()
       for (const enemy of this.enemies) {
-        enemy.sprite.anims.resume()
+        enemy.sprite.anims?.resume()
       }
     }
 
@@ -2133,6 +2145,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private setHealthPickupPulsePaused(shouldPause: boolean): void {
     for (const pickup of this.healthPickups) {
+      if (!pickup.auraTween) {
+        continue
+      }
+
       if (shouldPause) {
         pickup.auraTween.pause()
         continue
@@ -2144,6 +2160,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private setPachinkoTokenPulsePaused(shouldPause: boolean): void {
     for (const pickup of this.pachinkoTokenPickups) {
+      if (!pickup.auraTween) {
+        continue
+      }
+
       if (shouldPause) {
         pickup.auraTween.pause()
         continue
@@ -2544,6 +2564,7 @@ export class ArenaScene extends Phaser.Scene {
     this.passiveState = initialState.passiveState
     this.pendingPassiveChoices = []
     this.isPassiveSelectionOpen = false
+    this.isInteractionPauseApplied = false
     this.playerSpeed = applyPassivePlayerSpeed(initialState.playerSpeed, this.passiveState)
     this.playerDashState = createReadyPlayerDashState()
     this.playerDashDirection.set(1, 0)
@@ -3342,6 +3363,10 @@ export class ArenaScene extends Phaser.Scene {
         canCrit: true,
         baseDamage: swing.damage,
       })
+      if (this.isRunEnding || this.isInteractionBlocked()) {
+        return
+      }
+
       if (didDamage && enemy.sprite.active) {
         this.applyMeleeSwingKnockback(enemy, swing)
       }
@@ -3468,7 +3493,7 @@ export class ArenaScene extends Phaser.Scene {
         canCrit: true,
         baseDamage: chainBaseDamage,
       })
-      if (this.isRunEnding) {
+      if (this.isRunEnding || this.isInteractionBlocked()) {
         return
       }
     }
