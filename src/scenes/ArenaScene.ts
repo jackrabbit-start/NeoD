@@ -1,14 +1,14 @@
 import Phaser from 'phaser'
 import { ENEMY_DEFINITIONS } from '../data/enemies.js'
-import { ITEM_DEFINITIONS } from '../data/items.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { HudController } from '../ui/Hud.js'
-import type { AvailableRecipe, EnemyDefinition, InventoryState, LootId, WeaponId } from '../domain/types.js'
-import { getAvailableRecipes, resolveCombine } from '../systems/combine.js'
+import type { EnemyDefinition, InventoryState, LootId, WeaponId } from '../domain/types.js'
+import { getAvailableRecipes } from '../systems/combine.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
-import { addItem } from '../systems/inventory.js'
 import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
+import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
+import { applyLootPickup, attemptCombine } from './arena/combineInventoryWorkflow.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
 
@@ -188,30 +188,24 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    const availableRecipes = getAvailableRecipes(this.inventory)
-    const recipe = availableRecipes[0]
-
-    if (!recipe) {
-      this.statusMessage = 'No valid combine yet. Collect matching drops first.'
-      return
-    }
-
-    const combineResult = resolveCombine(this.inventory, recipe.recipe.id)
-    if (!combineResult) {
-      this.statusMessage = 'Combine failed. Inventory did not match the recipe.'
+    const combineAttempt = attemptCombine(this.inventory)
+    if (combineAttempt.kind !== 'success') {
+      this.statusMessage = combineAttempt.statusMessage
       return
     }
 
     this.isCombining = true
-    this.inventory = combineResult.nextInventory
-    this.activeWeaponId = combineResult.weaponId
-    this.statusMessage = `Combined into ${recipe.weapon.name}. Combat paused briefly to confirm the upgrade.`
+    this.inventory = combineAttempt.nextInventory
+    this.activeWeaponId = combineAttempt.weaponId
+    this.statusMessage = combineAttempt.statusMessage
 
-    this.freezeCombat(true)
-    this.time.delayedCall(450, () => {
-      this.isCombining = false
-      this.freezeCombat(false)
-    })
+    if (combineAttempt.shouldPauseCombat) {
+      this.freezeCombat(true)
+      this.time.delayedCall(450, () => {
+        this.isCombining = false
+        this.freezeCombat(false)
+      })
+    }
   }
 
   private updateEnemies(): void {
@@ -305,8 +299,9 @@ export class ArenaScene extends Phaser.Scene {
           this.player.y,
         ) <= pickupDistance
       ) {
-        this.inventory = addItem(this.inventory, loot.itemId)
-        this.statusMessage = `Collected ${ITEM_DEFINITIONS[loot.itemId].name}.`
+        const pickupResult = applyLootPickup(this.inventory, loot.itemId)
+        this.inventory = pickupResult.nextInventory
+        this.statusMessage = pickupResult.statusMessage
         loot.sprite.destroy()
       }
     }
@@ -507,35 +502,13 @@ export class ArenaScene extends Phaser.Scene {
         `Enemies alive: ${this.enemies.length}`,
         `Remaining spawns: ${this.remainingSpawns}`,
       ],
-      inventory: this.describeInventory(),
-      recipes: this.describeRecipes(recipes),
+      inventory: describeInventoryEntries(this.inventory),
+      recipes: describeAvailableRecipes(recipes),
       objective: this.isBossActive
         ? 'Defeat the Crown Slime to clear the run.'
         : 'Survive the waves, collect drops, and press C when a combine is ready.',
       tip: 'WASD move · Mouse aim · Hold click shoot · C combine',
       status: this.statusMessage,
     })
-  }
-
-  private describeInventory(): string[] {
-    const inventoryEntries = Object.entries(this.inventory) as [LootId, number][]
-
-    if (inventoryEntries.length === 0) {
-      return ['No drops collected yet.']
-    }
-
-    return inventoryEntries.map(
-      ([itemId, count]) => `${ITEM_DEFINITIONS[itemId].name} × ${count}`,
-    )
-  }
-
-  private describeRecipes(recipes: AvailableRecipe[]): string[] {
-    if (recipes.length === 0) {
-      return ['No valid combine yet.']
-    }
-
-    return recipes.map(
-      ({ recipe, weapon }) => `${recipe.name} → ${weapon.damage} dmg (${recipe.note})`,
-    )
   }
 }
