@@ -2845,11 +2845,11 @@ export class ArenaScene extends Phaser.Scene {
     this.hud.update({
       title: GAME_TITLE,
       subtitle: this.activeRunLabel || '슬라임 아레나 대기 중',
+      currentTimeLabel: formatRunTime(this.runElapsedMs),
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel} · 공격력 ×${playerStats.damageMultiplier.toFixed(2)}`,
         `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
-        `현재 시간: ${formatRunTime(this.runElapsedMs)}`,
         `적 출현 확률 (${currentPhase.minuteIndex + 1}분차)`,
         ...visibleEnemyChanceLines,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
