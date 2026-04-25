@@ -12,23 +12,23 @@ export const PACHINKO_REWARD_TABLE_REFRESH_MS = 5000 as const
 
 export const PACHINKO_XP_DISPLAY_SCALE = 100 as const
 
-export const PACHINKO_LEVEL_THRESHOLDS = [0, 600, 1400, 2600, 4200] as const
+export const PACHINKO_LEVEL_THRESHOLDS = [0, 1200, 3000, 5600, 9200] as const
 
 export const ENEMY_TOKEN_XP: Record<EnemyId, number> = {
-  slime: 100,
-  'spark-slime': 200,
-  'prism-slime': 400,
-  'dash-slime': 200,
-  'orbit-slime': 200,
-  'needle-wasp': 300,
-  'splitter-slime': 200,
-  'shard-sentinel': 300,
-  'mender-slime': 200,
-  'void-orb': 300,
-  'crusher-slime': 400,
-  'lantern-moth': 300,
-  'mirror-wisp': 300,
-  'siege-toad': 500,
+  slime: 60,
+  'spark-slime': 90,
+  'prism-slime': 180,
+  'dash-slime': 80,
+  'orbit-slime': 90,
+  'needle-wasp': 120,
+  'splitter-slime': 90,
+  'shard-sentinel': 130,
+  'mender-slime': 100,
+  'void-orb': 140,
+  'crusher-slime': 170,
+  'lantern-moth': 130,
+  'mirror-wisp': 140,
+  'siege-toad': 220,
   'slime-boss': 0,
 }
 

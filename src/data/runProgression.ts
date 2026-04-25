@@ -46,41 +46,41 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
   const weights: RunSpawnEntryDefinition[] = []
 
   if (clampedMinute < 6) {
-    weights.push({ enemyId: 'slime', count: Math.max(2, 16 - clampedMinute) })
+    weights.push({ enemyId: 'slime', count: Math.max(2, 9 - clampedMinute) })
   }
 
   if (clampedMinute >= 1 && clampedMinute < 12) {
-    weights.push({ enemyId: 'dash-slime', count: 2 + Math.min(7, clampedMinute) })
+    weights.push({ enemyId: 'dash-slime', count: 1 + Math.min(6, Math.floor(clampedMinute * 0.75)) })
   }
   if (clampedMinute >= 2 && clampedMinute < 16) {
-    weights.push({ enemyId: 'spark-slime', count: 2 + Math.floor(clampedMinute / 2) })
+    weights.push({ enemyId: 'spark-slime', count: 1 + Math.floor(clampedMinute / 3) })
   }
   if (clampedMinute >= 3 && clampedMinute < 18) {
-    weights.push({ enemyId: 'splitter-slime', count: 2 + Math.floor((clampedMinute - 3) / 2) })
+    weights.push({ enemyId: 'splitter-slime', count: 1 + Math.floor((clampedMinute - 3) / 3) })
   }
   if (clampedMinute >= 10 && clampedMinute < 22) {
-    weights.push({ enemyId: 'orbit-slime', count: 5 + Math.floor((clampedMinute - 10) / 3) })
+    weights.push({ enemyId: 'orbit-slime', count: 3 + Math.floor((clampedMinute - 10) / 3) })
   }
   if (clampedMinute >= 12 && clampedMinute < 24) {
-    weights.push({ enemyId: 'needle-wasp', count: 3 + Math.floor((clampedMinute - 12) / 3) })
+    weights.push({ enemyId: 'needle-wasp', count: 2 + Math.floor((clampedMinute - 12) / 3) })
   }
   if (clampedMinute >= 14 && clampedMinute < 24) {
-    weights.push({ enemyId: 'mender-slime', count: 2 + Math.floor((clampedMinute - 14) / 4) })
+    weights.push({ enemyId: 'mender-slime', count: 1 + Math.floor((clampedMinute - 14) / 4) })
   }
   if (clampedMinute >= 16) {
-    weights.push({ enemyId: 'shard-sentinel', count: 2 + Math.floor(lateRamp / 4) })
+    weights.push({ enemyId: 'shard-sentinel', count: 1 + Math.floor(lateRamp / 4) })
   }
   if (clampedMinute >= 18) {
-    weights.push({ enemyId: 'prism-slime', count: 2 + Math.floor((clampedMinute - 18) / 4) })
+    weights.push({ enemyId: 'prism-slime', count: 1 + Math.floor((clampedMinute - 18) / 4) })
   }
   if (clampedMinute >= 19) {
-    weights.push({ enemyId: 'lantern-moth', count: 2 + Math.floor((clampedMinute - 19) / 3) })
+    weights.push({ enemyId: 'lantern-moth', count: 1 + Math.floor((clampedMinute - 19) / 3) })
   }
   if (clampedMinute >= 20) {
-    weights.push({ enemyId: 'void-orb', count: 2 + Math.floor((clampedMinute - 20) / 3) })
+    weights.push({ enemyId: 'void-orb', count: 1 + Math.floor((clampedMinute - 20) / 3) })
   }
   if (clampedMinute >= 21) {
-    weights.push({ enemyId: 'mirror-wisp', count: 2 + Math.floor((clampedMinute - 21) / 3) })
+    weights.push({ enemyId: 'mirror-wisp', count: 1 + Math.floor((clampedMinute - 21) / 3) })
   }
   if (clampedMinute >= 23) {
     weights.push({ enemyId: 'crusher-slime', count: 1 + Math.floor((clampedMinute - 23) / 3) + Math.floor(finaleRamp / 2) })
@@ -96,7 +96,7 @@ function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
   const minuteIndex = Math.floor(phaseIndex / 2)
   const entries = entriesForMinute(minuteIndex).map((entry) => ({ ...entry }))
   if (phaseIndex >= 1 && minuteIndex === 0) {
-    entries.push({ enemyId: 'dash-slime', count: 2 })
+    entries.push({ enemyId: 'dash-slime', count: 1 })
   }
   if (entries.length <= 1) {
     return entries
@@ -129,10 +129,10 @@ function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
     startMs,
     durationMs: RUN_PHASE_DURATION_MS,
     entries: entriesForPhase(phaseIndex),
-    spawnIntervalMs: Math.max(300, 880 - minuteIndex * 24),
-    burstSize: Math.min(16, 5 + Math.floor(minuteIndex / 3)),
-    softEnemyCap: Math.min(150, 36 + minuteIndex * 4),
-    healthMultiplier: Number((1.15 + minuteIndex * 0.06).toFixed(2)),
+    spawnIntervalMs: Math.max(300, 1400 - minuteIndex * 36),
+    burstSize: Math.min(14, 2 + Math.floor(minuteIndex / 3)),
+    softEnemyCap: Math.min(150, 10 + minuteIndex * 5),
+    healthMultiplier: Number((1 + minuteIndex * 0.08 + Math.max(0, minuteIndex - 14) * 0.03).toFixed(2)),
     ...(oneTimeSpawns.length > 0 ? { oneTimeSpawns } : {}),
     ...(isFinale ? { isFinale } : {}),
   }

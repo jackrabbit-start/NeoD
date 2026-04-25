@@ -424,28 +424,28 @@ test('new arena run state does not reuse mutable containers', () => {
 })
 
 test('pachinko reward levels and enemy token xp follow the approved thresholds', () => {
-  assert.deepEqual(PACHINKO_LEVEL_THRESHOLDS, [0, 600, 1400, 2600, 4200])
+  assert.deepEqual(PACHINKO_LEVEL_THRESHOLDS, [0, 1200, 3000, 5600, 9200])
   assert.deepEqual(STAR_ODDS_BY_LEVEL[1], [70, 25, 5, 0, 0])
   assert.deepEqual(STAR_ODDS_BY_LEVEL[5], [20, 30, 30, 15, 5])
 
-  assert.equal(getTokenXpForEnemy('slime'), 100)
-  assert.equal(getTokenXpForEnemy('spark-slime'), 200)
-  assert.equal(getTokenXpForEnemy('dash-slime'), 200)
-  assert.equal(getTokenXpForEnemy('orbit-slime'), 200)
-  assert.equal(getTokenXpForEnemy('prism-slime'), 400)
-  assert.equal(getTokenXpForEnemy('lantern-moth'), 300)
-  assert.equal(getTokenXpForEnemy('mirror-wisp'), 300)
-  assert.equal(getTokenXpForEnemy('siege-toad'), 500)
+  assert.equal(getTokenXpForEnemy('slime'), 60)
+  assert.equal(getTokenXpForEnemy('spark-slime'), 90)
+  assert.equal(getTokenXpForEnemy('dash-slime'), 80)
+  assert.equal(getTokenXpForEnemy('orbit-slime'), 90)
+  assert.equal(getTokenXpForEnemy('prism-slime'), 180)
+  assert.equal(getTokenXpForEnemy('lantern-moth'), 130)
+  assert.equal(getTokenXpForEnemy('mirror-wisp'), 140)
+  assert.equal(getTokenXpForEnemy('siege-toad'), 220)
   assert.equal(getTokenXpForEnemy('slime-boss'), 0)
   assert.equal(shouldEnemyGrantPachinkoToken('slime'), true)
   assert.equal(shouldEnemyGrantPachinkoToken('slime-boss'), false)
 
   assert.equal(getPachinkoRewardLevel(0), 1)
-  assert.equal(getPachinkoRewardLevel(500), 1)
-  assert.equal(getPachinkoRewardLevel(600), 2)
-  assert.equal(getPachinkoRewardLevel(1400), 3)
-  assert.equal(getPachinkoRewardLevel(2600), 4)
-  assert.equal(getPachinkoRewardLevel(4200), 5)
+  assert.equal(getPachinkoRewardLevel(1100), 1)
+  assert.equal(getPachinkoRewardLevel(1200), 2)
+  assert.equal(getPachinkoRewardLevel(3000), 3)
+  assert.equal(getPachinkoRewardLevel(5600), 4)
+  assert.equal(getPachinkoRewardLevel(9200), 5)
   assert.equal(getPachinkoRewardLevel(99900), 5)
 })
 
@@ -474,8 +474,8 @@ test('player level raises pachinko star range before live table rolls stars', ()
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(33), { minStar: 5, maxStar: 5 })
 
   const lowLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 1).map((slot) => slot.star)
-  const midLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 9).map((slot) => slot.star)
-  const highLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 25).map((slot) => slot.star)
+  const midLevelStars = buildPachinkoSlotRewards(1200, PACHINKO_SLOT_COUNT, 0, 9).map((slot) => slot.star)
+  const highLevelStars = buildPachinkoSlotRewards(0, PACHINKO_SLOT_COUNT, 0, 25).map((slot) => slot.star)
 
   assert.equal(Math.min(...lowLevelStars), 1)
   assert.equal(Math.max(...lowLevelStars), 2)
@@ -489,22 +489,22 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
   let progress = { totalTokenXp: 0, queuedTokenXp: [] }
   progress = applyEnemyPachinkoTokenProgress(progress, 'slime')
   assert.deepEqual(progress, {
-    totalTokenXp: 100,
-    queuedTokenXp: [100],
-    grantedTokenXp: 100,
+    totalTokenXp: 60,
+    queuedTokenXp: [60],
+    grantedTokenXp: 60,
     didEnqueue: true,
     rewardLevel: 1,
   })
 
   progress = applyEnemyPachinkoTokenProgress(progress, 'prism-slime')
-  assert.deepEqual(progress.queuedTokenXp, [100, 400])
-  assert.equal(progress.totalTokenXp, 500)
+  assert.deepEqual(progress.queuedTokenXp, [60, 180])
+  assert.equal(progress.totalTokenXp, 240)
   assert.equal(progress.rewardLevel, 1)
 
   const boostedProgress = applyEnemyPachinkoTokenProgress(progress, 'mender-slime', 1.5)
-  assert.equal(boostedProgress.grantedTokenXp, 300)
-  assert.deepEqual(boostedProgress.queuedTokenXp, [100, 400, 300])
-  assert.equal(boostedProgress.totalTokenXp, 800)
+  assert.equal(boostedProgress.grantedTokenXp, 150)
+  assert.deepEqual(boostedProgress.queuedTokenXp, [60, 180, 150])
+  assert.equal(boostedProgress.totalTokenXp, 390)
 
   const bossProgress = applyEnemyPachinkoTokenProgress(progress, 'slime-boss')
   assert.deepEqual(bossProgress, {
@@ -524,22 +524,22 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
 })
 
 test('player progression starts per run and levels from token pickup xp', () => {
-  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 500, 1200, 2200, 3600])
+  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 900, 2200, 4200, 7000])
   assert.deepEqual(ENEMY_PLAYER_XP, {
-    slime: 100,
-    'spark-slime': 200,
-    'prism-slime': 500,
-    'dash-slime': 200,
-    'orbit-slime': 200,
-    'needle-wasp': 300,
-    'splitter-slime': 200,
-    'shard-sentinel': 300,
-    'mender-slime': 200,
-    'void-orb': 300,
-    'crusher-slime': 400,
-    'lantern-moth': 300,
-    'mirror-wisp': 300,
-    'siege-toad': 500,
+    slime: 60,
+    'spark-slime': 90,
+    'prism-slime': 180,
+    'dash-slime': 80,
+    'orbit-slime': 90,
+    'needle-wasp': 120,
+    'splitter-slime': 90,
+    'shard-sentinel': 130,
+    'mender-slime': 100,
+    'void-orb': 140,
+    'crusher-slime': 170,
+    'lantern-moth': 130,
+    'mirror-wisp': 140,
+    'siege-toad': 220,
     'slime-boss': 0,
   })
 
@@ -547,29 +547,29 @@ test('player progression starts per run and levels from token pickup xp', () => 
   assert.deepEqual(initial, { totalXp: 0, level: 1 })
   assert.deepEqual(createInitialArenaRunState().playerProgression, initial)
 
-  assert.equal(getPlayerXpForEnemy('slime'), 100)
-  assert.equal(getPlayerXpForEnemy('prism-slime'), 500)
+  assert.equal(getPlayerXpForEnemy('slime'), 60)
+  assert.equal(getPlayerXpForEnemy('prism-slime'), 180)
   assert.equal(getPlayerXpForEnemy('slime-boss'), 0)
   assert.equal(getPlayerLevelForXp(0), 1)
-  assert.equal(getPlayerLevelForXp(400), 1)
-  assert.equal(getPlayerLevelForXp(500), 2)
-  assert.equal(getPlayerLevelForXp(1200), 3)
-  assert.equal(getPlayerLevelForXp(3600), 5)
-  assert.equal(getPlayerLevelForXp(5500), 6)
-  assert.equal(getPlayerLevelForXp(99900), 17)
+  assert.equal(getPlayerLevelForXp(800), 1)
+  assert.equal(getPlayerLevelForXp(900), 2)
+  assert.equal(getPlayerLevelForXp(2200), 3)
+  assert.equal(getPlayerLevelForXp(7000), 5)
+  assert.equal(getPlayerLevelForXp(10300), 6)
+  assert.equal(getPlayerLevelForXp(99900), 16)
 
   const firstTokenPickup = applyEnemyPlayerXp(initial, 'prism-slime')
-  assert.deepEqual(firstTokenPickup.state, { totalXp: 500, level: 2 })
-  assert.equal(firstTokenPickup.grantedXp, 500)
-  assert.equal(firstTokenPickup.didLevelUp, true)
-  assert.equal(firstTokenPickup.view.xpIntoLevel, 0)
-  assert.equal(firstTokenPickup.view.xpToNextLevel, 700)
+  assert.deepEqual(firstTokenPickup.state, { totalXp: 180, level: 1 })
+  assert.equal(firstTokenPickup.grantedXp, 180)
+  assert.equal(firstTokenPickup.didLevelUp, false)
+  assert.equal(firstTokenPickup.view.xpIntoLevel, 180)
+  assert.equal(firstTokenPickup.view.xpToNextLevel, 900)
 
   const nextTokenPickup = applyEnemyPlayerXp(firstTokenPickup.state, 'needle-wasp')
-  assert.deepEqual(nextTokenPickup.state, { totalXp: 800, level: 2 })
+  assert.deepEqual(nextTokenPickup.state, { totalXp: 300, level: 1 })
   assert.equal(nextTokenPickup.didLevelUp, false)
   assert.equal(nextTokenPickup.view.xpIntoLevel, 300)
-  assert.equal(nextTokenPickup.view.progressRatio, 300 / 700)
+  assert.equal(nextTokenPickup.view.progressRatio, 300 / 900)
 
   const bossTokenPickup = applyEnemyPlayerXp(nextTokenPickup.state, 'slime-boss')
   assert.deepEqual(bossTokenPickup.state, nextTokenPickup.state)
@@ -583,37 +583,37 @@ test('player progression view clamps invalid xp and continues past seeded levels
     level: 1,
     currentLevelXp: 0,
     xpIntoLevel: 0,
-    xpToNextLevel: 500,
-    nextLevelAt: 500,
+    xpToNextLevel: 900,
+    nextLevelAt: 900,
     progressRatio: 0,
     isMaxLevel: false,
   })
 
-  assert.deepEqual(getPlayerProgressionView(4000), {
-    totalXp: 4000,
+  assert.deepEqual(getPlayerProgressionView(10000), {
+    totalXp: 10000,
     level: 5,
-    currentLevelXp: 3600,
-    xpIntoLevel: 400,
-    xpToNextLevel: 1900,
-    nextLevelAt: 5500,
-    progressRatio: 400 / 1900,
+    currentLevelXp: 7000,
+    xpIntoLevel: 3000,
+    xpToNextLevel: 3300,
+    nextLevelAt: 10300,
+    progressRatio: 3000 / 3300,
     isMaxLevel: false,
   })
 
   assert.deepEqual(getPlayerProgressionView(99900), {
     totalXp: 99900,
-    level: 17,
-    currentLevelXp: 88000,
-    xpIntoLevel: 11900,
-    xpToNextLevel: 15700,
-    nextLevelAt: 103700,
-    progressRatio: 11900 / 15700,
+    level: 16,
+    currentLevelXp: 92800,
+    xpIntoLevel: 7100,
+    xpToNextLevel: 15400,
+    nextLevelAt: 108200,
+    progressRatio: 7100 / 15400,
     isMaxLevel: false,
   })
 
   assert.deepEqual(applyPlayerXp({ totalXp: 400, level: 1 }, 800).state, {
     totalXp: 1200,
-    level: 3,
+    level: 2,
   })
 })
 
@@ -663,7 +663,7 @@ test('pachinko weapon-family synergy marks mostly-upside bonus slots', () => {
   assert.equal(modifiers.get(3), 'bonus')
   assert.equal(modifiers.get(5), 'jackpot')
 
-  const synergizedSlots = buildPachinkoSlotRewards(1400, PACHINKO_SLOT_COUNT, 0, 1, 'slime-glaive')
+  const synergizedSlots = buildPachinkoSlotRewards(3000, PACHINKO_SLOT_COUNT, 0, 1, 'slime-glaive')
   assert.equal(synergizedSlots[7].modifier?.kind, 'family')
   assert.equal(synergizedSlots[7].weaponId, 'slime-glaive')
   assert.equal(synergizedSlots[3].modifier?.kind, 'bonus')
@@ -1184,7 +1184,7 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   const finale = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
 
   assert.equal(firstPhase.minuteIndex, 0)
-  assert.equal(firstPhase.healthMultiplier, 1.15)
+  assert.equal(firstPhase.healthMultiplier, 1)
   assert.equal(firstHalfMinute.minuteIndex, 0)
   assert.equal(firstHalfMinute.id, 'minute-01-b')
   assert.equal(secondMinute.minuteIndex, 1)
@@ -1212,7 +1212,7 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
     {
       enemyId: 'slime',
       enemyName: '진흙 슬라임',
-      count: 16,
+      count: 9,
       ratio: 1,
       percentLabel: '100%',
     },
@@ -1234,7 +1234,7 @@ test('run progression spawn sequence interleaves weighted enemies early', () => 
   const firstBackPhase = getRunPhaseByElapsedMs(30_000)
   const sequence = flattenRunPhaseEntries(firstBackPhase)
 
-  assert.equal(sequence.length, 19)
+  assert.equal(sequence.length, 11)
   assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
 })
 
@@ -1724,11 +1724,11 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
   const voltSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
   assert.ok(voltSlime)
   assert.deepEqual(voltSlime?.drops, [])
-  assert.ok(voltSlime?.stats.some((stat) => stat.includes('보상 경험치 +2')))
+  assert.ok(voltSlime?.stats.some((stat) => stat.includes('보상 경험치 +90')))
 
   const prismSlime = codex.enemies.find((enemy) => enemy.id === 'prism-slime')
   assert.ok(prismSlime)
-  assert.ok(prismSlime?.stats.some((stat) => stat.includes('보상 경험치 +4')))
+  assert.ok(prismSlime?.stats.some((stat) => stat.includes('보상 경험치 +180')))
 
   const dashSlime = codex.enemies.find((enemy) => enemy.id === 'dash-slime')
   assert.ok(dashSlime)
@@ -1746,7 +1746,7 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
   assert.ok(needleWasp?.description.includes('비-슬라임'))
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('부채꼴')))
   assert.deepEqual(needleWasp?.drops, [])
-  assert.ok(needleWasp?.stats.some((stat) => stat.includes('보상 경험치 +3')))
+  assert.ok(needleWasp?.stats.some((stat) => stat.includes('보상 경험치 +120')))
 })
 
 test('recipe identity metadata stays aligned with known ids and weapon outputs', () => {
