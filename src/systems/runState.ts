@@ -1,4 +1,5 @@
 import type { InventoryState, WeaponId, WeaponStack, WeaponStackKey } from '../domain/types.js'
+import { createInitialPlayerProgressionState, type PlayerProgressionState } from './playerProgression.js'
 import type { WeaponTuningState } from './tuning.js'
 import { seedOwnedWeapons, seedWeaponStacks, STARTER_WEAPON_ID, STARTER_WEAPON_STACK_KEY } from './weaponOwnership.js'
 
@@ -10,6 +11,7 @@ export interface ArenaRunState {
   inventory: InventoryState
   tuningState: WeaponTuningState
   pachinkoTokenXp: number
+  playerProgression: PlayerProgressionState
   isInventoryOpen: boolean
   isCodexOpen: boolean
   isRunEnding: boolean
@@ -36,6 +38,7 @@ export function createInitialArenaRunState(): ArenaRunState {
     inventory: {},
     tuningState: {},
     pachinkoTokenXp: 0,
+    playerProgression: createInitialPlayerProgressionState(),
     isInventoryOpen: false,
     isCodexOpen: false,
     isRunEnding: false,

@@ -16,7 +16,11 @@ import { COMBAT_RECT, ENEMY_CONTACT_PADDING, PACHINKO_DIVIDER_X, PACHINKO_RECT, 
 import { VECTOR_ASSETS } from '../.tmp-test/src/game/visualManifest.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
-import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../.tmp-test/src/systems/playerHealthBar.js'
+import {
+  getPlayerExperienceFillWidth,
+  getPlayerHealthBarMetrics,
+  getPlayerHealthFillWidth,
+} from '../.tmp-test/src/systems/playerHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
 import {
   getLootAttractionStep,
@@ -124,6 +128,16 @@ import {
   resolveWeaponReward,
   shouldEnemyGrantPachinkoToken,
 } from '../.tmp-test/src/systems/pachinkoRewards.js'
+import {
+  ENEMY_PLAYER_XP,
+  PLAYER_LEVEL_XP_THRESHOLDS,
+  applyEnemyPlayerXp,
+  applyPlayerXp,
+  createInitialPlayerProgressionState,
+  getPlayerLevelForXp,
+  getPlayerProgressionView,
+  getPlayerXpForEnemy,
+} from '../.tmp-test/src/systems/playerProgression.js'
 import { HudController } from '../.tmp-test/src/ui/Hud.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
@@ -315,6 +329,7 @@ test('new arena runs start from the clean baseline state', () => {
   assert.deepEqual(state.weaponStacks, [{ weaponId: 'starter-blaster', star: 1, count: 1 }])
   assert.equal(state.activeWeaponKey, STARTER_WEAPON_STACK_KEY)
   assert.equal(state.pachinkoTokenXp, 0)
+  assert.deepEqual(state.playerProgression, { totalXp: 0, level: 1 })
   assert.equal(state.isInventoryOpen, false)
   assert.equal(state.isCodexOpen, false)
   assert.equal(state.isRunEnding, false)
@@ -337,6 +352,8 @@ test('new arena run state does not reuse mutable containers', () => {
   first.ownedWeaponIds.push('acid-sprayer')
   first.tuningState['acid-sprayer'] = 'sharpened-core'
   first.weaponStacks[0].count = 99
+  first.playerProgression.totalXp = 99
+  first.playerProgression.level = 5
 
   const second = createInitialArenaRunState()
 
@@ -344,6 +361,7 @@ test('new arena run state does not reuse mutable containers', () => {
   assert.deepEqual(second.ownedWeaponIds, ['starter-blaster'])
   assert.deepEqual(second.tuningState, {})
   assert.deepEqual(second.weaponStacks, [{ weaponId: 'starter-blaster', star: 1, count: 1 }])
+  assert.deepEqual(second.playerProgression, { totalXp: 0, level: 1 })
 })
 
 test('pachinko reward levels and enemy token xp follow the approved thresholds', () => {
@@ -411,6 +429,79 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
   assert.deepEqual(resolvePachinkoLandingReward(42, 0.999), {
     weaponId: 'needle-fan',
     star: 5,
+  })
+})
+
+test('player progression starts per run and levels from enemy defeat xp', () => {
+  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 5, 12, 22, 36])
+  assert.deepEqual(ENEMY_PLAYER_XP, {
+    slime: 1,
+    'spark-slime': 2,
+    'prism-slime': 5,
+    'dash-slime': 2,
+    'orbit-slime': 2,
+    'needle-wasp': 3,
+    'slime-boss': 0,
+  })
+
+  const initial = createInitialPlayerProgressionState()
+  assert.deepEqual(initial, { totalXp: 0, level: 1 })
+  assert.deepEqual(createInitialArenaRunState().playerProgression, initial)
+
+  assert.equal(getPlayerXpForEnemy('slime'), 1)
+  assert.equal(getPlayerXpForEnemy('prism-slime'), 5)
+  assert.equal(getPlayerXpForEnemy('slime-boss'), 0)
+  assert.equal(getPlayerLevelForXp(0), 1)
+  assert.equal(getPlayerLevelForXp(4), 1)
+  assert.equal(getPlayerLevelForXp(5), 2)
+  assert.equal(getPlayerLevelForXp(12), 3)
+  assert.equal(getPlayerLevelForXp(999), 5)
+
+  const firstDefeat = applyEnemyPlayerXp(initial, 'prism-slime')
+  assert.deepEqual(firstDefeat.state, { totalXp: 5, level: 2 })
+  assert.equal(firstDefeat.grantedXp, 5)
+  assert.equal(firstDefeat.didLevelUp, true)
+  assert.equal(firstDefeat.view.xpIntoLevel, 0)
+  assert.equal(firstDefeat.view.xpToNextLevel, 7)
+
+  const nextDefeat = applyEnemyPlayerXp(firstDefeat.state, 'needle-wasp')
+  assert.deepEqual(nextDefeat.state, { totalXp: 8, level: 2 })
+  assert.equal(nextDefeat.didLevelUp, false)
+  assert.equal(nextDefeat.view.xpIntoLevel, 3)
+  assert.equal(nextDefeat.view.progressRatio, 3 / 7)
+
+  const bossDefeat = applyEnemyPlayerXp(nextDefeat.state, 'slime-boss')
+  assert.deepEqual(bossDefeat.state, nextDefeat.state)
+  assert.equal(bossDefeat.grantedXp, 0)
+  assert.equal(bossDefeat.didLevelUp, false)
+})
+
+test('player progression view clamps invalid and max-level xp', () => {
+  assert.deepEqual(getPlayerProgressionView(-5), {
+    totalXp: 0,
+    level: 1,
+    currentLevelXp: 0,
+    xpIntoLevel: 0,
+    xpToNextLevel: 5,
+    nextLevelAt: 5,
+    progressRatio: 0,
+    isMaxLevel: false,
+  })
+
+  assert.deepEqual(getPlayerProgressionView(40), {
+    totalXp: 40,
+    level: 5,
+    currentLevelXp: 36,
+    xpIntoLevel: 4,
+    xpToNextLevel: 0,
+    nextLevelAt: null,
+    progressRatio: 1,
+    isMaxLevel: true,
+  })
+
+  assert.deepEqual(applyPlayerXp({ totalXp: 4, level: 1 }, 8).state, {
+    totalXp: 12,
+    level: 3,
   })
 })
 
@@ -1109,6 +1200,27 @@ test('arena frame stops immediately after any run-ending combat step', () => {
   )
 })
 
+test('arena enemy defeat applies player xp before outcome handling', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+
+  assert.ok(
+    arenaSceneSource.includes('const playerXpResult = this.grantPlayerXpForEnemy(enemy.config.id)'),
+    'damageEnemy should grant run-local player XP at the enemy defeat chokepoint',
+  )
+  assert.ok(
+    arenaSceneSource.includes('this.playerProgression = result.state'),
+    'grantPlayerXpForEnemy should update the scene progression state immediately',
+  )
+  assert.ok(
+    arenaSceneSource.includes('this.showPlayerLevelUpFeedback(result.level)'),
+    'level-up should trigger a lightweight visible feedback path',
+  )
+  assert.ok(
+    arenaSceneSource.includes('getPlayerProgressionView(this.playerProgression.totalXp)'),
+    'the player HUD should render from the player progression view',
+  )
+})
+
 test('loss result presentation keeps restart guidance distinct from boss clear', () => {
   const presentation = createRunResultPresentation({
     outcome: 'loss',
@@ -1770,12 +1882,16 @@ test('enemy health bar fill width tracks clamped health ratio', () => {
   assert.equal(getEnemyHealthFillWidth(5, 0, 32), 0)
 })
 
-test('player health bar metrics place a compact bar at the canvas bottom', () => {
+test('player health bar metrics place a compact top hud with level and xp rows', () => {
   assert.deepEqual(getPlayerHealthBarMetrics(960, 540), {
     x: 360,
-    y: 518,
+    y: 22,
     width: 240,
     height: 10,
+    levelLabelY: 38,
+    xpY: 52,
+    xpWidth: 240,
+    xpHeight: 6,
   })
 })
 
@@ -1786,4 +1902,12 @@ test('player health bar fill width tracks clamped health ratio', () => {
   assert.equal(getPlayerHealthFillWidth(-10, 100, 236), 0)
   assert.equal(getPlayerHealthFillWidth(140, 100, 236), 236)
   assert.equal(getPlayerHealthFillWidth(20, 0, 236), 0)
+})
+
+test('player experience bar fill width tracks clamped progress ratio', () => {
+  assert.equal(getPlayerExperienceFillWidth(0, 236), 0)
+  assert.equal(getPlayerExperienceFillWidth(0.5, 236), 118)
+  assert.equal(getPlayerExperienceFillWidth(1, 236), 236)
+  assert.equal(getPlayerExperienceFillWidth(-0.5, 236), 0)
+  assert.equal(getPlayerExperienceFillWidth(1.5, 236), 236)
 })
