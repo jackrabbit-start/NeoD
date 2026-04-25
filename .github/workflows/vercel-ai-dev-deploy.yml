@@ -15,6 +15,7 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  VERCEL_CLI_VERSION: 52.0.0
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
@@ -50,10 +51,25 @@ jobs:
         run: pnpm build
 
       - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+        run: npm install --global vercel@${VERCEL_CLI_VERSION}
 
       - name: Pull Vercel production environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Confirm Vercel Node.js override
+        run: |
+          set -euo pipefail
+
+          package_node_version="$(node -p "require('./package.json').engines?.node || ''")"
+          project_node_version="$(node -p "require('./.vercel/project.json').settings?.nodeVersion || ''")"
+
+          echo "package.json engines.node: ${package_node_version}"
+          echo "Vercel project settings nodeVersion: ${project_node_version}"
+
+          if [ "${package_node_version}" != "22.x" ]; then
+            echo "Expected package.json engines.node to pin Vercel builds to 22.x."
+            exit 1
+          fi
 
       - name: Build Vercel artifacts
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
