@@ -30,9 +30,10 @@ test('level-up passive choices are varied but deterministic from the injected ra
 
   assert.equal(firstChoices.length, 3)
   assert.equal(new Set(firstChoices.map((choice) => choice.id)).size, 3)
+  assert.ok(firstChoices.every((choice) => typeof choice.grade === 'string'))
   assert.notDeepEqual(
-    firstChoices.map((choice) => `${choice.id}:${choice.effectSummary}`),
-    secondChoices.map((choice) => `${choice.id}:${choice.effectSummary}`),
+    firstChoices.map((choice) => `${choice.id}:${choice.grade}:${choice.effectSummary}`),
+    secondChoices.map((choice) => `${choice.id}:${choice.grade}:${choice.effectSummary}`),
   )
 
   const weightedChoices = getPassiveCardChoices(
@@ -119,4 +120,5 @@ test('new pachinko and enemy cards expose varied utility modifiers', () => {
   assert.ok(lines.some((line) => /받는 피해/.test(line)))
   assert.ok(lines.some((line) => /보스 피해/.test(line)))
   assert.ok(lines.some((line) => /일반 적 피해/.test(line)))
+  assert.ok([jackpot.grade, shield.grade, boss.grade, crowd.grade].every(Boolean))
 })

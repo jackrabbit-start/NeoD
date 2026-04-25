@@ -826,6 +826,72 @@ button {
   align-items: center;
 }
 
+.hud-modal__item--grade-common {
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.08), rgba(143, 228, 255, 0) 70%),
+    rgba(14, 26, 54, 0.94);
+}
+
+.hud-modal__item--grade-rare {
+  border-color: rgba(103, 185, 255, 0.32);
+  background:
+    linear-gradient(135deg, rgba(87, 169, 255, 0.18), rgba(143, 228, 255, 0.04) 72%),
+    rgba(16, 30, 62, 0.97);
+}
+
+.hud-modal__item--grade-epic {
+  border-color: rgba(194, 126, 255, 0.42);
+  background:
+    linear-gradient(135deg, rgba(164, 96, 255, 0.2), rgba(250, 125, 255, 0.06) 74%),
+    rgba(24, 22, 62, 0.98);
+}
+
+.hud-modal__item--grade-legendary {
+  border-color: rgba(255, 196, 92, 0.52);
+  background:
+    linear-gradient(135deg, rgba(255, 196, 92, 0.24), rgba(255, 129, 76, 0.08) 74%),
+    rgba(48, 25, 20, 0.98);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 248, 214, 0.08);
+}
+
+.hud-modal__passive-grade {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.hud-modal__passive-grade--common {
+  color: #d9e6ff;
+  background: rgba(143, 228, 255, 0.08);
+  border-color: rgba(143, 228, 255, 0.18);
+}
+
+.hud-modal__passive-grade--rare {
+  color: #9bd6ff;
+  background: rgba(87, 169, 255, 0.14);
+  border-color: rgba(87, 169, 255, 0.28);
+}
+
+.hud-modal__passive-grade--epic {
+  color: #e1b9ff;
+  background: rgba(164, 96, 255, 0.16);
+  border-color: rgba(194, 126, 255, 0.32);
+}
+
+.hud-modal__passive-grade--legendary {
+  color: #ffe29a;
+  background: rgba(255, 196, 92, 0.18);
+  border-color: rgba(255, 196, 92, 0.36);
+}
+
 .hud-modal__item--weapon.is-equipped .hud-modal__weapon-meta {
   color: #a6ffd0;
 }
