@@ -13,6 +13,7 @@ import { MAX_WEAPON_STAR } from './pachinkoRewards.js'
 export const STARTER_WEAPON_ID: WeaponId = 'starter-blaster'
 export const STARTER_WEAPON_STAR: WeaponStar = 1
 export const STARTER_WEAPON_STACK_KEY = createWeaponStackKey(STARTER_WEAPON_ID, STARTER_WEAPON_STAR)
+export const AUTO_FUSE_STACK_COUNT = 3
 
 export interface WeaponLoadoutState {
   inventory: InventoryState
@@ -38,6 +39,12 @@ export interface FusionResult {
   resultKey: WeaponStackKey
   weaponId: WeaponId
   resultStar: WeaponStar
+}
+
+export interface AutoFusionResult {
+  weaponStacks: WeaponStack[]
+  activeWeaponKey: WeaponStackKey
+  fusions: FusionResult[]
 }
 
 export function createWeaponStackKey(weaponId: WeaponId, star: WeaponStar): WeaponStackKey {
@@ -149,6 +156,46 @@ export function addWeaponStack(
   return sortWeaponStacks(nextStacks)
 }
 
+export function addWeaponStackWithAutoFusion(
+  state: WeaponStackLoadoutState,
+  weaponId: WeaponId,
+  star: WeaponStar,
+  count = 1,
+): AutoFusionResult {
+  let weaponStacks = addWeaponStack(state.weaponStacks, weaponId, star, count)
+  let activeWeaponKey = normalizeActiveWeaponKey(weaponStacks, state.activeWeaponKey)
+  const fusions: FusionResult[] = []
+
+  let didFuse = true
+  while (didFuse) {
+    didFuse = false
+    const fusionSource = sortWeaponStacks(weaponStacks, activeWeaponKey)
+      .reverse()
+      .find((stack) => stack.star < MAX_WEAPON_STAR && stack.count >= AUTO_FUSE_STACK_COUNT)
+
+    if (!fusionSource) {
+      break
+    }
+
+    const sourceKey = getStackKey(fusionSource)
+    const fusion = fuseWeaponStack({ weaponStacks, activeWeaponKey }, sourceKey)
+    if (!fusion) {
+      break
+    }
+
+    weaponStacks = fusion.weaponStacks
+    activeWeaponKey = fusion.activeWeaponKey
+    fusions.push(fusion)
+    didFuse = true
+  }
+
+  return {
+    weaponStacks,
+    activeWeaponKey: normalizeActiveWeaponKey(weaponStacks, activeWeaponKey),
+    fusions,
+  }
+}
+
 export function equipWeaponStack(
   weaponStacks: WeaponStack[],
   activeWeaponKey: WeaponStackKey,
@@ -163,7 +210,7 @@ export function canFuseWeaponStack(weaponStacks: WeaponStack[], key: WeaponStack
     return false
   }
 
-  return getStackCount(weaponStacks, key) >= 2
+  return getStackCount(weaponStacks, key) >= AUTO_FUSE_STACK_COUNT
 }
 
 export function fuseWeaponStack(
@@ -183,7 +230,7 @@ export function fuseWeaponStack(
       if (getStackKey(stack) !== key) {
         return stack
       }
-      const nextCount = stack.count - 2
+      const nextCount = stack.count - AUTO_FUSE_STACK_COUNT
       sourceWasDepleted = nextCount <= 0
       return { ...stack, count: nextCount }
     })

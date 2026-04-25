@@ -5,7 +5,6 @@ import type {
   EnemyDefinition,
   HudOwnedWeaponView,
   RunEndReason,
-  WeaponId,
   WeaponStack,
   WeaponStackKey,
 } from '../domain/types.js'
@@ -122,10 +121,8 @@ import {
 import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import { deriveEffectiveWeaponStats } from '../systems/tuning.js'
 import {
-  addWeaponStack,
-  canFuseWeaponStack,
+  addWeaponStackWithAutoFusion,
   equipWeaponStack,
-  fuseWeaponStack,
   getStackKey,
   getWeaponIdFromStackKey,
   parseWeaponStackKey,
@@ -415,8 +412,6 @@ export class ArenaScene extends Phaser.Scene {
       onInventoryToggle: () => this.toggleInventory(),
       onInventoryClose: () => this.closeInventory(),
       onWeaponEquip: (weaponKey) => this.handleWeaponEquip(weaponKey as WeaponStackKey),
-      onWeaponTune: (weaponId) => this.handleWeaponTune(weaponId),
-      onWeaponFuse: (weaponKey) => this.handleWeaponFuse(weaponKey),
       onStageSelectionToggle: () => this.toggleStageSelection(),
       onStageSelectionClose: () => this.closeStageSelection(),
       onStageSelect: (stageIndex) => this.handleStageSelection(stageIndex),
@@ -1731,7 +1726,7 @@ export class ArenaScene extends Phaser.Scene {
   private openInventory(): void {
     this.isInventoryOpen = true
     this.applyInteractionPause(true)
-    this.statusMessage = '인벤토리가 열렸습니다. 살펴보고 조합하는 동안 전투가 일시정지됩니다.'
+    this.statusMessage = '인벤토리가 열렸습니다. 장착 무기와 보유 무기를 확인하세요.'
     this.updateHud()
   }
 
@@ -1852,36 +1847,6 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handleWeaponFuse(weaponKey: WeaponStackKey): void {
-    if (!this.isInventoryOpen) {
-      return
-    }
-
-    const result = fuseWeaponStack({
-      weaponStacks: this.weaponStacks,
-      activeWeaponKey: this.activeWeaponKey,
-    }, weaponKey)
-
-    if (!result) {
-      this.statusMessage = '같은 무기와 같은 별 2개가 있어야 합성할 수 있습니다.'
-      this.updateHud()
-      return
-    }
-
-    this.weaponStacks = result.weaponStacks
-    this.activeWeaponKey = result.activeWeaponKey
-    this.statusMessage = `${WEAPON_DEFINITIONS[result.weaponId].name} ${'★'.repeat(result.resultStar)} 합성 완료.`
-    this.updateHud()
-  }
-
-  private handleWeaponTune(_weaponId: WeaponId): void {
-    if (!this.isInventoryOpen) {
-      return
-    }
-
-    this.statusMessage = '튜닝은 이번 파친코 별 등급 패스에서는 비활성화되었습니다.'
-    this.updateHud()
-  }
 
 
   private freezeCombat(shouldFreeze: boolean): void {
@@ -2280,11 +2245,11 @@ export class ArenaScene extends Phaser.Scene {
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
       ],
       inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`],
-      recipes: this.getFusionSummaryLines(),
+      recipes: ['같은 무기·같은 별 3개는 자동으로 다음 별 등급이 됩니다.'],
       objective: this.isFinaleActive
         ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
         : '30분 생존 압박을 버티며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
-      tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 떨어진 토큰을 먹으면 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스 · 스테이지 선택 버튼',
+      tip: 'WASD 이동 · J 대시 · 자동 사격 · 토큰 파친코 · 무기 3개 자동 합성 · I 인벤토리 · Q 코덱스',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen || this.isStageSelectOpen,
@@ -2327,11 +2292,6 @@ export class ArenaScene extends Phaser.Scene {
       const ownedWeapon = WEAPON_DEFINITIONS[stack.weaponId]
       const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
       const stackKey = getStackKey(stack)
-      const canFuse = canFuseWeaponStack(this.weaponStacks, stackKey)
-      const fuseDisabledReason = stack.star >= 5
-        ? '5★가 최대 등급입니다.'
-        : '같은 무기와 같은 별 2개가 필요합니다.'
-
       return {
         id: stack.weaponId,
         stackKey,
@@ -2343,24 +2303,10 @@ export class ArenaScene extends Phaser.Scene {
         fireRateMs: effectiveWeapon.fireRateMs,
         projectileSpeed: effectiveWeapon.projectileSpeed,
         isEquipped: stackKey === this.activeWeaponKey,
-        tuningLabel: null,
-        canTune: false,
-        tuneDisabledReason: '튜닝은 이번 파친코 별 등급 패스에서는 비활성화되었습니다.',
-        canFuse,
-        fuseDisabledReason: canFuse ? null : fuseDisabledReason,
         hudIconKey: ownedWeapon.visual.hudIconKey,
         accentColor: ownedWeapon.visual.accentColor,
       }
     })
-  }
-
-  private getFusionSummaryLines(): string[] {
-    const eligible = sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).filter((stack) => canFuseWeaponStack(this.weaponStacks, getStackKey(stack)))
-    if (eligible.length === 0) {
-      return ['같은 무기와 같은 별 2개를 모으면 합성 가능']
-    }
-
-    return eligible.map((stack) => `${WEAPON_DEFINITIONS[stack.weaponId].name} ${'★'.repeat(stack.star)} 합성 가능`)
   }
 
   private getActiveWeaponLabel(): string {
@@ -2442,10 +2388,21 @@ export class ArenaScene extends Phaser.Scene {
     const rect = this.syncPachinkoBoard()
     const laneRatio = Phaser.Math.Clamp((token.sprite.x - rect.x) / rect.width, 0, 0.999)
     const reward = resolvePachinkoLandingReward(this.pachinkoTokenXp, laneRatio)
-    this.weaponStacks = addWeaponStack(this.weaponStacks, reward.weaponId, reward.star, 1)
+    const fusionResult = addWeaponStackWithAutoFusion(
+      { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
+      reward.weaponId,
+      reward.star,
+      1,
+    )
+    this.weaponStacks = fusionResult.weaponStacks
+    this.activeWeaponKey = fusionResult.activeWeaponKey
     const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${'★'.repeat(reward.star)}`
-    this.latestPachinkoReward = rewardLabel
-    this.statusMessage = `파친코 보상 획득: ${rewardLabel}`
+    const lastFusion = fusionResult.fusions.at(-1)
+    const fusionLabel = lastFusion
+      ? ` · 자동 합성: ${WEAPON_DEFINITIONS[lastFusion.weaponId].name} ${'★'.repeat(lastFusion.resultStar)}`
+      : ''
+    this.latestPachinkoReward = `${rewardLabel}${fusionLabel}`
+    this.statusMessage = `파친코 보상 획득: ${rewardLabel}${fusionLabel}`
     token.sprite.destroy()
     this.pachinkoTokenInFlight = null
     this.launchNextPachinkoToken()

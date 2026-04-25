@@ -553,10 +553,21 @@ button {
   margin-bottom: 4px;
 }
 
+.hud-modal__summary,
+.hud-modal__hint {
+  color: #b9c7ff;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .hud-modal__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+}
+
+.hud-modal__grid--inventory {
+  grid-template-columns: 1fr;
 }
 
 .hud-modal__section {
@@ -666,6 +677,16 @@ button {
   cursor: default;
 }
 
+.hud-modal__item--equipped {
+  align-items: center;
+}
+
+.hud-modal__item--owned:focus-within .hud-modal__weapon-stats--owned,
+.hud-modal__item--owned:hover .hud-modal__weapon-stats--owned {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .hud-modal__item--stage {
   align-items: center;
 }
@@ -677,8 +698,19 @@ button {
 .hud-modal__weapon-actions {
   display: grid;
   justify-items: end;
+  align-content: center;
   gap: 6px;
-  min-width: 112px;
+  min-width: 190px;
+}
+
+.hud-modal__weapon-stats {
+  text-align: right;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.hud-modal__weapon-stats--owned {
+  opacity: 0;
+  transform: translateY(2px);
 }
 
 .hud-modal__recipe-output,
