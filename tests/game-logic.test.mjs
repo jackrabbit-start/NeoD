@@ -476,6 +476,11 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
   assert.equal(progress.totalTokenXp, 5)
   assert.equal(progress.rewardLevel, 1)
 
+  const boostedProgress = applyEnemyPachinkoTokenProgress(progress, 'mender-slime', 1.5)
+  assert.equal(boostedProgress.grantedTokenXp, 3)
+  assert.deepEqual(boostedProgress.queuedTokenXp, [1, 4, 3])
+  assert.equal(boostedProgress.totalTokenXp, 8)
+
   const bossProgress = applyEnemyPachinkoTokenProgress(progress, 'slime-boss')
   assert.deepEqual(bossProgress, {
     ...progress,
