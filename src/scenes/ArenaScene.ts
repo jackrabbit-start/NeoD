@@ -19,6 +19,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { CodexController } from '../ui/Codex.js'
 import type { HudController } from '../ui/Hud.js'
+import { GAMEPLAY_CONTROL_TIP, GAME_TITLE } from '../ui/controlCopy.js'
 import { getCodexState } from '../systems/codex.js'
 import {
   advanceEnemyCooldown,
@@ -2267,7 +2268,7 @@ export class ArenaScene extends Phaser.Scene {
     const playerProgression = getPlayerProgressionView(this.playerProgression.totalXp)
 
     this.hud.update({
-      title: 'NeoD',
+      title: GAME_TITLE,
       subtitle: this.activeRunLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
@@ -2284,7 +2285,7 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isFinaleActive
         ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
         : '30분 생존 압박을 버티며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
-      tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 떨어진 토큰을 먹으면 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스 · 스테이지 선택 버튼',
+      tip: GAMEPLAY_CONTROL_TIP,
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen || this.isStageSelectOpen,
