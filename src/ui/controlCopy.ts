@@ -4,4 +4,4 @@ export const GAME_HEADER_CONTROL_HINTS = ['WASD 이동', 'J 대시', 'I 인벤�
 
 export const GAMEPLAY_CONTROL_TIP = `${GAME_HEADER_CONTROL_HINTS.join(
   ' · ',
-)} · 자동 사격 · 토큰 자동 투입 · 같은 별 합성 · 스테이지 선택`
+)} · 자동 사격 · 토큰 자동 투입 · 무기 3개 자동 합성 · 스테이지 선택`

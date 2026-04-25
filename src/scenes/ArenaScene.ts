@@ -5,7 +5,6 @@ import type {
   EnemyDefinition,
   HudOwnedWeaponView,
   RunEndReason,
-  WeaponId,
   WeaponStack,
   WeaponStackKey,
 } from '../domain/types.js'
@@ -99,6 +98,7 @@ import {
   applyEnemyPachinkoTokenProgress,
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
+  getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
   getTokenXpForEnemy,
   resolvePachinkoSlotIndex,
@@ -137,11 +137,9 @@ import {
 } from '../systems/weaponPresentation.js'
 import { deriveEffectiveWeaponStats } from '../systems/tuning.js'
 import {
-  addWeaponStack,
-  canFuseWeaponStack,
+  addWeaponStackWithAutoFusion,
   equipWeaponStack,
   formatWeaponStarLabel,
-  fuseWeaponStack,
   getStackKey,
   getWeaponIdFromStackKey,
   parseWeaponStackKey,
@@ -443,6 +441,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private latestPachinkoReward: string | null = null
 
+  private pachinkoRewardTableSeed = 0
+
   private pachinkoPins?: Phaser.Physics.Arcade.StaticGroup
 
   private pachinkoVisuals: Phaser.GameObjects.GameObject[] = []
@@ -487,8 +487,6 @@ export class ArenaScene extends Phaser.Scene {
       onInventoryToggle: () => this.toggleInventory(),
       onInventoryClose: () => this.closeInventory(),
       onWeaponEquip: (weaponKey) => this.handleWeaponEquip(weaponKey as WeaponStackKey),
-      onWeaponTune: (weaponId) => this.handleWeaponTune(weaponId),
-      onWeaponFuse: (weaponKey) => this.handleWeaponFuse(weaponKey),
       onStageSelectionToggle: () => this.toggleStageSelection(),
       onStageSelectionClose: () => this.closeStageSelection(),
       onStageSelect: (stageIndex) => this.handleStageSelection(stageIndex),
@@ -1940,7 +1938,7 @@ export class ArenaScene extends Phaser.Scene {
   private openInventory(): void {
     this.isInventoryOpen = true
     this.applyInteractionPause(true)
-    this.statusMessage = '인벤토리가 열렸습니다. 살펴보고 조합하는 동안 전투가 일시정지됩니다.'
+    this.statusMessage = '인벤토리가 열렸습니다. 장착 무기와 보유 무기를 확인하세요.'
     this.updateHud()
   }
 
@@ -2061,36 +2059,7 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handleWeaponFuse(weaponKey: WeaponStackKey): void {
-    if (!this.isInventoryOpen) {
-      return
-    }
 
-    const result = fuseWeaponStack({
-      weaponStacks: this.weaponStacks,
-      activeWeaponKey: this.activeWeaponKey,
-    }, weaponKey)
-
-    if (!result) {
-      this.statusMessage = '같은 무기와 같은 별 2개가 있어야 합성할 수 있습니다.'
-      this.updateHud()
-      return
-    }
-
-    this.weaponStacks = result.weaponStacks
-    this.activeWeaponKey = result.activeWeaponKey
-    this.statusMessage = `${WEAPON_DEFINITIONS[result.weaponId].name} ${formatWeaponStarLabel(result.resultStar)} 합성 완료.`
-    this.updateHud()
-  }
-
-  private handleWeaponTune(_weaponId: WeaponId): void {
-    if (!this.isInventoryOpen) {
-      return
-    }
-
-    this.statusMessage = '튜닝은 이번 파친코 별 등급 패스에서는 비활성화되었습니다.'
-    this.updateHud()
-  }
 
 
   private freezeCombat(shouldFreeze: boolean): void {
@@ -2472,6 +2441,9 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
     this.nextHeartPickupAt = 0
+    this.pachinkoTokenXp = initialState.pachinkoTokenXp
+    this.latestPachinkoReward = null
+    this.pachinkoRewardTableSeed = 0
   }
 
   private destroyRunEntities(): void {
@@ -2605,7 +2577,7 @@ export class ArenaScene extends Phaser.Scene {
         `적 체력 배율: ×${this.activeEnemyHealthMultiplier.toFixed(2)}`,
       ],
       inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`],
-      recipes: this.getFusionSummaryLines(),
+      recipes: ['같은 무기·같은 별 3개는 자동으로 다음 별 등급이 됩니다.'],
       objective: this.isFinaleActive
         ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
         : '30분 생존 압박을 버티며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
@@ -2654,9 +2626,6 @@ export class ArenaScene extends Phaser.Scene {
       const ownedWeapon = WEAPON_DEFINITIONS[stack.weaponId]
       const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
       const stackKey = getStackKey(stack)
-      const canFuse = canFuseWeaponStack(this.weaponStacks, stackKey)
-      const fuseDisabledReason = '같은 무기와 같은 별 2개가 필요합니다.'
-
       return {
         id: stack.weaponId,
         stackKey,
@@ -2668,25 +2637,12 @@ export class ArenaScene extends Phaser.Scene {
         fireRateMs: effectiveWeapon.fireRateMs,
         projectileSpeed: effectiveWeapon.projectileSpeed,
         isEquipped: stackKey === this.activeWeaponKey,
-        tuningLabel: null,
-        canTune: false,
-        tuneDisabledReason: '튜닝은 이번 파친코 별 등급 패스에서는 비활성화되었습니다.',
-        canFuse,
-        fuseDisabledReason: canFuse ? null : fuseDisabledReason,
         hudIconKey: ownedWeapon.visual.hudIconKey,
         accentColor: ownedWeapon.visual.accentColor,
       }
     })
   }
 
-  private getFusionSummaryLines(): string[] {
-    const eligible = sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).filter((stack) => canFuseWeaponStack(this.weaponStacks, getStackKey(stack)))
-    if (eligible.length === 0) {
-      return ['같은 무기와 같은 별 2개를 모으면 합성 가능']
-    }
-
-    return eligible.map((stack) => `${WEAPON_DEFINITIONS[stack.weaponId].name} ${formatWeaponStarLabel(stack.star)} 합성 가능`)
-  }
 
   private getActiveWeaponLabel(): string {
     const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
@@ -2718,6 +2674,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
+    this.pachinkoRewardTableSeed = getPachinkoRewardTableSeed(this.time.now)
     const rect = this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
 
@@ -2802,11 +2759,28 @@ export class ArenaScene extends Phaser.Scene {
     const rect = this.syncPachinkoBoard()
     const laneRatio = Phaser.Math.Clamp((token.sprite.x - rect.x) / rect.width, 0, 0.999)
     const slotIndex = resolvePachinkoSlotIndex(laneRatio)
-    const reward = resolvePachinkoSlotReward(this.pachinkoTokenXp, laneRatio)
-    this.weaponStacks = addWeaponStack(this.weaponStacks, reward.weaponId, reward.star, 1)
+    const reward = resolvePachinkoSlotReward(
+      this.pachinkoTokenXp,
+      laneRatio,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )
+    const fusionResult = addWeaponStackWithAutoFusion(
+      { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
+      reward.weaponId,
+      reward.star,
+      1,
+    )
+    this.weaponStacks = fusionResult.weaponStacks
+    this.activeWeaponKey = fusionResult.activeWeaponKey
     const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${formatWeaponStarLabel(reward.star)}`
-    this.latestPachinkoReward = rewardLabel
-    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}`
+    const lastFusion = fusionResult.fusions.at(-1)
+    const fusionLabel = lastFusion
+      ? ` · 자동 합성: ${WEAPON_DEFINITIONS[lastFusion.weaponId].name} ${formatWeaponStarLabel(lastFusion.resultStar)}`
+      : ''
+    this.latestPachinkoReward = `${rewardLabel}${fusionLabel}`
+    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}${fusionLabel}`
     this.destroyActivePachinkoToken(token)
     this.launchAvailablePachinkoTokens()
   }
@@ -2880,7 +2854,7 @@ export class ArenaScene extends Phaser.Scene {
       .setDisplaySize(rect.width - 16, 4)
     this.pachinkoLevelBadge
       ?.setPosition(rect.x + rect.width - 12, rect.y + 14)
-      .setText(`Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`)
+      .setText(`Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)} · LIVE`)
     const queueBadgeX = this.getPachinkoQueueBadgeX(rect)
     this.pachinkoQueueBadge
       ?.setPosition(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET)
@@ -2943,7 +2917,7 @@ export class ArenaScene extends Phaser.Scene {
       fontStyle: '700',
       align: 'left',
     }).setDepth(63)
-    const levelBadge = this.add.text(rect.x + rect.width - 12, rect.y + 14, `Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, {
+    const levelBadge = this.add.text(rect.x + rect.width - 12, rect.y + 14, `Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)} · LIVE`, {
       color: '#101a32',
       backgroundColor: '#ffd866',
       fontFamily: 'Inter, system-ui, sans-serif',
@@ -3010,7 +2984,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private createPachinkoSlotVisuals(rect: RectBounds): void {
-    for (const reward of buildPachinkoSlotRewards(this.pachinkoTokenXp)) {
+    for (const reward of buildPachinkoSlotRewards(
+      this.pachinkoTokenXp,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )) {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
       const frame = this.add.rectangle(centerX, centerY, rect.width / reward.slotCount - 3, PACHINKO_SLOT_VISUAL_HEIGHT - 8, 0x07111f, 0.96)
@@ -3042,7 +3021,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private syncPachinkoSlotVisuals(rect: RectBounds): void {
-    const rewards = buildPachinkoSlotRewards(this.pachinkoTokenXp)
+    const rewards = buildPachinkoSlotRewards(
+      this.pachinkoTokenXp,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )
     for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
       const visual = this.pachinkoSlotVisuals[index]
       const reward = rewards[index]

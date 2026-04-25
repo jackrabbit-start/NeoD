@@ -23,7 +23,7 @@ const renderItems = (items: CodexItemEntry[]) => items.length === 0
 `
 
 const renderRecipes = (recipes: CodexRecipeEntry[]) => recipes.length === 0
-  ? '<p class="codex-empty">기존 조합식은 호환 데이터로 남지만, 이번 루프에서는 같은 무기·같은 별 2개 합성이 우선입니다.</p>'
+  ? '<p class="codex-empty">기존 조합식은 호환 데이터로 남지만, 이번 루프에서는 같은 무기·같은 별 3개 자동 합성이 우선입니다.</p>'
   : `
   <div class="codex-grid">
     ${recipes
