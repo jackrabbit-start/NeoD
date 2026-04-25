@@ -627,6 +627,9 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.ok(thirdWave)
   assert.ok(eliteWave)
   assert.ok(bossWave)
+  assert.equal(secondWave.burstSize, 3)
+  assert.equal(thirdWave.burstSize, 4)
+  assert.equal(bossWave.burstSize, undefined)
   assert.deepEqual(
     getWaveSpawnSequence(secondWave),
     [...Array(15).fill('slime'), ...Array(9).fill('dash-slime')],
@@ -1047,7 +1050,7 @@ test('dash slime movement locks a burst vector through the charge window', () =>
     dashSlime.speed,
     dashSlime.movementBehavior,
     lockedMove.runtimeState,
-    1_500,
+    1_550,
   )
 
   assert.equal(recoveryMove.mode, 'dash-recover')

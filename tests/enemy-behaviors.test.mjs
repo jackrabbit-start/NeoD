@@ -38,7 +38,7 @@ test('orbit movement makes spark slime circle while backing off when too close',
   assert.ok(velocity.y > 0)
 })
 
-test('enemy pressure constants match the survival pressure pass', () => {
+test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   const slime = ENEMY_DEFINITIONS.slime
   const spark = ENEMY_DEFINITIONS['spark-slime']
   const prism = ENEMY_DEFINITIONS['prism-slime']
@@ -46,38 +46,52 @@ test('enemy pressure constants match the survival pressure pass', () => {
   const orbit = ENEMY_DEFINITIONS['orbit-slime']
   const boss = ENEMY_DEFINITIONS['slime-boss']
 
-  assert.equal(slime.maxHealth, 26)
-  assert.equal(slime.speed, 66)
-  assert.equal(slime.contactDamage, 12)
+  assert.equal(slime.maxHealth, 30)
+  assert.equal(slime.speed, 84)
+  assert.equal(slime.contactDamage, 18)
 
-  assert.equal(spark.maxHealth, 34)
-  assert.equal(spark.speed, 76)
-  assert.equal(spark.contactDamage, 14)
+  assert.equal(spark.maxHealth, 40)
+  assert.equal(spark.speed, 92)
+  assert.equal(spark.contactDamage, 20)
+  assert.equal(spark.movementBehavior.kind, 'orbit')
+  assert.equal(spark.movementBehavior.preferredDistance, 132)
+  assert.equal(spark.movementBehavior.distanceTolerance, 22)
   assert.equal(spark.attackBehavior.kind, 'telegraphed-aoe')
-  assert.equal(spark.attackBehavior.damage, 18)
-  assert.equal(spark.attackBehavior.cooldownMs, 1600)
+  assert.equal(spark.attackBehavior.damage, 24)
+  assert.equal(spark.attackBehavior.cooldownMs, 1050)
+  assert.equal(spark.attackBehavior.telegraphMs, 520)
+  assert.equal(spark.attackBehavior.radius, 72)
+  assert.equal(spark.attackBehavior.range, 290)
 
-  assert.equal(prism.maxHealth, 88)
-  assert.equal(prism.speed, 68)
-  assert.equal(prism.contactDamage, 20)
+  assert.equal(prism.maxHealth, 110)
+  assert.equal(prism.speed, 82)
+  assert.equal(prism.contactDamage, 28)
 
-  assert.equal(dash.maxHealth, 38)
-  assert.equal(dash.speed, 64)
-  assert.equal(dash.contactDamage, 15)
+  assert.equal(dash.maxHealth, 46)
+  assert.equal(dash.speed, 76)
+  assert.equal(dash.contactDamage, 22)
+  assert.equal(dash.movementBehavior.kind, 'dash')
+  assert.equal(dash.movementBehavior.triggerRange, 270)
+  assert.equal(dash.movementBehavior.chargeSpeed, 270)
+  assert.equal(dash.movementBehavior.chargeDurationMs, 520)
+  assert.equal(dash.movementBehavior.cooldownMs, 850)
 
-  assert.equal(orbit.maxHealth, 32)
-  assert.equal(orbit.speed, 60)
-  assert.equal(orbit.contactDamage, 13)
+  assert.equal(orbit.maxHealth, 38)
+  assert.equal(orbit.speed, 82)
+  assert.equal(orbit.contactDamage, 19)
+  assert.equal(orbit.movementBehavior.kind, 'orbit')
+  assert.equal(orbit.movementBehavior.preferredDistance, 86)
+  assert.equal(orbit.movementBehavior.distanceTolerance, 28)
 
-  assert.equal(boss.maxHealth, 620)
-  assert.equal(boss.speed, 56)
-  assert.equal(boss.contactDamage, 26)
+  assert.equal(boss.maxHealth, 720)
+  assert.equal(boss.speed, 64)
+  assert.equal(boss.contactDamage, 34)
   assert.equal(boss.attackBehavior.kind, 'telegraphed-aoe')
-  assert.equal(boss.attackBehavior.damage, 34)
-  assert.equal(boss.attackBehavior.cooldownMs, 1350)
-  assert.equal(boss.attackBehavior.telegraphMs, 560)
-  assert.equal(boss.attackBehavior.radius, 120)
-  assert.equal(boss.attackBehavior.range, 285)
+  assert.equal(boss.attackBehavior.damage, 42)
+  assert.equal(boss.attackBehavior.cooldownMs, 1050)
+  assert.equal(boss.attackBehavior.telegraphMs, 470)
+  assert.equal(boss.attackBehavior.radius, 145)
+  assert.equal(boss.attackBehavior.range, 330)
   assert.equal(boss.attackBehavior.anchor, 'player')
 })
 
@@ -109,11 +123,11 @@ test('telegraphed aoe uses configured anchors for readable pressure zones', () =
 
   assert.deepEqual(
     sparkTelegraph && { x: sparkTelegraph.x, y: sparkTelegraph.y, radius: sparkTelegraph.radius },
-    { x: 90, y: 120, radius: 54 },
+    { x: 90, y: 120, radius: 72 },
   )
   assert.deepEqual(
     bossTelegraph && { x: bossTelegraph.x, y: bossTelegraph.y, radius: bossTelegraph.radius },
-    { x: 90, y: 120, radius: 120 },
+    { x: 90, y: 120, radius: 145 },
   )
   assert.deepEqual(
     selfAnchoredTelegraph && {
@@ -129,7 +143,7 @@ test('telegraph start and cooldown helpers remain deterministic', () => {
   const attackBehavior = ENEMY_DEFINITIONS['spark-slime'].attackBehavior
 
   assert.equal(shouldEnemyStartTelegraph(attackBehavior, 150, 0), true)
-  assert.equal(shouldEnemyStartTelegraph(attackBehavior, 260, 0), false)
+  assert.equal(shouldEnemyStartTelegraph(attackBehavior, 300, 0), false)
   assert.equal(shouldEnemyStartTelegraph(attackBehavior, 150, 300), false)
   assert.equal(advanceEnemyCooldown(1200, 300), 900)
   assert.equal(advanceEnemyCooldown(1200, 1500), 0)

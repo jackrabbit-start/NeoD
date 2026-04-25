@@ -183,6 +183,7 @@ export interface WaveDefinition {
   label: string
   entries: WaveEntryDefinition[]
   spawnIntervalMs: number
+  burstSize?: number
   isBossWave?: boolean
 }
 

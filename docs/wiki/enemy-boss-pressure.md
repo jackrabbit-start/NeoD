@@ -54,6 +54,37 @@ Known caveats:
 - Local commands emitted the known Node engine warning when run under Node `v25.5.0`; the repo expects Node `22.x`.
 - The build emitted the known Vite chunk-size warning.
 
+
+## Near-Miss Low-Clear-Rate Follow-Up
+
+The follow-up interview after PR #31 clarified that the 3x density pass was still too easy. The new target is a default balance that feels like a hard, low-clear-rate mode: roughly **under 20% clear rate before mastery**.
+
+Durable rules from the follow-up:
+
+- Use near-miss reach: dash distance/speed and AOE range should feel like they barely miss when dodged correctly.
+- Add grouped pressure: waves may use burst/group spawning so several enemies enter at once instead of only one enemy per timer tick.
+- Idle/static play should not survive regular waves.
+- Even at low clear rate, preserve the non-goals: no unreadable deaths, no opening instant deaths, and no literally unavoidable hitboxes.
+- Do not use player hit cooldown as the primary tuning lever unless a later requirement explicitly reopens it.
+
+Implementation currently in progress on `ai-task/difficulty-near-miss-pressure` adds optional `WaveDefinition.burstSize`, burst-spawn runtime behavior, stronger enemy movement/attack constants, and a small starter weapon nerf.
+
+Verification recorded before this context capture:
+
+- `pnpm typecheck`
+- `pnpm test` — 94 passing tests
+- `pnpm build`
+- `git diff --check`
+
+Known caveat: no manual browser play-feel validation has proven the <20% clear-rate target yet.
+
+Source artifacts:
+
+- `.omx/specs/deep-interview-difficulty-near-miss-pressure.md`
+- `.omx/interviews/difficulty-near-miss-pressure-20260425T114801Z.md`
+- `.omx/context/difficulty-near-miss-pressure-20260425T114145Z.md`
+- `.omx/context/post-interview-difficulty-near-miss-pressure-20260425T115729Z.md`
+
 ## Source Artifacts
 
 - `.omx/specs/deep-interview-enemy-boss-pressure.md`

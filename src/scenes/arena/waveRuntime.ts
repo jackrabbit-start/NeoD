@@ -42,6 +42,7 @@ export function startWaveRuntime(
 
   const pendingSpawns = getWaveSpawnSequence(wave)
   const totalSpawns = pendingSpawns.length
+  const burstSize = Math.max(1, Math.floor(wave.burstSize ?? 1))
   let remainingSpawns = totalSpawns
   applyState({
     currentWaveIndex: index,
@@ -51,15 +52,16 @@ export function startWaveRuntime(
     isBossActive: wave.isBossWave === true,
   })
 
-  const spawnAndDecrement = () => {
-    const enemyId = pendingSpawns.shift()
-    if (!enemyId) {
-      remainingSpawns = 0
-      applyState({ remainingSpawns })
-      return
+  const spawnBurstAndDecrement = () => {
+    for (let spawnedCount = 0; spawnedCount < burstSize; spawnedCount += 1) {
+      const enemyId = pendingSpawns.shift()
+      if (!enemyId) {
+        break
+      }
+
+      spawnEnemy(enemyId)
     }
 
-    spawnEnemy(enemyId)
     remainingSpawns = pendingSpawns.length
     applyState({
       remainingSpawns,
@@ -67,20 +69,20 @@ export function startWaveRuntime(
   }
 
   if (wave.isBossWave) {
-    spawnAndDecrement()
+    spawnBurstAndDecrement()
     return true
   }
 
   clearSpawnLoop()
-  spawnAndDecrement()
+  spawnBurstAndDecrement()
   if (remainingSpawns <= 0) {
     return true
   }
 
   scheduleSpawnLoop({
     delayMs: wave.spawnIntervalMs,
-    repeat: Math.max(0, totalSpawns - 1),
-    onTick: spawnAndDecrement,
+    repeat: Math.max(0, Math.ceil(totalSpawns / burstSize) - 1),
+    onTick: spawnBurstAndDecrement,
   })
   return true
 }

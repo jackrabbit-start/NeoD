@@ -55,3 +55,8 @@
 - Added `docs/wiki/melee-weapon-line.md` to synthesize the melee-first interview, PRD, test spec, and implementation verification.
 - Updated `docs/index.md` so future agents can find the melee architecture guidance.
 - Source artifacts: `.omx/specs/deep-interview-weapon-capsule-variety.md`, `.omx/plans/prd-melee-weapon-line.md`, `.omx/plans/test-spec-melee-weapon-line.md`, and `.omx/context/post-interview-melee-weapon-line-20260425T114954Z.md`.
+
+## [2026-04-25] gameplay | Captured near-miss difficulty follow-up
+
+- Updated `docs/wiki/enemy-boss-pressure.md` with the low-clear-rate near-miss follow-up: burst/group spawns, harder dash/AOE reach, and explicit readability non-goals.
+- Source artifacts: `.omx/specs/deep-interview-difficulty-near-miss-pressure.md`, `.omx/interviews/difficulty-near-miss-pressure-20260425T114801Z.md`, and `.omx/context/post-interview-difficulty-near-miss-pressure-20260425T115729Z.md`.
