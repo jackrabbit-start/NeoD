@@ -288,13 +288,17 @@ export interface HudOwnedWeaponView {
   fireRateMs: number
   projectileSpeed: number
   isEquipped: boolean
-  tuningLabel: string | null
-  canTune: boolean
-  tuneDisabledReason: string | null
   canFuse?: boolean
   fuseDisabledReason?: string | null
   hudIconKey?: string
   accentColor?: number
+}
+
+export interface HudPassiveChoiceView {
+  id: string
+  name: string
+  description: string
+  effectSummary: string
 }
 
 export interface HudModalState {
@@ -302,6 +306,12 @@ export interface HudModalState {
   items: HudOwnedItemView[]
   recipes: HudRecipeView[]
   weapons: HudOwnedWeaponView[]
+}
+
+export interface HudPassiveSelectionState {
+  isOpen: boolean
+  level: number
+  choices: HudPassiveChoiceView[]
 }
 
 export interface HudStageView {
@@ -324,6 +334,7 @@ export interface HudState {
   stats: string[]
   inventory: string[]
   recipes: string[]
+  passives: string[]
   objective: string
   tip: string
   status: string
@@ -332,6 +343,7 @@ export interface HudState {
   stageButtonLabel: string
   stageButtonDisabled: boolean
   stageSelection: HudStageSelectionState
+  passiveSelection: HudPassiveSelectionState
   pachinko?: PachinkoHudState
   modal: HudModalState
 }

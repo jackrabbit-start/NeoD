@@ -8,7 +8,7 @@ export function getCodexState(isOpen: boolean): CodexState {
     isOpen,
     title: '현장 코덱스',
     subtitle: '공유 데이터 보기 · Q로 닫기',
-    hint: '현재 런의 보상 루프는 재료 아이콘 드롭 대신 토큰 파친코와 무기 별 등급 합성을 사용합니다.',
+    hint: '현재 런의 보상 루프는 토큰 파친코 + 별 합성 + 레벨업 패시브 카드 선택을 사용합니다.',
     items: [],
     recipes: [],
     enemies: Object.values(ENEMY_DEFINITIONS).map((enemy) => ({

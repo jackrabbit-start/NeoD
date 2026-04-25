@@ -5,7 +5,6 @@ import type {
   EnemyDefinition,
   HudOwnedWeaponView,
   RunEndReason,
-  WeaponId,
   WeaponStack,
   WeaponStackKey,
 } from '../domain/types.js'
@@ -70,6 +69,16 @@ import {
   getPlayerHealthBarMetrics,
   getPlayerHealthFillWidth,
 } from '../systems/playerHealthBar.js'
+import {
+  addPassiveCard,
+  applyPassivePlayerSpeed,
+  applyPassiveWeaponEffects,
+  getPassiveCardChoices,
+  getPassiveSummaryLines,
+  resolveCriticalHit,
+  type PassiveCardDefinition,
+  type PassiveState,
+} from '../systems/passives.js'
 import {
   applyEnemyPlayerXp,
   getPlayerProgressionView,
@@ -273,6 +282,7 @@ interface ProjectileEntity {
   sprite: PhysicsImage
   tint: number
   damage: number
+  baseDamage: number
   radius: number
   remainingLifetimeMs: number
   remainingHits: number
@@ -296,6 +306,7 @@ interface HazardZoneEntity {
   y: number
   radius: number
   damage: number
+  baseDamage: number
   remainingLifetimeMs: number
   totalLifetimeMs: number
   tickEveryMs: number
@@ -371,6 +382,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private isStageSelectOpen = false
 
+  private isPassiveSelectionOpen = false
+
   private isRunEnding = false
 
   private playerHealth = 100
@@ -383,6 +396,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private playerSpeed = 220
+
+  private passiveState: PassiveState = {}
+
+  private pendingPassiveChoices: PassiveCardDefinition[] = []
 
   private playerDashState: PlayerDashState = createReadyPlayerDashState()
 
@@ -472,11 +489,11 @@ export class ArenaScene extends Phaser.Scene {
       onInventoryToggle: () => this.toggleInventory(),
       onInventoryClose: () => this.closeInventory(),
       onWeaponEquip: (weaponKey) => this.handleWeaponEquip(weaponKey as WeaponStackKey),
-      onWeaponTune: (weaponId) => this.handleWeaponTune(weaponId),
       onWeaponFuse: (weaponKey) => this.handleWeaponFuse(weaponKey),
       onStageSelectionToggle: () => this.toggleStageSelection(),
       onStageSelectionClose: () => this.closeStageSelection(),
       onStageSelect: (stageIndex) => this.handleStageSelection(stageIndex),
+      onPassiveSelect: (passiveId) => this.handlePassiveSelection(passiveId),
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
@@ -584,7 +601,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private isInteractionBlocked(): boolean {
-    return this.isInventoryOpen || this.isCodexOpen || this.isStageSelectOpen
+    return this.isInventoryOpen || this.isCodexOpen || this.isStageSelectOpen || this.isPassiveSelectionOpen
   }
 
   private resolveStartElapsedMs(data: ArenaSceneStartData): number {
@@ -749,7 +766,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleCodexToggle(): void {
-    if (!Phaser.Input.Keyboard.JustDown(this.codexKey) || this.isInventoryOpen || this.isStageSelectOpen) {
+    if (!Phaser.Input.Keyboard.JustDown(this.codexKey) || this.isInventoryOpen || this.isStageSelectOpen || this.isPassiveSelectionOpen) {
       return
     }
 
@@ -1097,7 +1114,10 @@ export class ArenaScene extends Phaser.Scene {
 
           projectile.hitEnemyIds = hitStep.hitEnemyIds
           projectile.remainingHits = hitStep.remainingHits
-          const didDamage = this.damageEnemy(enemy, projectile.damage)
+          const didDamage = this.damageEnemy(enemy, projectile.damage, {
+            canCrit: true,
+            baseDamage: projectile.baseDamage,
+          })
           if (this.isRunEnding) {
             return
           }
@@ -1450,7 +1470,7 @@ export class ArenaScene extends Phaser.Scene {
       repeat: -1,
     })
 
-    const sprite = this.physics.add.image(x, y, 'tuning-capsule')
+    const sprite = this.physics.add.image(x, y, 'spark-knot')
     sprite.setCircle(9)
     sprite.setDepth(4)
     sprite.setScale(0.74)
@@ -1542,6 +1562,8 @@ export class ArenaScene extends Phaser.Scene {
 
           this.damageEnemy(enemy, hazard.damage, {
             ignoreRecentHit: true,
+            canCrit: true,
+            baseDamage: hazard.baseDamage,
           })
           if (this.isRunEnding) {
             return
@@ -1661,6 +1683,8 @@ export class ArenaScene extends Phaser.Scene {
     damage: number,
     options?: {
       ignoreRecentHit?: boolean
+      canCrit?: boolean
+      baseDamage?: number
     },
   ): boolean {
     const now = this.time.now
@@ -1668,8 +1692,17 @@ export class ArenaScene extends Phaser.Scene {
       return false
     }
 
+    const criticalHit = options?.canCrit
+      ? resolveCriticalHit(options.baseDamage ?? damage, this.passiveState)
+      : {
+          damage,
+          isCritical: false,
+          critChance: 0,
+          critDamageMultiplier: 1,
+        }
+
     enemy.lastHitAt = now
-    enemy.currentHealth -= damage
+    enemy.currentHealth -= criticalHit.damage
     this.syncEnemyHealthBar(enemy)
 
     if (enemy.currentHealth > 0) {
@@ -1679,6 +1712,9 @@ export class ArenaScene extends Phaser.Scene {
         scale: 1,
         duration: 100,
       })
+      if (criticalHit.isCritical) {
+        this.showCriticalHitFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage)
+      }
       return true
     }
 
@@ -1711,6 +1747,9 @@ export class ArenaScene extends Phaser.Scene {
     if (!didDropPachinkoToken) {
       this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 드롭을 계속 모으세요.`
     }
+    if (criticalHit.isCritical) {
+      this.showCriticalHitFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage)
+    }
     return true
   }
 
@@ -1721,6 +1760,7 @@ export class ArenaScene extends Phaser.Scene {
 
     if (result.didLevelUp) {
       this.showPlayerLevelUpFeedback(result.level)
+      this.openPassiveSelection(result.level)
     }
 
     return result
@@ -1745,6 +1785,27 @@ export class ArenaScene extends Phaser.Scene {
       y: 62,
       alpha: 0,
       duration: 820,
+      ease: 'Quad.Out',
+      onComplete: () => text.destroy(),
+    })
+  }
+
+  private showCriticalHitFeedback(x: number, y: number, damage: number): void {
+    const text = this.add
+      .text(x, y - 22, `CRIT! ${damage}`, {
+        color: '#ffd866',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '16px',
+        fontStyle: '900',
+      })
+      .setOrigin(0.5)
+      .setDepth(8)
+
+    this.tweens.add({
+      targets: text,
+      y: y - 54,
+      alpha: 0,
+      duration: 520,
       ease: 'Quad.Out',
       onComplete: () => text.destroy(),
     })
@@ -1786,7 +1847,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    if (this.isCodexOpen || this.isStageSelectOpen) {
+    if (this.isCodexOpen || this.isStageSelectOpen || this.isPassiveSelectionOpen) {
       return
     }
 
@@ -1821,7 +1882,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private openStageSelection(): void {
-    if (this.isInventoryOpen || this.isCodexOpen || this.isRunEnding) {
+    if (this.isInventoryOpen || this.isCodexOpen || this.isRunEnding || this.isPassiveSelectionOpen) {
       return
     }
 
@@ -1851,6 +1912,33 @@ export class ArenaScene extends Phaser.Scene {
     this.isStageSelectOpen = false
     this.applyInteractionPause(false)
     this.scene.restart({ startWaveIndex: stageIndex, startElapsedMs })
+  }
+
+  private openPassiveSelection(level: number): void {
+    this.pendingPassiveChoices = getPassiveCardChoices(level, this.passiveState)
+    this.isPassiveSelectionOpen = true
+    this.applyInteractionPause(true)
+    this.statusMessage = `Lv.${level} 달성! 패시브 카드 1장을 선택하세요.`
+    this.updateHud()
+  }
+
+  private handlePassiveSelection(passiveId: string): void {
+    if (!this.isPassiveSelectionOpen) {
+      return
+    }
+
+    const selected = this.pendingPassiveChoices.find((choice) => choice.id === passiveId)
+    if (!selected) {
+      return
+    }
+
+    this.passiveState = addPassiveCard(this.passiveState, selected.id)
+    this.playerSpeed = applyPassivePlayerSpeed(220, this.passiveState)
+    this.isPassiveSelectionOpen = false
+    this.pendingPassiveChoices = []
+    this.applyInteractionPause(false)
+    this.statusMessage = `패시브 선택: ${selected.name} · ${selected.effectSummary}`
+    this.updateHud()
   }
 
   private applyInteractionPause(shouldPause: boolean): void {
@@ -1939,16 +2027,6 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handleWeaponTune(_weaponId: WeaponId): void {
-    if (!this.isInventoryOpen) {
-      return
-    }
-
-    this.statusMessage = '튜닝은 이번 파친코 별 등급 패스에서는 비활성화되었습니다.'
-    this.updateHud()
-  }
-
-
   private freezeCombat(shouldFreeze: boolean): void {
     if (this.enemySpacingCollider) {
       this.enemySpacingCollider.active = !shouldFreeze
@@ -1977,10 +2055,13 @@ export class ArenaScene extends Phaser.Scene {
 
   private getActiveEffectiveWeapon() {
     const activeStack = parseWeaponStackKey(this.activeWeaponKey)
-    return deriveEffectiveWeaponStats(
-      activeStack?.weaponId ?? getWeaponIdFromStackKey(this.activeWeaponKey),
-      {},
-      activeStack?.star ?? 1,
+    return applyPassiveWeaponEffects(
+      deriveEffectiveWeaponStats(
+        activeStack?.weaponId ?? getWeaponIdFromStackKey(this.activeWeaponKey),
+        {},
+        activeStack?.star ?? 1,
+      ),
+      this.passiveState,
     )
   }
 
@@ -2310,7 +2391,10 @@ export class ArenaScene extends Phaser.Scene {
     this.playerHealth = initialState.playerHealth
     this.playerMaxHealth = initialState.playerMaxHealth
     this.playerProgression = initialState.playerProgression
-    this.playerSpeed = initialState.playerSpeed
+    this.passiveState = initialState.passiveState
+    this.pendingPassiveChoices = []
+    this.isPassiveSelectionOpen = false
+    this.playerSpeed = applyPassivePlayerSpeed(initialState.playerSpeed, this.passiveState)
     this.playerDashState = createReadyPlayerDashState()
     this.playerDashDirection.set(1, 0)
     this.lastPlayerMoveDirection.set(1, 0)
@@ -2414,6 +2498,7 @@ export class ArenaScene extends Phaser.Scene {
     this.isInventoryOpen = false
     this.isCodexOpen = false
     this.isStageSelectOpen = false
+    this.isPassiveSelectionOpen = false
     this.codex.update(getCodexState(false))
     this.physics.world.pause()
     this.freezeCombat(true)
@@ -2442,7 +2527,10 @@ export class ArenaScene extends Phaser.Scene {
     const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
     const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
     const activeStar = activeStack?.star ?? 1
-    const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar)
+    const weapon = applyPassiveWeaponEffects(
+      deriveEffectiveWeaponStats(weaponId, {}, activeStar),
+      this.passiveState,
+    )
     const playerProgression = getPlayerProgressionView(this.playerProgression.totalXp)
 
     this.hud.update({
@@ -2457,6 +2545,7 @@ export class ArenaScene extends Phaser.Scene {
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
         `적 체력 배율: ×${this.activeEnemyHealthMultiplier.toFixed(2)}`,
       ],
+      passives: getPassiveSummaryLines(this.passiveState),
       inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`],
       recipes: this.getFusionSummaryLines(),
       objective: this.isFinaleActive
@@ -2465,12 +2554,22 @@ export class ArenaScene extends Phaser.Scene {
       tip: GAMEPLAY_CONTROL_TIP,
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
-      inventoryButtonDisabled: this.isCodexOpen || this.isStageSelectOpen,
+      inventoryButtonDisabled: this.isCodexOpen || this.isStageSelectOpen || this.isPassiveSelectionOpen,
       stageButtonLabel: this.isStageSelectOpen ? '선택 닫기' : '스테이지 선택',
-      stageButtonDisabled: this.isInventoryOpen || this.isCodexOpen || this.isRunEnding,
+      stageButtonDisabled: this.isInventoryOpen || this.isCodexOpen || this.isRunEnding || this.isPassiveSelectionOpen,
       stageSelection: {
         isOpen: this.isStageSelectOpen,
         stages: getStageSelectionViews(this.runElapsedMs),
+      },
+      passiveSelection: {
+        isOpen: this.isPassiveSelectionOpen,
+        level: playerProgression.level,
+        choices: this.pendingPassiveChoices.map((choice) => ({
+          id: choice.id,
+          name: choice.name,
+          description: choice.description,
+          effectSummary: choice.effectSummary,
+        })),
       },
       pachinko: {
         level: getPachinkoRewardLevel(this.pachinkoTokenXp),
@@ -2505,7 +2604,10 @@ export class ArenaScene extends Phaser.Scene {
   private getOwnedWeaponViews(): HudOwnedWeaponView[] {
     return sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).map((stack) => {
       const ownedWeapon = WEAPON_DEFINITIONS[stack.weaponId]
-      const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
+      const effectiveWeapon = applyPassiveWeaponEffects(
+        deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star),
+        this.passiveState,
+      )
       const stackKey = getStackKey(stack)
       const canFuse = canFuseWeaponStack(this.weaponStacks, stackKey)
       const fuseDisabledReason = stack.star >= 5
@@ -2523,9 +2625,6 @@ export class ArenaScene extends Phaser.Scene {
         fireRateMs: effectiveWeapon.fireRateMs,
         projectileSpeed: effectiveWeapon.projectileSpeed,
         isEquipped: stackKey === this.activeWeaponKey,
-        tuningLabel: null,
-        canTune: false,
-        tuneDisabledReason: '튜닝은 이번 파친코 별 등급 패스에서는 비활성화되었습니다.',
         canFuse,
         fuseDisabledReason: canFuse ? null : fuseDisabledReason,
         hudIconKey: ownedWeapon.visual.hudIconKey,
@@ -2626,7 +2725,7 @@ export class ArenaScene extends Phaser.Scene {
     const sprite = this.physics.add.image(
       rect.x + rect.width * spawnRatio,
       rect.y + 12,
-      'tuning-capsule',
+      'spark-knot',
     )
     sprite.setCircle(9)
     sprite.setScale(0.8)
@@ -2969,6 +3068,7 @@ export class ArenaScene extends Phaser.Scene {
       sprite: projectile,
       tint: projectileSpec.tint,
       damage: projectileSpec.damage,
+      baseDamage: projectileSpec.damage,
       radius: projectileSpec.radius,
       remainingLifetimeMs: projectileSpec.lifetimeMs,
       remainingHits: projectileSpec.maxHits,
@@ -3009,7 +3109,10 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
-      const didDamage = this.damageEnemy(enemy, swing.damage)
+      const didDamage = this.damageEnemy(enemy, swing.damage, {
+        canCrit: true,
+        baseDamage: swing.damage,
+      })
       if (didDamage && enemy.sprite.active) {
         this.applyMeleeSwingKnockback(enemy, swing)
       }
@@ -3094,6 +3197,7 @@ export class ArenaScene extends Phaser.Scene {
       y,
       radius: hazard.radius,
       damage: hazard.damage,
+      baseDamage: hazard.damage,
       remainingLifetimeMs: hazard.durationMs,
       totalLifetimeMs: hazard.durationMs,
       tickEveryMs: hazard.tickEveryMs,
@@ -3129,7 +3233,11 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
-      this.damageEnemy(target, getChainDamage(baseDamage, chainIndex + 1, chain.falloff))
+      const chainBaseDamage = getChainDamage(baseDamage, chainIndex + 1, chain.falloff)
+      this.damageEnemy(target, chainBaseDamage, {
+        canCrit: true,
+        baseDamage: chainBaseDamage,
+      })
       if (this.isRunEnding) {
         return
       }

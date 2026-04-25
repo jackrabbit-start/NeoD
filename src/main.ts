@@ -57,6 +57,7 @@ hud.update({
   title: GAME_TITLE,
   subtitle: '슬라임 아레나 진입 준비…',
   stats: ['게임 런타임 시작 중'],
+  passives: ['레벨업 패시브 준비 중'],
   inventory: ['파친코 보상 레벨 준비 중'],
   recipes: ['같은 별 무기 합성 대기 중'],
   objective: '토큰을 파친코에 넣어 무기 별 등급을 합성하고 크라운 슬라임에게 도전하세요.',
@@ -69,6 +70,11 @@ hud.update({
   stageSelection: {
     isOpen: false,
     stages: [],
+  },
+  passiveSelection: {
+    isOpen: false,
+    level: 1,
+    choices: [],
   },
   pachinko: {
     level: 1,
