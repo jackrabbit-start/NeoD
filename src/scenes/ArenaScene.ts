@@ -208,6 +208,7 @@ import {
   formatWeaponStarLabel,
   getStackKey,
   getWeaponIdFromStackKey,
+  getWeaponStarHopeDescription,
   parseWeaponStackKey,
   sortWeaponStacks,
 } from '../systems/weaponOwnership.js'
@@ -3983,7 +3984,7 @@ export class ArenaScene extends Phaser.Scene {
         id: stack.weaponId,
         stackKey,
         name: ownedWeapon.name,
-        description: ownedWeapon.description,
+        description: getWeaponStarHopeDescription(ownedWeapon.description, stack.star),
         identityLabel: getWeaponIdentityLabel(effectiveWeapon),
         summary: getWeaponSummary(effectiveWeapon),
         star: stack.star,
