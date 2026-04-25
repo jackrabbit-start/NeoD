@@ -56,6 +56,10 @@ import {
   isBossWaveReady,
   shouldAdvanceWave,
 } from '../.tmp-test/src/systems/waves.js'
+import {
+  createRunResultHudState,
+  createRunResultPresentation,
+} from '../.tmp-test/src/systems/runResult.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -609,6 +613,45 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(isBossEnemyId('dash-slime'), false)
   assert.equal(getDefeatedEnemyRunOutcome('slime-boss'), 'win')
   assert.equal(getDefeatedEnemyRunOutcome('dash-slime'), 'continue')
+})
+
+test('boss win result presentation is explicit and reward-neutral', () => {
+  const presentation = createRunResultPresentation({
+    outcome: 'win',
+    weaponName: '스타터 블래스터',
+    wavesCleared: 4,
+  })
+  const hudState = createRunResultHudState({
+    outcome: 'win',
+    weaponName: '스타터 블래스터',
+    wavesCleared: 4,
+  })
+
+  assert.equal(presentation.title, '런 클리어')
+  assert.match(presentation.subtitle, /크라운 슬라임/)
+  assert.match(presentation.restartPrompt, /R 키/)
+  assert.deepEqual(presentation.statLines, [
+    '결과: 클리어',
+    '최종 무기: 스타터 블래스터',
+    '돌파 웨이브: 4',
+  ])
+  assert.ok(presentation.inventoryLines.every((line) => !/해금|unlock/i.test(line)))
+  assert.equal(hudState.title, '런 클리어')
+  assert.equal(hudState.inventoryButtonDisabled, true)
+  assert.equal(hudState.modal.isOpen, false)
+})
+
+test('loss result presentation keeps restart guidance distinct from boss clear', () => {
+  const presentation = createRunResultPresentation({
+    outcome: 'loss',
+    weaponName: '스타터 블래스터',
+    wavesCleared: 2,
+  })
+
+  assert.equal(presentation.title, '런 실패')
+  assert.match(presentation.statLines[0] ?? '', /실패/)
+  assert.match(presentation.objective, /다시 도전/)
+  assert.match(presentation.restartPrompt, /새 런/)
 })
 
 test('elite wave appears before the boss wave', () => {

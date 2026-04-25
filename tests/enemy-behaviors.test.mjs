@@ -69,12 +69,14 @@ test('enemy pressure constants match the survival pressure pass', () => {
   assert.equal(orbit.speed, 60)
   assert.equal(orbit.contactDamage, 13)
 
-  assert.equal(boss.maxHealth, 220)
+  assert.equal(boss.maxHealth, 260)
   assert.equal(boss.speed, 48)
   assert.equal(boss.contactDamage, 22)
   assert.equal(boss.attackBehavior.kind, 'telegraphed-aoe')
   assert.equal(boss.attackBehavior.damage, 28)
   assert.equal(boss.attackBehavior.cooldownMs, 2200)
+  assert.equal(boss.attackBehavior.telegraphMs, 850)
+  assert.equal(boss.attackBehavior.radius, 94)
 })
 
 test('telegraphed aoe uses player or self anchor based on enemy config', () => {
@@ -95,7 +97,7 @@ test('telegraphed aoe uses player or self anchor based on enemy config', () => {
   )
   assert.deepEqual(
     bossTelegraph && { x: bossTelegraph.x, y: bossTelegraph.y, radius: bossTelegraph.radius },
-    { x: 44, y: 55, radius: 88 },
+    { x: 44, y: 55, radius: 94 },
   )
 })
 

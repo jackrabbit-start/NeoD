@@ -33,6 +33,7 @@ import {
   type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
 import {
   advanceKnockbackState,
@@ -200,8 +201,6 @@ export class ArenaScene extends Phaser.Scene {
   private wavesCleared = 0
 
   private spawnTimer?: Phaser.Time.TimerEvent
-
-  private resultTransitionTimer?: Phaser.Time.TimerEvent
 
   private isBossActive = false
 
@@ -542,6 +541,10 @@ export class ArenaScene extends Phaser.Scene {
           projectile.hitEnemyIds = hitStep.hitEnemyIds
           projectile.remainingHits = hitStep.remainingHits
           const didDamage = this.damageEnemy(enemy, projectile.damage)
+          if (this.isRunEnding) {
+            return
+          }
+
           if (didDamage && enemy.sprite.active) {
             this.applyDirectProjectileKnockback(enemy, projectile)
           }
@@ -1025,8 +1028,6 @@ export class ArenaScene extends Phaser.Scene {
   private destroyRunEntities(): void {
     this.spawnTimer?.remove(false)
     this.spawnTimer = undefined
-    this.resultTransitionTimer?.remove(false)
-    this.resultTransitionTimer = undefined
     this.enemySpacingCollider?.destroy()
     this.enemySpacingCollider = undefined
 
@@ -1072,7 +1073,7 @@ export class ArenaScene extends Phaser.Scene {
     this.hazardZones = []
   }
 
-  private endRun(outcome: 'win' | 'loss'): void {
+  private endRun(outcome: RunOutcome): void {
     if (this.isRunEnding) {
       return
     }
@@ -1085,36 +1086,18 @@ export class ArenaScene extends Phaser.Scene {
     this.codex.update(getCodexState(false))
     this.physics.world.pause()
     this.freezeCombat(true)
-    this.hud.update({
-      title: outcome === 'win' ? 'Run complete' : 'Run failed',
-      subtitle:
-        outcome === 'win'
-          ? 'Boss defeated. Press R to replay.'
-          : 'The slime swarm overwhelmed the player.',
-      stats: [],
-      inventory: [],
-      recipes: [],
-      objective: 'Press R on the result screen to restart.',
-      tip: 'WASD move · Auto-fire nearest enemy · Dodge telegraphs · Open inventory to swap or combine · Q codex',
-      status: this.statusMessage,
-      inventoryButtonLabel: 'Inventory unavailable',
-      inventoryButtonDisabled: true,
-      modal: {
-        isOpen: false,
-        items: [],
-        recipes: [],
-        weapons: [],
-      },
-    })
 
-    this.resultTransitionTimer?.remove(false)
-    this.resultTransitionTimer = this.time.delayedCall(600, () => {
-      this.scene.start('result', {
-        outcome,
-        weaponName: WEAPON_DEFINITIONS[this.activeWeaponId].name,
-        wavesCleared: this.wavesCleared,
-      })
-    })
+    const payload = this.createResultPayload(outcome)
+    this.hud.update(createRunResultHudState(payload))
+    this.scene.start('result', payload)
+  }
+
+  private createResultPayload(outcome: RunOutcome): RunResultPayload {
+    return {
+      outcome,
+      weaponName: WEAPON_DEFINITIONS[this.activeWeaponId].name,
+      wavesCleared: this.wavesCleared,
+    }
   }
 
   private updateHud(): void {
@@ -1321,13 +1304,17 @@ export class ArenaScene extends Phaser.Scene {
       chain.maxChains,
     )
 
-    nearbyTargetIds.forEach((runtimeId, chainIndex) => {
+    for (let chainIndex = 0; chainIndex < nearbyTargetIds.length; chainIndex += 1) {
+      const runtimeId = nearbyTargetIds[chainIndex]
       const target = this.enemies.find((enemy) => enemy.runtimeId === runtimeId && enemy.sprite.active)
       if (!target) {
-        return
+        continue
       }
 
       this.damageEnemy(target, getChainDamage(baseDamage, chainIndex + 1, chain.falloff))
-    })
+      if (this.isRunEnding) {
+        return
+      }
+    }
   }
 }
