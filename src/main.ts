@@ -52,7 +52,7 @@ hud.update({
   inventory: ['파친코 보상 레벨 준비 중'],
   recipes: ['같은 별 무기 합성 대기 중'],
   objective: '토큰을 파친코에 넣어 무기 별 등급을 합성하고 크라운 슬라임에게 도전하세요.',
-  tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 토큰은 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스 · 스테이지 선택 버튼',
+  tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 떨어진 토큰을 먹으면 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스 · 스테이지 선택 버튼',
   status: '아레나 연결 중',
   inventoryButtonLabel: '인벤토리 열기',
   inventoryButtonDisabled: false,
@@ -65,6 +65,7 @@ hud.update({
   pachinko: {
     level: 1,
     totalTokenXp: 0,
+    droppedTokens: 0,
     queuedTokens: 0,
     isTokenInFlight: false,
     latestReward: null,

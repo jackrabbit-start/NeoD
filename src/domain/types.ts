@@ -14,6 +14,7 @@ export interface WeaponStack {
 export interface PachinkoHudState {
   level: number
   totalTokenXp: number
+  droppedTokens: number
   queuedTokens: number
   isTokenInFlight: boolean
   latestReward: string | null
