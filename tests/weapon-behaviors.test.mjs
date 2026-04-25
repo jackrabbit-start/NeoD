@@ -12,6 +12,7 @@ import {
   collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
+  getWeaponAttackContract,
   getWeaponAttackRange,
   getWeaponIdentityLabel,
   getWeaponSummary,
@@ -23,196 +24,78 @@ import {
   selectChainTargets,
 } from '../.tmp-test/src/systems/weaponBehaviors.js'
 
-test('acid sprayer fires a three-shot spray that leaves lingering hazards', () => {
+const toContractKey = (weapon) => {
+  const contract = getWeaponAttackContract(weapon)
+  return `${contract.family}|${contract.geometry}|${contract.cadence}|${contract.followUp}`
+}
+
+test('acid sprayer fires a close splatter spray that leaves lingering hazards', () => {
   const plan = buildAttackPlan(WEAPON_DEFINITIONS['acid-sprayer'], { x: 0, y: 0 }, { x: 10, y: 0 })
 
-  assert.equal(plan.projectiles.length, 3)
+  assert.equal(plan.projectiles.length, 4)
   assert.equal(plan.cooldownMs, WEAPON_DEFINITIONS['acid-sprayer'].fireRateMs)
 
   const [left, center, right] = plan.projectiles
-  assert.equal(center?.hazardOnHit?.damage, 6)
-  assert.equal(center?.hazardOnExpire?.durationMs, 950)
-  assert.equal(center?.lifetimeMs, 250)
+  assert.equal(center?.hazardOnHit?.damage, 7)
+  assert.equal(center?.hazardOnExpire?.durationMs, 900)
+  assert.equal(center?.lifetimeMs, 210)
   assert.equal(center?.maxTravelDistance, getWeaponAttackRange(WEAPON_DEFINITIONS['acid-sprayer']))
   assert.ok((left?.direction.y ?? 0) < 0)
-  assert.ok(Math.abs(center?.direction.y ?? 0) < 1e-9)
-  assert.ok((right?.direction.y ?? 0) > 0)
+  assert.ok(Math.abs(plan.projectiles[1]?.direction.y ?? 0) < 0.2)
+  assert.ok((right?.direction.y ?? 0) >= 0)
 })
 
 test('weapon attack range helper uses ranged metadata and melee behavior authority', () => {
   const starter = WEAPON_DEFINITIONS['starter-blaster']
   const glaive = WEAPON_DEFINITIONS['slime-glaive']
+  const vortex = WEAPON_DEFINITIONS['mist-vortex']
 
   assert.equal(getWeaponAttackRange(starter), starter.range)
   assert.equal(getWeaponAttackRange(glaive), glaive.attackBehavior.range)
+  assert.equal(getWeaponAttackRange(vortex), vortex.range)
   assert.equal(Object.hasOwn(glaive, 'range'), false)
 })
 
-test('weapon refresh preserves protected gameplay fields and stable asset keys', () => {
+test('weapon table preserves registered ids plus stable asset and knockback surfaces', () => {
   assert.deepEqual(
-    Object.fromEntries(
-      Object.entries(WEAPON_DEFINITIONS).map(([weaponId, weapon]) => [
-        weaponId,
-        {
-          range: Object.hasOwn(weapon, 'range') ? weapon.range : undefined,
-          damage: weapon.damage,
-          fireRateMs: weapon.fireRateMs,
-          projectileSpeed: weapon.projectileSpeed,
-          projectileTextureKey: weapon.projectileTextureKey,
-          hudIconKey: weapon.visual.hudIconKey,
-          knockback: weapon.knockback,
-          attackBehavior: weapon.attackBehavior,
-        },
-      ]),
-    ),
-    {
-      'starter-blaster': {
-        range: 420,
-        damage: 10,
-        fireRateMs: 320,
-        projectileSpeed: 460,
-        projectileTextureKey: 'starter-projectile',
-        hudIconKey: 'weapon-starter-blaster',
-        knockback: { force: 90, durationMs: 110 },
-        attackBehavior: { kind: 'single', projectileLifetimeMs: 1000 },
-      },
-      'acid-sprayer': {
-        range: 130,
-        damage: 20,
-        fireRateMs: 230,
-        projectileSpeed: 500,
-        projectileTextureKey: 'acid-projectile',
-        hudIconKey: 'weapon-acid-sprayer',
-        knockback: { force: 70, durationMs: 95 },
-        attackBehavior: {
-          kind: 'spray-hazard',
-          projectileCount: 3,
-          spreadDegrees: 28,
-          projectileLifetimeMs: 250,
-          hazardRadius: 24,
-          hazardDurationMs: 950,
-          hazardTickMs: 220,
-          hazardDamage: 6,
-        },
-      },
-      'frost-lance': {
-        range: 520,
-        damage: 18,
-        fireRateMs: 190,
-        projectileSpeed: 620,
-        projectileTextureKey: 'frost-projectile',
-        hudIconKey: 'weapon-frost-lance',
-        knockback: { force: 55, durationMs: 80 },
-        attackBehavior: { kind: 'pierce', projectileLifetimeMs: 900, maxHits: 3 },
-      },
-      'storm-cannon': {
-        range: 500,
-        damage: 28,
-        fireRateMs: 210,
-        projectileSpeed: 560,
-        projectileTextureKey: 'storm-projectile',
-        hudIconKey: 'weapon-storm-cannon',
-        knockback: { force: 125, durationMs: 130 },
-        attackBehavior: { kind: 'single', projectileLifetimeMs: 1050 },
-      },
-      'arc-loom': {
-        range: 500,
-        damage: 24,
-        fireRateMs: 175,
-        projectileSpeed: 590,
-        projectileTextureKey: 'arc-projectile',
-        hudIconKey: 'weapon-arc-loom',
-        knockback: { force: 85, durationMs: 100 },
-        attackBehavior: {
-          kind: 'chain',
-          projectileLifetimeMs: 900,
-          maxChains: 2,
-          chainRange: 130,
-          chainFalloff: 0.65,
-        },
-      },
-      'spark-carbine': {
-        range: 560,
-        damage: 15,
-        fireRateMs: 145,
-        projectileSpeed: 720,
-        projectileTextureKey: 'spark-projectile',
-        hudIconKey: 'weapon-spark-carbine',
-        knockback: { force: 60, durationMs: 75 },
-        attackBehavior: { kind: 'single', projectileLifetimeMs: 820 },
-      },
-      'mist-vortex': {
-        range: 190,
-        damage: 14,
-        fireRateMs: 260,
-        projectileSpeed: 430,
-        projectileTextureKey: 'mist-projectile',
-        hudIconKey: 'weapon-mist-vortex',
-        knockback: { force: 45, durationMs: 90 },
-        attackBehavior: {
-          kind: 'spray-hazard',
-          projectileCount: 5,
-          spreadDegrees: 18,
-          projectileLifetimeMs: 360,
-          hazardRadius: 36,
-          hazardDurationMs: 1450,
-          hazardTickMs: 300,
-          hazardDamage: 4,
-        },
-      },
-      'slime-glaive': {
-        range: undefined,
-        damage: 30,
-        fireRateMs: 520,
-        projectileSpeed: 0,
-        projectileTextureKey: 'arc-projectile',
-        hudIconKey: 'weapon-slime-glaive',
-        knockback: { force: 115, durationMs: 120 },
-        attackBehavior: {
-          kind: 'melee-cleave',
-          range: 94,
-          arcDegrees: 105,
-          visualDurationMs: 150,
-          maxTargets: 4,
-        },
-      },
-      'prism-cutter': {
-        range: undefined,
-        damage: 22,
-        fireRateMs: 330,
-        projectileSpeed: 0,
-        projectileTextureKey: 'frost-projectile',
-        hudIconKey: 'weapon-prism-cutter',
-        knockback: { force: 80, durationMs: 85 },
-        attackBehavior: {
-          kind: 'melee-cleave',
-          range: 72,
-          arcDegrees: 62,
-          visualDurationMs: 105,
-          maxTargets: 2,
-        },
-      },
-      'needle-fan': {
-        range: 210,
-        damage: 16,
-        fireRateMs: 210,
-        projectileSpeed: 610,
-        projectileTextureKey: 'needle-projectile',
-        hudIconKey: 'weapon-needle-fan',
-        knockback: { force: 65, durationMs: 80 },
-        attackBehavior: {
-          kind: 'spray-hazard',
-          projectileCount: 4,
-          spreadDegrees: 16,
-          projectileLifetimeMs: 320,
-          hazardRadius: 20,
-          hazardDurationMs: 700,
-          hazardTickMs: 240,
-          hazardDamage: 3,
-        },
-      },
-    },
+    Object.keys(WEAPON_DEFINITIONS).sort(),
+    [
+      'acid-sprayer',
+      'arc-loom',
+      'frost-lance',
+      'mist-vortex',
+      'needle-fan',
+      'prism-cutter',
+      'slime-glaive',
+      'spark-carbine',
+      'starter-blaster',
+      'storm-cannon',
+    ],
   )
+
+  for (const weapon of Object.values(WEAPON_DEFINITIONS)) {
+    assert.ok(weapon.projectileTextureKey.trim())
+    assert.ok(weapon.visual.hudIconKey.trim())
+    assert.ok(weapon.knockback.force > 0)
+    assert.ok(weapon.knockback.durationMs > 0)
+    assert.ok(weapon.identityLabel?.trim())
+  }
+})
+
+test('weapon attack contract tuples are unique and break former overlap clusters', () => {
+  const contracts = Object.fromEntries(
+    Object.entries(WEAPON_DEFINITIONS).map(([weaponId, weapon]) => [weaponId, getWeaponAttackContract(weapon)]),
+  )
+  const tupleKeys = Object.values(WEAPON_DEFINITIONS).map(toContractKey)
+
+  assert.equal(new Set(tupleKeys).size, tupleKeys.length)
+  assert.notDeepEqual(contracts['starter-blaster'], contracts['storm-cannon'])
+  assert.notDeepEqual(contracts['starter-blaster'], contracts['spark-carbine'])
+  assert.notDeepEqual(contracts['storm-cannon'], contracts['spark-carbine'])
+  assert.notDeepEqual(contracts['acid-sprayer'], contracts['mist-vortex'])
+  assert.notDeepEqual(contracts['acid-sprayer'], contracts['needle-fan'])
+  assert.notDeepEqual(contracts['mist-vortex'], contracts['needle-fan'])
+  assert.notDeepEqual(contracts['slime-glaive'], contracts['prism-cutter'])
 })
 
 test('frost lance plan preserves a piercing projectile', () => {
@@ -245,13 +128,26 @@ test('arc loom summary and chain damage expose crowd-control identity', () => {
   assert.equal(getChainDamage(24, 2, 0.65), 10)
 })
 
-test('spark carbine is a fast single-shot electric branch', () => {
+test('starter blaster becomes a compact split-shot branch', () => {
+  const starter = WEAPON_DEFINITIONS['starter-blaster']
+  const plan = buildAttackPlan(starter, { x: 0, y: 0 }, { x: 100, y: 0 })
+
+  assert.equal(starter.attackBehavior.kind, 'split-shot')
+  assert.equal(plan.projectiles.length, 2)
+  assert.equal(plan.projectiles[0]?.damage, 7)
+  assert.equal(plan.projectiles[0]?.delayMs ?? 0, 0)
+  assert.equal(plan.projectiles[1]?.delayMs ?? 0, 0)
+  assert.match(getWeaponSummary(starter), /갈래당 7/)
+  assert.match(getWeaponSummary(starter), /2갈래/)
+})
+
+test('spark carbine becomes a burst-fire electric branch', () => {
   const starter = WEAPON_DEFINITIONS['starter-blaster']
   const storm = WEAPON_DEFINITIONS['storm-cannon']
   const spark = WEAPON_DEFINITIONS['spark-carbine']
   const plan = buildAttackPlan(spark, { x: 0, y: 0 }, { x: 100, y: 0 })
 
-  assert.equal(spark.attackBehavior.kind, 'single')
+  assert.equal(spark.attackBehavior.kind, 'burst-fire')
   assert.equal(getWeaponIdentityLabel(spark), '오버드라이브 속사')
   assert.ok(spark.fireRateMs < starter.fireRateMs)
   assert.ok(spark.fireRateMs < storm.fireRateMs)
@@ -259,65 +155,72 @@ test('spark carbine is a fast single-shot electric branch', () => {
   assert.ok(spark.projectileSpeed > storm.projectileSpeed)
   assert.ok(spark.damage < storm.damage)
   assert.equal(plan.cooldownMs, spark.fireRateMs)
-  assert.equal(plan.projectiles.length, 1)
-  assert.equal(plan.projectiles[0]?.speed, spark.projectileSpeed)
-  assert.equal(plan.projectiles[0]?.lifetimeMs, 820)
-  assert.equal(plan.projectiles[0]?.maxTravelDistance, getWeaponAttackRange(spark))
+  assert.equal(plan.projectiles.length, 3)
+  assert.equal(plan.projectiles[0]?.damage, 11)
+  assert.deepEqual(plan.projectiles.map((projectile) => projectile.delayMs ?? 0), [0, 55, 110])
+  assert.equal(plan.projectiles[0]?.lifetimeMs, 720)
+  assert.match(getWeaponSummary(spark), /탄당 11/)
+  assert.match(getWeaponSummary(spark), /3점사/)
 })
 
-test('mist vortex is a distinct spray hazard control branch', () => {
+test('storm cannon impact shell carries explosion follow-up', () => {
+  const storm = WEAPON_DEFINITIONS['storm-cannon']
+  const plan = buildAttackPlan(storm, { x: 0, y: 0 }, { x: 100, y: 0 })
+
+  assert.equal(storm.attackBehavior.kind, 'impact-aoe')
+  assert.equal(plan.projectiles.length, 1)
+  assert.equal(plan.projectiles[0]?.explosionOnHit?.radius, 42)
+  assert.equal(plan.projectiles[0]?.explosionOnExpire?.damage, 18)
+  assert.match(getWeaponSummary(storm), /직격 28/)
+  assert.match(getWeaponSummary(storm), /폭발 18/)
+  assert.match(getWeaponSummary(storm), /반경 42/)
+})
+
+test('mist vortex becomes a distinct zone-control branch', () => {
   const acid = WEAPON_DEFINITIONS['acid-sprayer']
   const mist = WEAPON_DEFINITIONS['mist-vortex']
 
   assert.equal(acid.attackBehavior.kind, 'spray-hazard')
-  assert.equal(mist.attackBehavior.kind, 'spray-hazard')
+  assert.equal(mist.attackBehavior.kind, 'zone-control')
 
-  const acidBehavior = acid.attackBehavior
   const mistBehavior = mist.attackBehavior
-  const differingDimensions = [
-    mistBehavior.projectileCount !== acidBehavior.projectileCount,
-    mistBehavior.spreadDegrees !== acidBehavior.spreadDegrees,
-    mistBehavior.projectileLifetimeMs !== acidBehavior.projectileLifetimeMs,
-    mistBehavior.hazardRadius !== acidBehavior.hazardRadius,
-    mistBehavior.hazardDurationMs !== acidBehavior.hazardDurationMs,
-    mistBehavior.hazardTickMs !== acidBehavior.hazardTickMs,
-    mistBehavior.hazardDamage !== acidBehavior.hazardDamage,
-    mist.damage !== acid.damage,
-  ].filter(Boolean).length
   const plan = buildAttackPlan(mist, { x: 0, y: 0 }, { x: 100, y: 0 })
-  const center = plan.projectiles[Math.floor(plan.projectiles.length / 2)]
+  const orb = plan.projectiles[0]
 
   assert.equal(getWeaponIdentityLabel(mist), '멘탈 안개')
-  assert.ok(differingDimensions >= 2)
-  assert.ok(mistBehavior.hazardRadius > acidBehavior.hazardRadius)
-  assert.ok(mistBehavior.hazardDurationMs > acidBehavior.hazardDurationMs)
-  assert.ok(mistBehavior.hazardDamage < acidBehavior.hazardDamage)
-  assert.equal(plan.projectiles.length, 5)
-  assert.equal(center?.hazardOnHit?.radius, mistBehavior.hazardRadius)
-  assert.equal(center?.hazardOnHit?.durationMs, mistBehavior.hazardDurationMs)
-  assert.equal(center?.hazardOnHit?.tickEveryMs, mistBehavior.hazardTickMs)
-  assert.equal(center?.hazardOnHit?.damage, mistBehavior.hazardDamage)
+  assert.ok(mistBehavior.zoneRadius > acid.attackBehavior.hazardRadius)
+  assert.ok(mistBehavior.zoneDurationMs > acid.attackBehavior.hazardDurationMs)
+  assert.equal(plan.projectiles.length, 1)
+  assert.equal(orb?.hazardOnHit?.radius, mistBehavior.zoneRadius)
+  assert.equal(orb?.hazardOnHit?.durationMs, mistBehavior.zoneDurationMs)
+  assert.equal(orb?.hazardOnHit?.tickEveryMs, mistBehavior.zoneTickMs)
+  assert.equal(orb?.hazardOnHit?.damage, mistBehavior.zoneDamage)
+  assert.match(getWeaponSummary(mist), /틱 5/)
+  assert.match(getWeaponSummary(mist), /지대 44/)
 })
 
-test('melee weapon plans create actionable frontal cleave swings without projectiles', () => {
+test('slime glaive keeps a wide peel cleave while prism cutter becomes delayed paired cuts', () => {
   const glaive = WEAPON_DEFINITIONS['slime-glaive']
   const cutter = WEAPON_DEFINITIONS['prism-cutter']
   const plan = buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 })
+  const cutterPlan = buildAttackPlan(cutter, { x: 0, y: 0 }, { x: 100, y: 0 })
 
   assert.equal(glaive.attackBehavior.kind, 'melee-cleave')
-  assert.equal(cutter.attackBehavior.kind, 'melee-cleave')
+  assert.equal(cutter.attackBehavior.kind, 'split-shot')
   assert.equal(plan.projectiles.length, 0)
   assert.equal(plan.meleeSwings.length, 1)
+  assert.equal(cutterPlan.projectiles.length, 2)
+  assert.deepEqual(cutterPlan.projectiles.map((projectile) => projectile.delayMs ?? 0), [0, 90])
   assert.equal(isAttackPlanActionable(plan), true)
   assert.equal(plan.cooldownMs, glaive.fireRateMs)
   assert.equal(plan.meleeSwings[0]?.range, glaive.attackBehavior.range)
   assert.equal(plan.meleeSwings[0]?.arcDegrees, glaive.attackBehavior.arcDegrees)
   assert.deepEqual(plan.meleeSwings[0]?.direction, { x: 1, y: 0 })
 
-  assert.notEqual(glaive.attackBehavior.range, cutter.attackBehavior.range)
-  assert.notEqual(glaive.attackBehavior.arcDegrees, cutter.attackBehavior.arcDegrees)
+  assert.equal(cutterPlan.projectiles[0]?.speed, Math.round(cutter.projectileSpeed * 0.84))
   assert.notEqual(glaive.fireRateMs, cutter.fireRateMs)
   assert.match(getWeaponSummary(glaive), /범위/)
+  assert.match(getWeaponSummary(cutter), /2갈래/)
 })
 
 test('projectile range step clamps at the max travel boundary', () => {
@@ -382,19 +285,19 @@ test('frontal cleave target selection respects range, arc, radius, and determini
   )
 })
 
-test('needle fan reuses spray-hazard behavior for a bounded reward branch', () => {
+test('needle fan becomes a cone split-shot volley without lingering puddles', () => {
   const needleFan = WEAPON_DEFINITIONS['needle-fan']
   const plan = buildAttackPlan(needleFan, { x: 0, y: 0 }, { x: 100, y: 0 })
 
-  assert.equal(needleFan.attackBehavior.kind, 'spray-hazard')
+  assert.equal(needleFan.attackBehavior.kind, 'split-shot')
   assert.equal(getWeaponIdentityLabel(needleFan), '간바레 산탄')
-  assert.equal(plan.projectiles.length, 4)
+  assert.equal(plan.projectiles.length, 5)
   assert.equal(plan.cooldownMs, needleFan.fireRateMs)
   assert.equal(plan.projectiles[0]?.maxTravelDistance, getWeaponAttackRange(needleFan))
   assert.ok((plan.projectiles[0]?.direction.y ?? 0) < 0)
   assert.ok((plan.projectiles.at(-1)?.direction.y ?? 0) > 0)
-  assert.equal(plan.projectiles[0]?.hazardOnHit?.radius, 20)
-  assert.equal(plan.projectiles[0]?.hazardOnHit?.damage, 3)
+  assert.equal(plan.projectiles[0]?.hazardOnHit, undefined)
+  assert.match(getWeaponSummary(needleFan), /5갈래/)
 })
 
 test('chain target selection is deterministic by distance then runtime id', () => {

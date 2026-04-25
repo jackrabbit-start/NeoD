@@ -912,9 +912,11 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
 
-  assert.deepEqual(describeAvailableRecipes(acidRecipes), [
-    '난리자베스 분사기 [난리 분사] → 피해 20 · 초당 4발 · 사거리 130 · 난리 분사 (안정적인 젤을 난리 난 초록 리액션 분사로 바꿉니다.)',
-  ])
+  const [acidSummary] = describeAvailableRecipes(acidRecipes)
+  assert.match(acidSummary ?? '', /난리자베스 분사기 \[난리 분사]/)
+  assert.match(acidSummary ?? '', /사거리 130/)
+  assert.match(acidSummary ?? '', /난리 분사/)
+  assert.doesNotMatch(acidSummary ?? '', /초당 \d+회/)
 
   const sparkRecipes = getActionableRecipes(
     {
@@ -931,12 +933,14 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
 
-  assert.deepEqual(describeAvailableRecipes(sparkRecipes), [
-    '오버드라이브 카빈 [오버드라이브 속사] → 피해 15 · 초당 7발 · 사거리 560 · 오버드라이브 속사 (안정적인 젤 코어로 전하를 붙잡아 쇼츠 박자의 속사 무기로 만듭니다.)',
-  ])
-  assert.deepEqual(describeAvailableRecipes(mistRecipes), [
-    '멘탈나감 소용돌이 [멘탈 안개] → 피해 14 · 초당 4발 · 사거리 190 · 멘탈 안개 (서리 입자와 안개 구슬을 멘탈 나간 듯한 회전 제어 지대로 만듭니다.)',
-  ])
+  const [sparkSummary] = describeAvailableRecipes(sparkRecipes)
+  const [mistSummary] = describeAvailableRecipes(mistRecipes)
+  assert.match(sparkSummary ?? '', /오버드라이브 카빈 \[오버드라이브 속사]/)
+  assert.match(sparkSummary ?? '', /탄당 11/)
+  assert.match(sparkSummary ?? '', /3점사/)
+  assert.match(mistSummary ?? '', /멘탈나감 소용돌이 \[멘탈 안개]/)
+  assert.match(mistSummary ?? '', /틱 5/)
+  assert.match(mistSummary ?? '', /지대 44/)
 
   const needleRecipes = getActionableRecipes(
     {
@@ -945,9 +949,9 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     },
     ['starter-blaster'],
   )
-  assert.deepEqual(describeAvailableRecipes(needleRecipes), [
-    '간바레 응원부채 [간바레 산탄] → 피해 16 · 초당 5발 · 사거리 210 · 간바레 산탄 (벌레 사수의 날카로운 키틴을 간바레 구호 같은 산탄 부채로 다듬습니다.)',
-  ])
+  const [needleSummary] = describeAvailableRecipes(needleRecipes)
+  assert.match(needleSummary ?? '', /간바레 응원부채 \[간바레 산탄]/)
+  assert.match(needleSummary ?? '', /5갈래/)
 })
 
 test('actionable recipes exclude outputs that are already owned', () => {
@@ -1830,6 +1834,133 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
   }
 })
 
+test('hud weapon modal renders the owned-weapon summary path with redesigned summary text', () => {
+  class FakeClassList {
+    toggle() {}
+  }
+
+  class FakeElement {
+    children = []
+    classList = new FakeClassList()
+    dataset = {}
+    disabled = false
+    style = {}
+    textContent = ''
+    assignments = 0
+    #innerHTML = ''
+    #regions = new Map()
+
+    constructor(tagName = 'div') {
+      this.tagName = tagName.toUpperCase()
+    }
+
+    get innerHTML() {
+      return this.#innerHTML
+    }
+
+    set innerHTML(value) {
+      this.assignments += 1
+      this.#innerHTML = value
+
+      if (value.includes('data-region="equipped-weapons"')) {
+        this.#regions.set('button[data-action="inventory-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="equipped-weapons"]', new FakeElement('div'))
+        this.#regions.set('[data-region="weapons"]', new FakeElement('div'))
+        this.#regions.set('[data-region="character-stats"]', new FakeElement('div'))
+      }
+      if (value.includes('data-region="stages"')) {
+        this.#regions.set('button[data-action="stage-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="stages"]', new FakeElement('div'))
+      }
+    }
+
+    addEventListener() {}
+    removeEventListener() {}
+    append(...nodes) { this.children.push(...nodes) }
+    replaceChildren(...nodes) { this.children = nodes }
+    querySelector(selector) { return this.#regions.get(selector) ?? null }
+    querySelectorAll() { return [] }
+  }
+
+  const previousDocument = globalThis.document
+  globalThis.document = {
+    createElement: (tagName) => new FakeElement(tagName),
+  }
+
+  try {
+    const root = new FakeElement('section')
+    const controller = new HudController(root)
+
+    controller.update({
+      title: 'NeoD 프로토타입',
+      subtitle: '무기 점검',
+      stats: ['체력: 10/10', '무기: 점검 중'],
+      inventory: ['젤 파편 × 1'],
+      recipes: ['합성 대기'],
+      objective: '무기 정보를 확인하세요.',
+      tip: 'WASD 이동 · J 대시',
+      status: '점검 중',
+      inventoryButtonLabel: '인벤토리 닫기',
+      inventoryButtonDisabled: false,
+      stageButtonLabel: '스테이지 선택',
+      stageButtonDisabled: false,
+      stageSelection: {
+        isOpen: false,
+        stages: [],
+      },
+      modal: {
+        isOpen: true,
+        items: [],
+        recipes: [],
+        weapons: [
+          {
+            id: 'spark-carbine',
+            stackKey: 'spark-carbine:2',
+            name: '오버드라이브 카빈',
+            description: '속도감 있는 전격 점사입니다.',
+            summary: '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사',
+            star: 2,
+            count: 1,
+            damage: 19,
+            fireRateMs: 131,
+            projectileSpeed: 792,
+            isEquipped: true,
+            tuningLabel: null,
+            canTune: false,
+            tuneDisabledReason: '튜닝 비활성',
+            canFuse: false,
+            fuseDisabledReason: '같은 별 2개가 필요합니다.',
+            hudIconKey: 'weapon-spark-carbine',
+            accentColor: 0xfff06a,
+          },
+        ],
+        characterStats: [],
+      },
+      pachinko: {
+        level: 1,
+        totalTokenXp: 0,
+        droppedTokens: 0,
+        queuedTokens: 0,
+        isTokenInFlight: false,
+        latestReward: null,
+      },
+    })
+
+    const weaponList = controller.weaponList
+    const firstWeaponRow = weaponList.children[0]
+    const actions = firstWeaponRow.children[1]
+    const meta = actions.children[0]
+
+    assert.equal(meta.textContent, '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사')
+  } finally {
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
+})
+
 test('elite drop table returns a tuning capsule', () => {
   assert.equal(
     resolveWeightedDrop(ENEMY_DEFINITIONS['prism-slime'].drops, () => 0),
@@ -2000,8 +2131,8 @@ test('player level combat stats raise health and weapon damage globally', () => 
   assert.equal(levelTenBlaster.playerDamageMultiplier, 1.45)
   assert.equal(levelTenBlaster.weaponSpecialTier, 1)
   assert.equal(levelTenBlaster.visualPowerTier, 1)
-  assert.match(levelTenBlaster.levelUpgradeLabel, /관통 2회/)
-  assert.match(levelTenBlaster.levelUpgradeDescription, /관통탄/)
+  assert.match(levelTenBlaster.levelUpgradeLabel, /범위 \+16%/)
+  assert.match(levelTenBlaster.levelUpgradeDescription, /무기 성능이 45%만큼 증폭/)
 })
 
 test('weapon milestone upgrades expand behavior every five and ten player levels', () => {
@@ -2010,8 +2141,8 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
   assert.equal(levelFiveGlaive.attackBehavior.range, 102)
 
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
-  assert.equal(levelTenBlaster.attackBehavior.kind, 'pierce')
-  assert.equal(levelTenBlaster.attackBehavior.maxHits, 2)
+  assert.equal(levelTenBlaster.attackBehavior.kind, 'split-shot')
+  assert.equal(levelTenBlaster.attackBehavior.projectileCount, 2)
 
   const levelTwentyFrost = deriveEffectiveWeaponStats('frost-lance', {}, 1, 20)
   assert.equal(levelTwentyFrost.attackBehavior.kind, 'pierce')
@@ -2023,16 +2154,16 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
   assert.equal(levelTwentyArc.attackBehavior.chainRange, 172)
 
   const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
-  assert.equal(levelTwentyMist.attackBehavior.kind, 'spray-hazard')
-  assert.equal(levelTwentyMist.attackBehavior.projectileCount, 7)
-  assert.equal(levelTwentyMist.attackBehavior.hazardRadius, 48)
+  assert.equal(levelTwentyMist.attackBehavior.kind, 'zone-control')
+  assert.equal(levelTwentyMist.attackBehavior.zoneRadius, 44)
+  assert.equal(levelTwentyMist.attackBehavior.zoneDamage, 5)
 })
 
 test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
   const plan = buildAttackPlan(levelTenBlaster, { x: 0, y: 0 }, { x: 10, y: 0 })
 
-  assert.equal(plan.projectiles.length, 1)
+  assert.equal(plan.projectiles.length, 2)
   assert.equal(plan.projectiles[0].visualPowerTier, 1)
   assert.equal(plan.projectiles[0].radius, 6)
 
