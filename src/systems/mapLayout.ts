@@ -30,6 +30,7 @@ export interface MapLayout {
   obstacles: RectObstacle[]
   ambientItemSpawns: AmbientItemSpawnPoint[]
   heartItemSpawns: Point[]
+  magnetItemSpawns: Point[]
 }
 
 export type RandomSource = () => number
@@ -42,10 +43,11 @@ export const ARENA_WORLD_BOUNDS: WorldBounds = {
 }
 
 export const PLAYER_SAFE_RADIUS = 220
-export const ENEMY_SPAWN_MIN_DISTANCE = 360
-export const ENEMY_SPAWN_RING_DISTANCE = 520
+export const ENEMY_SPAWN_MIN_DISTANCE = 320
+export const ENEMY_SPAWN_RING_DISTANCE = 560
 export const AMBIENT_ITEM_RADIUS = 18
 export const HEART_ITEM_RADIUS = 18
+export const MAGNET_ITEM_RADIUS = 18
 
 const AMBIENT_ITEM_SEQUENCE: LootId[] = [
   'gel-shard',
@@ -145,11 +147,33 @@ export function getHeartItemSpawnPoints(
     }))
 }
 
+export function getMagnetItemSpawnPoints(
+  bounds: WorldBounds = ARENA_WORLD_BOUNDS,
+  obstacles: RectObstacle[] = getStaticMapObstacles(bounds),
+): Point[] {
+  const candidates: Point[] = [
+    { x: bounds.x + bounds.width * 0.12, y: bounds.y + bounds.height * 0.38 },
+    { x: bounds.x + bounds.width * 0.42, y: bounds.y + bounds.height * 0.36 },
+    { x: bounds.x + bounds.width * 0.68, y: bounds.y + bounds.height * 0.48 },
+    { x: bounds.x + bounds.width * 0.9, y: bounds.y + bounds.height * 0.62 },
+    { x: bounds.x + bounds.width * 0.38, y: bounds.y + bounds.height * 0.76 },
+    { x: bounds.x + bounds.width * 0.66, y: bounds.y + bounds.height * 0.86 },
+  ]
+
+  return candidates
+    .filter((point) => isClearForSpawn(point, bounds, obstacles, MAGNET_ITEM_RADIUS, 56))
+    .map((point) => ({
+      x: Math.round(point.x),
+      y: Math.round(point.y),
+    }))
+}
+
 export function createMapLayout(bounds: WorldBounds = ARENA_WORLD_BOUNDS): MapLayout {
   const obstacles = getStaticMapObstacles(bounds)
   const playerStart = getWorldCenter(bounds)
   const ambientItemSpawns = getAmbientItemSpawnPoints(bounds, obstacles)
   const heartItemSpawns = getHeartItemSpawnPoints(bounds, obstacles)
+  const magnetItemSpawns = getMagnetItemSpawnPoints(bounds, obstacles)
 
   return {
     worldBounds: bounds,
@@ -157,6 +181,7 @@ export function createMapLayout(bounds: WorldBounds = ARENA_WORLD_BOUNDS): MapLa
     obstacles,
     ambientItemSpawns,
     heartItemSpawns,
+    magnetItemSpawns,
   }
 }
 
@@ -184,6 +209,18 @@ export function selectHeartItemSpawnPoint(
   return spawnPoints[index] ?? null
 }
 
+export function selectMagnetItemSpawnPoint(
+  spawnPoints: Point[],
+  random: RandomSource = Math.random,
+): Point | null {
+  if (spawnPoints.length === 0) {
+    return null
+  }
+
+  const index = Math.min(spawnPoints.length - 1, Math.floor(random() * spawnPoints.length))
+  return spawnPoints[index] ?? null
+}
+
 function clampToWorld(point: Point, bounds: WorldBounds, margin: number): Point {
   return {
     x: Math.min(bounds.x + bounds.width - margin, Math.max(bounds.x + margin, point.x)),
@@ -192,9 +229,14 @@ function clampToWorld(point: Point, bounds: WorldBounds, margin: number): Point 
 }
 
 function getEnemySpawnCandidates(player: Point, bounds: WorldBounds, random: RandomSource): Point[] {
-  const directions = 12
+  const directions = 16
   const startIndex = Math.floor(random() * directions)
-  const distances = [ENEMY_SPAWN_RING_DISTANCE, Math.round(ENEMY_SPAWN_RING_DISTANCE * 0.78)]
+  const distances = [
+    ENEMY_SPAWN_RING_DISTANCE,
+    Math.round(ENEMY_SPAWN_RING_DISTANCE * 0.82),
+    Math.round(ENEMY_SPAWN_RING_DISTANCE * 1.22),
+    ENEMY_SPAWN_MIN_DISTANCE,
+  ]
   const candidates: Point[] = []
 
   for (const distance of distances) {

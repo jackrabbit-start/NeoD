@@ -71,6 +71,12 @@ const renderStatusPanel = (state: HudState) => `
       <span>상태</span>
       <strong>${escapeHtml(state.status)}</strong>
     </div>
+    ${state.currentTimeLabel ? `
+      <div class="hud-summary__status-line hud-summary__status-line--time">
+        <span>현재 시간</span>
+        <strong>${escapeHtml(state.currentTimeLabel)}</strong>
+      </div>
+    ` : ''}
     <div class="hud-summary__status-meta">
       <p><span>목표</span>${escapeHtml(state.objective)}</p>
       <p><span>팁</span>${escapeHtml(state.tip)}</p>
@@ -333,6 +339,13 @@ export class HudController {
         <div class="hud-summary__grid">
           ${renderSummarySection('능력치', renderList(state.stats), 'hud-summary__section--stats')}
           ${renderSummarySection('패시브', renderList(state.passives ?? []), 'hud-summary__section--stats')}
+          ${(state.pachinko?.enemyOdds ?? []).length > 0
+            ? renderSummarySection(
+                `적 출현 확률 · ${state.pachinko?.enemyOdds?.[0] ?? '현재'}`,
+                renderList(state.pachinko?.enemyOdds?.slice(1) ?? []),
+                'hud-summary__section--enemy-odds',
+              )
+            : ''}
           ${state.pachinko ? renderSummarySection('파친코', renderList([
             `보상 레벨: Lv.${state.pachinko.level} · 누적 토큰 XP ${state.pachinko.totalTokenXp}`,
             `바닥 토큰: ${state.pachinko.droppedTokens}개 · 투입 중: ${state.pachinko.activeTokens}/${30}개 · 대기: ${state.pachinko.queuedTokens}개`,
@@ -471,7 +484,21 @@ export class HudController {
       return [this.createEmptyText('아직 보유한 무기가 없습니다.')]
     }
 
-    return weapons.map((weapon) => this.createWeaponRow(weapon, 'owned'))
+    const groupedWeapons = new Map<string, HudOwnedWeaponView[]>()
+
+    for (const weapon of weapons) {
+      const key = weapon.id
+      const group = groupedWeapons.get(key)
+      if (group) {
+        group.push(weapon)
+      } else {
+        groupedWeapons.set(key, [weapon])
+      }
+    }
+
+    return [...groupedWeapons.values()].map((group) =>
+      group.length <= 1 ? this.createWeaponRow(group[0], 'owned') : this.createOwnedWeaponGroup(group),
+    )
   }
 
   private createWeaponRow(weapon: HudOwnedWeaponView, variant: 'equipped' | 'owned'): HTMLElement {
@@ -529,16 +556,66 @@ export class HudController {
     const stats = document.createElement('small')
     stats.className = `hud-modal__weapon-meta hud-modal__weapon-stats hud-modal__weapon-stats--${variant}`
     const upgradeText = weapon.levelUpgradeLabel ? ` · ${weapon.levelUpgradeLabel}` : ''
-    const cadence = Math.round(1000 / weapon.fireRateMs)
-    const cadenceLabel = weapon.projectileSpeed > 0
-      ? `피해 ${weapon.damage} · 초당 ${cadence}발 · 탄속 ${weapon.projectileSpeed}`
-      : `피해 ${weapon.damage} · 초당 ${cadence}회 · 근접 판정`
-    stats.textContent = `${cadenceLabel}${upgradeText}`
+    stats.textContent = `${weapon.summary}${upgradeText}`
     stats.title = weapon.summary
     if (weapon.accentColor != null) {
       stats.style.color = `#${weapon.accentColor.toString(16).padStart(6, '0')}`
     }
     return stats
+  }
+
+  private createOwnedWeaponGroup(group: HudOwnedWeaponView[]): HTMLElement {
+    const sortedGroup = [...group].sort((left, right) => {
+      if ((right.star ?? 0) !== (left.star ?? 0)) {
+        return (right.star ?? 0) - (left.star ?? 0)
+      }
+      if (right.isEquipped !== left.isEquipped) {
+        return Number(right.isEquipped) - Number(left.isEquipped)
+      }
+      return (right.count ?? 0) - (left.count ?? 0)
+    })
+
+    const featured = sortedGroup[0]
+    const variants = sortedGroup.slice(1)
+
+    const wrapper = document.createElement('div')
+    wrapper.className = 'hud-modal__weapon-group'
+
+    wrapper.append(this.createWeaponRow(featured, 'owned'))
+
+    if (variants.length > 0) {
+      const variantsSection = document.createElement('div')
+      variantsSection.className = 'hud-modal__weapon-variants'
+
+      const variantsLabel = document.createElement('small')
+      variantsLabel.className = 'hud-modal__weapon-variants-label'
+      variantsLabel.textContent = '다른 등급'
+
+      const variantsGrid = document.createElement('div')
+      variantsGrid.className = 'hud-modal__weapon-variants-grid'
+      variantsGrid.replaceChildren(...variants.map((weapon) => this.createWeaponVariantChip(weapon)))
+
+      variantsSection.append(variantsLabel, variantsGrid)
+      wrapper.append(variantsSection)
+    }
+
+    return wrapper
+  }
+
+  private createWeaponVariantChip(weapon: HudOwnedWeaponView): HTMLElement {
+    const chip = document.createElement('div')
+    chip.className = `hud-modal__weapon-variant${weapon.isEquipped ? ' is-equipped' : ''}`
+
+    const star = document.createElement('strong')
+    star.className = 'hud-modal__weapon-variant-star'
+    star.textContent = formatWeaponStarLabel(weapon.star)
+
+    const count = document.createElement('small')
+    count.className = 'hud-modal__weapon-variant-count'
+    count.textContent = `× ${weapon.count ?? 1}`
+
+    chip.append(star, count)
+    return chip
   }
 
   private createPassiveButtons(choices: HudState['passiveSelection']['choices']): HTMLElement[] {
@@ -549,15 +626,27 @@ export class HudController {
     return choices.map((choice) => {
       const button = document.createElement('button')
       button.type = 'button'
-      button.className = 'hud-modal__item hud-modal__item--action'
+      button.className = `hud-modal__item hud-modal__item--action hud-modal__item--grade-${choice.grade}`
       button.dataset.action = 'passive-select'
       button.dataset.passiveId = choice.id
+
+      const left = document.createElement('div')
+      left.className = 'hud-modal__left'
 
       const textGroup = document.createElement('span')
       textGroup.className = 'hud-modal__content'
 
+      const icon = this.createHudIcon(choice.iconKey, choice.name)
+      if (icon) {
+        left.append(icon)
+      }
+
       const title = document.createElement('strong')
       title.textContent = choice.name
+
+      const grade = document.createElement('small')
+      grade.className = `hud-modal__passive-grade hud-modal__passive-grade--${choice.grade}`
+      grade.textContent = choice.gradeLabel
 
       const summary = document.createElement('small')
       summary.textContent = choice.effectSummary
@@ -565,8 +654,9 @@ export class HudController {
       const description = document.createElement('small')
       description.textContent = choice.description
 
-      textGroup.append(title, summary, description)
-      button.append(textGroup)
+      textGroup.append(title, grade, summary, description)
+      left.append(textGroup)
+      button.append(left)
       return button
     })
   }

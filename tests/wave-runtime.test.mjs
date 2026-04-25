@@ -18,18 +18,19 @@ test('run progression runtime starts with immediate recurring pressure', () => {
   const step = advanceRunProgressionRuntime(state, 0, 0)
 
   assert.equal(step.state.elapsedMs, 0)
-  assert.equal(step.activePhase.id, 'minute-01')
-  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime', 'slime', 'slime'])
+  assert.equal(step.activePhase.id, 'minute-01-a')
+  assert.equal(step.spawnedEnemyIds.length, 5)
+  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime', 'slime', 'slime', 'slime'])
   assert.equal(step.timedOut, false)
 })
 
 test('run progression advances by elapsed time even while enemies carry over', () => {
-  const start = createRunProgressionRuntime(59_900)
+  const start = createRunProgressionRuntime(29_900)
   const step = advanceRunProgressionRuntime(start, 200, 12)
 
-  assert.equal(step.activePhase.id, 'minute-02')
+  assert.equal(step.activePhase.id, 'minute-01-b')
   assert.equal(step.phaseChanged, true)
-  assert.equal(step.state.elapsedMs, 60_100)
+  assert.equal(step.state.elapsedMs, 30_100)
   assert.ok(step.spawnedEnemyIds.length > 0)
 })
 
@@ -58,10 +59,10 @@ test('run progression hard-caps at 30 minutes for timeout handling', () => {
   assert.equal(step.timedOut, true)
 })
 
-test('run progression table covers all 30 one-minute phases with escalating pressure', () => {
-  assert.equal(RUN_PROGRESS_PHASES.length, 30)
+test('run progression table covers 30 minutes with half-minute probability phases', () => {
+  assert.equal(RUN_PROGRESS_PHASES.length, 60)
   assert.equal(RUN_PROGRESS_PHASES[0]?.startMs, 0)
-  assert.equal(RUN_PROGRESS_PHASES.at(-1)?.startMs, 29 * 60_000)
+  assert.equal(RUN_PROGRESS_PHASES.at(-1)?.startMs, 29 * 60_000 + 30_000)
   assert.ok((RUN_PROGRESS_PHASES.at(-1)?.softEnemyCap ?? 0) > (RUN_PROGRESS_PHASES[0]?.softEnemyCap ?? 0))
   assert.ok((RUN_PROGRESS_PHASES.at(-1)?.healthMultiplier ?? 0) > (RUN_PROGRESS_PHASES[0]?.healthMultiplier ?? 0))
 })

@@ -34,15 +34,18 @@ import {
   ARENA_WORLD_BOUNDS,
   ENEMY_SPAWN_MIN_DISTANCE,
   HEART_ITEM_RADIUS,
+  MAGNET_ITEM_RADIUS,
   PLAYER_SAFE_RADIUS,
   createMapLayout,
   getAmbientItemSpawnPoints,
   getHeartItemSpawnPoints,
+  getMagnetItemSpawnPoints,
   getWorldCenter,
   isCircleClearOfObstacles,
   isPointWithinWorld,
   selectAmbientItemSpawnPoint,
   selectHeartItemSpawnPoint,
+  selectMagnetItemSpawnPoint,
   selectEnemySpawnPoint,
 } from '../.tmp-test/src/systems/mapLayout.js'
 import {
@@ -56,6 +59,18 @@ import {
   getNextHeartPickupSpawnAt,
   shouldSpawnHeartPickup,
 } from '../.tmp-test/src/systems/healthPickups.js'
+import {
+  MAGNET_PICKUP_ATTRACTION_RADIUS,
+  MAGNET_PICKUP_DURATION_MS,
+  MAGNET_PICKUP_INITIAL_DELAY_MS,
+  MAGNET_PICKUP_INTERVAL_MS,
+  MAGNET_PICKUP_MAX_ACTIVE,
+  getInitialMagnetPickupSpawnAt,
+  getMagnetizedUntil,
+  getNextMagnetPickupSpawnAt,
+  isMagnetActive,
+  shouldSpawnMagnetPickup,
+} from '../.tmp-test/src/systems/magnetPickups.js'
 import {
   getTopRightMiniMapBounds,
   projectWorldPointToMiniMap,
@@ -122,6 +137,7 @@ import {
 import {
   FINAL_STAGE_START_MS,
   RUN_DURATION_MS,
+  flattenRunPhaseEntries,
   formatRunTime,
   getRunEnemySpawnChanceRows,
   getRunPhaseByElapsedMs,
@@ -294,6 +310,8 @@ test('loot pickup phase uses a forgiving collect radius and attraction band', ()
   assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS + 0.01), 'attract')
   assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS), 'collect')
   assert.equal(getLootPickupPhase(Number.POSITIVE_INFINITY), 'idle')
+  assert.equal(getLootPickupPhase(MAGNET_PICKUP_ATTRACTION_RADIUS, MAGNET_PICKUP_ATTRACTION_RADIUS), 'attract')
+  assert.equal(getLootPickupPhase(MAGNET_PICKUP_ATTRACTION_RADIUS + 1, MAGNET_PICKUP_ATTRACTION_RADIUS), 'idle')
 })
 
 test('loot attraction step is bounded to the attraction phase', () => {
@@ -301,6 +319,7 @@ test('loot attraction step is bounded to the attraction phase', () => {
   assert.equal(getLootAttractionStep(LOOT_COLLECT_RADIUS, 16), 0)
   assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, 16) > 0, true)
   assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, -16), 0)
+  assert.equal(getLootAttractionStep(MAGNET_PICKUP_ATTRACTION_RADIUS - 1, 16, MAGNET_PICKUP_ATTRACTION_RADIUS) > 0, true)
 })
 
 test('loot pickup workflow updates inventory and reports the pickup message', () => {
@@ -399,29 +418,29 @@ test('new arena run state does not reuse mutable containers', () => {
 })
 
 test('pachinko reward levels and enemy token xp follow the approved thresholds', () => {
-  assert.deepEqual(PACHINKO_LEVEL_THRESHOLDS, [0, 6, 14, 26, 42])
+  assert.deepEqual(PACHINKO_LEVEL_THRESHOLDS, [0, 600, 1400, 2600, 4200])
   assert.deepEqual(STAR_ODDS_BY_LEVEL[1], [70, 25, 5, 0, 0])
   assert.deepEqual(STAR_ODDS_BY_LEVEL[5], [20, 30, 30, 15, 5])
 
-  assert.equal(getTokenXpForEnemy('slime'), 1)
-  assert.equal(getTokenXpForEnemy('spark-slime'), 2)
-  assert.equal(getTokenXpForEnemy('dash-slime'), 2)
-  assert.equal(getTokenXpForEnemy('orbit-slime'), 2)
-  assert.equal(getTokenXpForEnemy('prism-slime'), 4)
-  assert.equal(getTokenXpForEnemy('lantern-moth'), 3)
-  assert.equal(getTokenXpForEnemy('mirror-wisp'), 3)
-  assert.equal(getTokenXpForEnemy('siege-toad'), 5)
+  assert.equal(getTokenXpForEnemy('slime'), 100)
+  assert.equal(getTokenXpForEnemy('spark-slime'), 200)
+  assert.equal(getTokenXpForEnemy('dash-slime'), 200)
+  assert.equal(getTokenXpForEnemy('orbit-slime'), 200)
+  assert.equal(getTokenXpForEnemy('prism-slime'), 400)
+  assert.equal(getTokenXpForEnemy('lantern-moth'), 300)
+  assert.equal(getTokenXpForEnemy('mirror-wisp'), 300)
+  assert.equal(getTokenXpForEnemy('siege-toad'), 500)
   assert.equal(getTokenXpForEnemy('slime-boss'), 0)
   assert.equal(shouldEnemyGrantPachinkoToken('slime'), true)
   assert.equal(shouldEnemyGrantPachinkoToken('slime-boss'), false)
 
   assert.equal(getPachinkoRewardLevel(0), 1)
-  assert.equal(getPachinkoRewardLevel(5), 1)
-  assert.equal(getPachinkoRewardLevel(6), 2)
-  assert.equal(getPachinkoRewardLevel(14), 3)
-  assert.equal(getPachinkoRewardLevel(26), 4)
-  assert.equal(getPachinkoRewardLevel(42), 5)
-  assert.equal(getPachinkoRewardLevel(999), 5)
+  assert.equal(getPachinkoRewardLevel(500), 1)
+  assert.equal(getPachinkoRewardLevel(600), 2)
+  assert.equal(getPachinkoRewardLevel(1400), 3)
+  assert.equal(getPachinkoRewardLevel(2600), 4)
+  assert.equal(getPachinkoRewardLevel(4200), 5)
+  assert.equal(getPachinkoRewardLevel(99900), 5)
 })
 
 test('pachinko reward resolution keeps weapon random and star odds deterministic', () => {
@@ -448,9 +467,9 @@ test('player level raises pachinko star range before live table rolls stars', ()
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(25), { minStar: 4, maxStar: 5 })
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(33), { minStar: 5, maxStar: 5 })
 
-  const lowLevelStars = buildPachinkoSlotRewards(42, PACHINKO_SLOT_COUNT, 0, 1).map((slot) => slot.star)
-  const midLevelStars = buildPachinkoSlotRewards(42, PACHINKO_SLOT_COUNT, 0, 9).map((slot) => slot.star)
-  const highLevelStars = buildPachinkoSlotRewards(42, PACHINKO_SLOT_COUNT, 0, 25).map((slot) => slot.star)
+  const lowLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 1).map((slot) => slot.star)
+  const midLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 9).map((slot) => slot.star)
+  const highLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 25).map((slot) => slot.star)
 
   assert.equal(Math.min(...lowLevelStars), 1)
   assert.equal(Math.max(...lowLevelStars), 2)
@@ -464,17 +483,22 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
   let progress = { totalTokenXp: 0, queuedTokenXp: [] }
   progress = applyEnemyPachinkoTokenProgress(progress, 'slime')
   assert.deepEqual(progress, {
-    totalTokenXp: 1,
-    queuedTokenXp: [1],
-    grantedTokenXp: 1,
+    totalTokenXp: 100,
+    queuedTokenXp: [100],
+    grantedTokenXp: 100,
     didEnqueue: true,
     rewardLevel: 1,
   })
 
   progress = applyEnemyPachinkoTokenProgress(progress, 'prism-slime')
-  assert.deepEqual(progress.queuedTokenXp, [1, 4])
-  assert.equal(progress.totalTokenXp, 5)
+  assert.deepEqual(progress.queuedTokenXp, [100, 400])
+  assert.equal(progress.totalTokenXp, 500)
   assert.equal(progress.rewardLevel, 1)
+
+  const boostedProgress = applyEnemyPachinkoTokenProgress(progress, 'mender-slime', 1.5)
+  assert.equal(boostedProgress.grantedTokenXp, 300)
+  assert.deepEqual(boostedProgress.queuedTokenXp, [100, 400, 300])
+  assert.equal(boostedProgress.totalTokenXp, 800)
 
   const bossProgress = applyEnemyPachinkoTokenProgress(progress, 'slime-boss')
   assert.deepEqual(bossProgress, {
@@ -486,30 +510,30 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
 
   const landingSeed = 7
   const playerLevel = 17
-  const visibleLandingSlot = resolvePachinkoSlotReward(42, 0.999, PACHINKO_SLOT_COUNT, landingSeed, playerLevel)
-  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999, landingSeed, playerLevel), {
+  const visibleLandingSlot = resolvePachinkoSlotReward(4200, 0.999, PACHINKO_SLOT_COUNT, landingSeed, playerLevel)
+  assert.deepEqual(resolvePachinkoLandingReward(4200, 0.999, landingSeed, playerLevel), {
     weaponId: visibleLandingSlot.weaponId,
     star: visibleLandingSlot.star,
   })
 })
 
-test('player progression starts per run and levels from enemy defeat xp', () => {
-  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 5, 12, 22, 36])
+test('player progression starts per run and levels from token pickup xp', () => {
+  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 500, 1200, 2200, 3600])
   assert.deepEqual(ENEMY_PLAYER_XP, {
-    slime: 1,
-    'spark-slime': 2,
-    'prism-slime': 5,
-    'dash-slime': 2,
-    'orbit-slime': 2,
-    'needle-wasp': 3,
-    'splitter-slime': 2,
-    'shard-sentinel': 3,
-    'mender-slime': 2,
-    'void-orb': 3,
-    'crusher-slime': 4,
-    'lantern-moth': 3,
-    'mirror-wisp': 3,
-    'siege-toad': 5,
+    slime: 100,
+    'spark-slime': 200,
+    'prism-slime': 500,
+    'dash-slime': 200,
+    'orbit-slime': 200,
+    'needle-wasp': 300,
+    'splitter-slime': 200,
+    'shard-sentinel': 300,
+    'mender-slime': 200,
+    'void-orb': 300,
+    'crusher-slime': 400,
+    'lantern-moth': 300,
+    'mirror-wisp': 300,
+    'siege-toad': 500,
     'slime-boss': 0,
   })
 
@@ -517,34 +541,34 @@ test('player progression starts per run and levels from enemy defeat xp', () => 
   assert.deepEqual(initial, { totalXp: 0, level: 1 })
   assert.deepEqual(createInitialArenaRunState().playerProgression, initial)
 
-  assert.equal(getPlayerXpForEnemy('slime'), 1)
-  assert.equal(getPlayerXpForEnemy('prism-slime'), 5)
+  assert.equal(getPlayerXpForEnemy('slime'), 100)
+  assert.equal(getPlayerXpForEnemy('prism-slime'), 500)
   assert.equal(getPlayerXpForEnemy('slime-boss'), 0)
   assert.equal(getPlayerLevelForXp(0), 1)
-  assert.equal(getPlayerLevelForXp(4), 1)
-  assert.equal(getPlayerLevelForXp(5), 2)
-  assert.equal(getPlayerLevelForXp(12), 3)
-  assert.equal(getPlayerLevelForXp(36), 5)
-  assert.equal(getPlayerLevelForXp(55), 6)
-  assert.equal(getPlayerLevelForXp(999), 17)
+  assert.equal(getPlayerLevelForXp(400), 1)
+  assert.equal(getPlayerLevelForXp(500), 2)
+  assert.equal(getPlayerLevelForXp(1200), 3)
+  assert.equal(getPlayerLevelForXp(3600), 5)
+  assert.equal(getPlayerLevelForXp(5500), 6)
+  assert.equal(getPlayerLevelForXp(99900), 17)
 
-  const firstDefeat = applyEnemyPlayerXp(initial, 'prism-slime')
-  assert.deepEqual(firstDefeat.state, { totalXp: 5, level: 2 })
-  assert.equal(firstDefeat.grantedXp, 5)
-  assert.equal(firstDefeat.didLevelUp, true)
-  assert.equal(firstDefeat.view.xpIntoLevel, 0)
-  assert.equal(firstDefeat.view.xpToNextLevel, 7)
+  const firstTokenPickup = applyEnemyPlayerXp(initial, 'prism-slime')
+  assert.deepEqual(firstTokenPickup.state, { totalXp: 500, level: 2 })
+  assert.equal(firstTokenPickup.grantedXp, 500)
+  assert.equal(firstTokenPickup.didLevelUp, true)
+  assert.equal(firstTokenPickup.view.xpIntoLevel, 0)
+  assert.equal(firstTokenPickup.view.xpToNextLevel, 700)
 
-  const nextDefeat = applyEnemyPlayerXp(firstDefeat.state, 'needle-wasp')
-  assert.deepEqual(nextDefeat.state, { totalXp: 8, level: 2 })
-  assert.equal(nextDefeat.didLevelUp, false)
-  assert.equal(nextDefeat.view.xpIntoLevel, 3)
-  assert.equal(nextDefeat.view.progressRatio, 3 / 7)
+  const nextTokenPickup = applyEnemyPlayerXp(firstTokenPickup.state, 'needle-wasp')
+  assert.deepEqual(nextTokenPickup.state, { totalXp: 800, level: 2 })
+  assert.equal(nextTokenPickup.didLevelUp, false)
+  assert.equal(nextTokenPickup.view.xpIntoLevel, 300)
+  assert.equal(nextTokenPickup.view.progressRatio, 300 / 700)
 
-  const bossDefeat = applyEnemyPlayerXp(nextDefeat.state, 'slime-boss')
-  assert.deepEqual(bossDefeat.state, nextDefeat.state)
-  assert.equal(bossDefeat.grantedXp, 0)
-  assert.equal(bossDefeat.didLevelUp, false)
+  const bossTokenPickup = applyEnemyPlayerXp(nextTokenPickup.state, 'slime-boss')
+  assert.deepEqual(bossTokenPickup.state, nextTokenPickup.state)
+  assert.equal(bossTokenPickup.grantedXp, 0)
+  assert.equal(bossTokenPickup.didLevelUp, false)
 })
 
 test('player progression view clamps invalid xp and continues past seeded levels', () => {
@@ -553,36 +577,36 @@ test('player progression view clamps invalid xp and continues past seeded levels
     level: 1,
     currentLevelXp: 0,
     xpIntoLevel: 0,
-    xpToNextLevel: 5,
-    nextLevelAt: 5,
+    xpToNextLevel: 500,
+    nextLevelAt: 500,
     progressRatio: 0,
     isMaxLevel: false,
   })
 
-  assert.deepEqual(getPlayerProgressionView(40), {
-    totalXp: 40,
+  assert.deepEqual(getPlayerProgressionView(4000), {
+    totalXp: 4000,
     level: 5,
-    currentLevelXp: 36,
-    xpIntoLevel: 4,
-    xpToNextLevel: 19,
-    nextLevelAt: 55,
-    progressRatio: 4 / 19,
+    currentLevelXp: 3600,
+    xpIntoLevel: 400,
+    xpToNextLevel: 1900,
+    nextLevelAt: 5500,
+    progressRatio: 400 / 1900,
     isMaxLevel: false,
   })
 
-  assert.deepEqual(getPlayerProgressionView(999), {
-    totalXp: 999,
+  assert.deepEqual(getPlayerProgressionView(99900), {
+    totalXp: 99900,
     level: 17,
-    currentLevelXp: 880,
-    xpIntoLevel: 119,
-    xpToNextLevel: 157,
-    nextLevelAt: 1037,
-    progressRatio: 119 / 157,
+    currentLevelXp: 88000,
+    xpIntoLevel: 11900,
+    xpToNextLevel: 15700,
+    nextLevelAt: 103700,
+    progressRatio: 11900 / 15700,
     isMaxLevel: false,
   })
 
-  assert.deepEqual(applyPlayerXp({ totalXp: 4, level: 1 }, 8).state, {
-    totalXp: 12,
+  assert.deepEqual(applyPlayerXp({ totalXp: 400, level: 1 }, 800).state, {
+    totalXp: 1200,
     level: 3,
   })
 })
@@ -614,10 +638,10 @@ test('pachinko slot table makes displayed bottom rewards exact', () => {
   const nextTable = buildPachinkoSlotRewards(0, PACHINKO_SLOT_COUNT, 1)
   assert.notDeepEqual(nextTable.map((slot) => `${slot.weaponId}:${slot.star}`), levelOneSlots.map((slot) => `${slot.weaponId}:${slot.star}`))
 
-  const levelFiveSlots = buildPachinkoSlotRewards(42, PACHINKO_SLOT_COUNT, 0, 17)
+  const levelFiveSlots = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 17)
   assert.ok(levelFiveSlots.every((slot) => slot.star >= 3 && slot.star <= 5), 'player level should bound visible star outcomes')
-  const levelFiveLandingSlot = resolvePachinkoSlotReward(42, 0.999, PACHINKO_SLOT_COUNT, 0, 17)
-  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999, 0, 17), {
+  const levelFiveLandingSlot = resolvePachinkoSlotReward(4200, 0.999, PACHINKO_SLOT_COUNT, 0, 17)
+  assert.deepEqual(resolvePachinkoLandingReward(4200, 0.999, 0, 17), {
     weaponId: levelFiveLandingSlot.weaponId,
     star: levelFiveLandingSlot.star,
   })
@@ -633,7 +657,7 @@ test('pachinko weapon-family synergy marks mostly-upside bonus slots', () => {
   assert.equal(modifiers.get(3), 'bonus')
   assert.equal(modifiers.get(5), 'jackpot')
 
-  const synergizedSlots = buildPachinkoSlotRewards(14, PACHINKO_SLOT_COUNT, 0, 1, 'slime-glaive')
+  const synergizedSlots = buildPachinkoSlotRewards(1400, PACHINKO_SLOT_COUNT, 0, 1, 'slime-glaive')
   assert.equal(synergizedSlots[7].modifier?.kind, 'family')
   assert.equal(synergizedSlots[7].weaponId, 'slime-glaive')
   assert.equal(synergizedSlots[3].modifier?.kind, 'bonus')
@@ -656,19 +680,19 @@ test('pachinko slot modifiers never punish the base reward', () => {
     star: 5,
   })
 
-  const familyLanding = resolvePachinkoLandingReward(14, 0.75, 0, 1, 'slime-glaive')
+  const familyLanding = resolvePachinkoLandingReward(1400, 0.75, 0, 1, 'slime-glaive')
   assert.deepEqual(familyLanding, {
     weaponId: 'slime-glaive',
-    star: 2,
+    star: 1,
   })
 })
 
 test('pachinko slot index clamps boundaries and live table timing', () => {
-  assert.equal(PACHINKO_REWARD_TABLE_REFRESH_MS, 850)
+  assert.equal(PACHINKO_REWARD_TABLE_REFRESH_MS, 5000)
   assert.equal(getPachinkoRewardTableSeed(0), 0)
-  assert.equal(getPachinkoRewardTableSeed(849), 0)
-  assert.equal(getPachinkoRewardTableSeed(850), 1)
-  assert.equal(getPachinkoRewardTableSeed(1700), 2)
+  assert.equal(getPachinkoRewardTableSeed(4999), 0)
+  assert.equal(getPachinkoRewardTableSeed(5000), 1)
+  assert.equal(getPachinkoRewardTableSeed(1700), 0)
 
   assert.equal(resolvePachinkoSlotIndex(-1), 0)
   assert.equal(resolvePachinkoSlotIndex(0), 0)
@@ -826,6 +850,23 @@ test('heart item spawn points are sparse map pickups outside inventory loot', ()
   assert.deepEqual(selectHeartItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
 })
 
+
+test('magnet item spawn points are map utility pickups outside inventory loot', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawnPoints = getMagnetItemSpawnPoints(layout.worldBounds, layout.obstacles)
+
+  assert.equal(spawnPoints.length >= 4, true)
+  assert.equal(LOOT_IDS.includes('magnet-pickup'), false)
+  for (const spawn of spawnPoints) {
+    assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 56), true)
+    assert.equal(isCircleClearOfObstacles(spawn, MAGNET_ITEM_RADIUS, layout.obstacles), true)
+  }
+
+  assert.deepEqual(layout.magnetItemSpawns, spawnPoints)
+  assert.deepEqual(selectMagnetItemSpawnPoint(spawnPoints, () => 0), spawnPoints[0])
+  assert.deepEqual(selectMagnetItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
+})
+
 test('enemy map spawn selection respects player distance, world bounds, and obstacle clearance', () => {
   const layout = createMapLayout(ARENA_WORLD_BOUNDS)
   const spawn = selectEnemySpawnPoint(
@@ -846,7 +887,7 @@ test('enemy map spawn selection respects player distance, world bounds, and obst
 
 test('heart pickup healing and intermittent spawn gates stay deterministic', () => {
   assert.equal(HEART_PICKUP_HEAL_AMOUNT, 24)
-  assert.equal(HEART_PICKUP_MAX_ACTIVE, 3)
+  assert.equal(HEART_PICKUP_MAX_ACTIVE, 4)
   assert.equal(getHealedPlayerHealth(40, 100), 64)
   assert.equal(getHealedPlayerHealth(90, 100), 100)
   assert.equal(getHealedPlayerHealth(-5, 100), 24)
@@ -854,11 +895,29 @@ test('heart pickup healing and intermittent spawn gates stay deterministic', () 
   assert.equal(getNextHeartPickupSpawnAt(1_000, () => 0), 1_000 + HEART_PICKUP_INTERVAL_MS)
   assert.equal(
     getNextHeartPickupSpawnAt(1_000, () => 0.999),
-    1_000 + HEART_PICKUP_INTERVAL_MS + 3_996,
+    1_000 + HEART_PICKUP_INTERVAL_MS + 2_997,
   )
   assert.equal(shouldSpawnHeartPickup(6_999, 7_000, 0), false)
   assert.equal(shouldSpawnHeartPickup(7_000, 7_000, HEART_PICKUP_MAX_ACTIVE), false)
   assert.equal(shouldSpawnHeartPickup(7_000, 7_000, HEART_PICKUP_MAX_ACTIVE - 1), true)
+})
+
+
+test('magnet pickup timing and duration stay deterministic', () => {
+  assert.equal(MAGNET_PICKUP_MAX_ACTIVE, 2)
+  assert.equal(MAGNET_PICKUP_DURATION_MS, 5_000)
+  assert.equal(getInitialMagnetPickupSpawnAt(1_000), 1_000 + MAGNET_PICKUP_INITIAL_DELAY_MS)
+  assert.equal(getNextMagnetPickupSpawnAt(1_000, () => 0), 1_000 + MAGNET_PICKUP_INTERVAL_MS)
+  assert.equal(
+    getNextMagnetPickupSpawnAt(1_000, () => 0.999),
+    1_000 + MAGNET_PICKUP_INTERVAL_MS + 5_994,
+  )
+  assert.equal(getMagnetizedUntil(3_000), 8_000)
+  assert.equal(isMagnetActive(7_999, 8_000), true)
+  assert.equal(isMagnetActive(8_000, 8_000), false)
+  assert.equal(shouldSpawnMagnetPickup(10_999, 11_000, 0), false)
+  assert.equal(shouldSpawnMagnetPickup(11_000, 11_000, MAGNET_PICKUP_MAX_ACTIVE), false)
+  assert.equal(shouldSpawnMagnetPickup(11_000, 11_000, MAGNET_PICKUP_MAX_ACTIVE - 1), true)
 })
 
 test('minimap projects world points and viewport into the top-right overlay', () => {
@@ -907,9 +966,11 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
 
-  assert.deepEqual(describeAvailableRecipes(acidRecipes), [
-    '난리자베스 분사기 [난리 분사] → 피해 19 · 장판 압박 · 사거리 145 · 난리 분사 (젤 안정성을 포기하고 산성 난사와 진한 발밑 장판으로 바꿉니다.)',
-  ])
+  const [acidSummary] = describeAvailableRecipes(acidRecipes)
+  assert.match(acidSummary ?? '', /난리자베스 분사기 \[난리 분사]/)
+  assert.match(acidSummary ?? '', /사거리 145/)
+  assert.match(acidSummary ?? '', /난리 분사/)
+  assert.doesNotMatch(acidSummary ?? '', /초당 \d+회/)
 
   const sparkRecipes = getActionableRecipes(
     {
@@ -926,12 +987,14 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
 
-  assert.deepEqual(describeAvailableRecipes(sparkRecipes), [
-    '오버드라이브 카빈 [오버드라이브 속사] → 피해 10 · 3연발 · 사거리 520 · 오버드라이브 속사 (전하를 짧은 간격의 3연발로 쪼개 한 방향 압박을 빠르게 누적합니다.)',
-  ])
-  assert.deepEqual(describeAvailableRecipes(mistRecipes), [
-    '멘탈나감 소용돌이 [멘탈 안개] → 피해 12 · 장판 압박 · 사거리 220 · 멘탈 안개 (서리와 안개를 오래 남는 소용돌이 구역으로 바꿔 전장 흐름을 지연시킵니다.)',
-  ])
+  const [sparkSummary] = describeAvailableRecipes(sparkRecipes)
+  const [mistSummary] = describeAvailableRecipes(mistRecipes)
+  assert.match(sparkSummary ?? '', /오버드라이브 카빈 \[오버드라이브 속사]/)
+  assert.match(sparkSummary ?? '', /피해 10/)
+  assert.match(sparkSummary ?? '', /3연발/)
+  assert.match(mistSummary ?? '', /멘탈나감 소용돌이 \[멘탈 안개]/)
+  assert.match(mistSummary ?? '', /피해 12/)
+  assert.match(mistSummary ?? '', /장판 압박/)
 
   const needleRecipes = getActionableRecipes(
     {
@@ -940,9 +1003,9 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     },
     ['starter-blaster'],
   )
-  assert.deepEqual(describeAvailableRecipes(needleRecipes), [
-    '간바레 응원부채 [간바레 산탄] → 피해 11 · 6연발 · 사거리 240 · 간바레 산탄 (키틴 바늘을 한순간 넓게 펴서 장판 없이 즉시 밀어내는 부채 산탄으로 다듬습니다.)',
-  ])
+  const [needleSummary] = describeAvailableRecipes(needleRecipes)
+  assert.match(needleSummary ?? '', /간바레 응원부채 \[간바레 산탄]/)
+  assert.match(needleSummary ?? '', /6연발/)
 })
 
 test('actionable recipes exclude outputs that are already owned', () => {
@@ -1110,11 +1173,14 @@ test('equipping an owned weapon only changes the active weapon id', () => {
 
 test('run progression advances by elapsed time instead of enemy clear state', () => {
   const firstPhase = getRunPhaseByElapsedMs(0)
+  const firstHalfMinute = getRunPhaseByElapsedMs(30_000)
   const secondMinute = getRunPhaseByElapsedMs(60_000)
   const finale = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
 
   assert.equal(firstPhase.minuteIndex, 0)
   assert.equal(firstPhase.healthMultiplier, 1.15)
+  assert.equal(firstHalfMinute.minuteIndex, 0)
+  assert.equal(firstHalfMinute.id, 'minute-01-b')
   assert.equal(secondMinute.minuteIndex, 1)
   assert.equal(secondMinute.stageIndex, 1)
   assert.equal(finale.isFinale, true)
@@ -1126,10 +1192,14 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
 })
 
-test('run progression exposes per-enemy spawn chance rows for the current minute', () => {
+test('run progression exposes per-enemy spawn chance rows for the current half-minute phase', () => {
   const firstPhase = getRunPhaseByElapsedMs(0)
+  const thirdMinuteFront = getRunPhaseByElapsedMs(2 * 60_000)
+  const thirdMinuteBack = getRunPhaseByElapsedMs(2 * 60_000 + 30_000)
   const latePhase = getRunPhaseByElapsedMs(24 * 60_000)
   const firstRows = getRunEnemySpawnChanceRows(firstPhase)
+  const thirdMinuteFrontRows = getRunEnemySpawnChanceRows(thirdMinuteFront)
+  const thirdMinuteBackRows = getRunEnemySpawnChanceRows(thirdMinuteBack)
   const lateRows = getRunEnemySpawnChanceRows(latePhase)
 
   assert.deepEqual(firstRows, [
@@ -1141,6 +1211,10 @@ test('run progression exposes per-enemy spawn chance rows for the current minute
       percentLabel: '100%',
     },
   ])
+  const firstBackRows = getRunEnemySpawnChanceRows(getRunPhaseByElapsedMs(30_000))
+  assert.ok(firstBackRows.some((row) => row.enemyId === 'dash-slime'))
+  assert.notDeepEqual(firstRows, firstBackRows)
+  assert.notDeepEqual(thirdMinuteFrontRows, thirdMinuteBackRows)
   assert.ok(lateRows.length > 4)
   assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
   assert.ok(lateRows.some((row) => row.enemyId === 'void-orb'))
@@ -1148,14 +1222,45 @@ test('run progression exposes per-enemy spawn chance rows for the current minute
   assert.equal(lateRows.reduce((sum, row) => sum + row.ratio, 0).toFixed(4), '1.0000')
 })
 
+
+test('run progression spawn sequence interleaves weighted enemies early', () => {
+  const firstBackPhase = getRunPhaseByElapsedMs(30_000)
+  const sequence = flattenRunPhaseEntries(firstBackPhase)
+
+  assert.equal(sequence.length, 19)
+  assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
+})
+
 test('hud places enemy spawn odds beside the game title for visibility', () => {
   const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
   const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
 
   assert.ok(hudSource.includes('renderTitleEnemyOdds(state.pachinko?.enemyOdds)'))
+  assert.ok(hudSource.includes("hud-summary__section--enemy-odds"))
   assert.ok(hudSource.includes('hud-summary__enemy-odds'))
   assert.ok(hudSource.includes('적 출현 확률 ·'))
   assert.ok(styleSource.includes('.hud-summary__enemy-odds'))
+})
+
+test('arena hud injects enemy spawn odds into the visible stats list', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+  const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
+  const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
+
+  assert.ok(arenaSceneSource.includes('const visibleEnemyChanceLines = enemyChanceLines.slice(0, 5)'))
+  assert.ok(arenaSceneSource.includes("`적 출현 확률 (${currentPhase.label.split(' · ')[0]"))
+  assert.ok(arenaSceneSource.includes('...visibleEnemyChanceLines'))
+  assert.ok(arenaSceneSource.includes('currentTimeLabel: formatRunTime(this.runElapsedMs)'))
+  assert.ok(arenaSceneSource.includes('자석 효과 활성화'))
+  assert.ok(arenaSceneSource.includes('enemyOddsLabel'))
+  assert.ok(arenaSceneSource.includes('syncEnemyOddsHudText(enemyChanceLines)'))
+  assert.ok(arenaSceneSource.includes('const currentTimeLabel = formatRunTime(this.runElapsedMs)'))
+  assert.ok(arenaSceneSource.includes('const phaseLabel = phase.label.split'))
+  assert.ok(arenaSceneSource.includes('현재 시간 ${currentTimeLabel} · 적 출현 확률 · ${phaseLabel} ·'))
+  assert.ok(hudSource.includes('<span>현재 시간</span>'))
+  assert.ok(hudSource.includes('state.currentTimeLabel'))
+  assert.ok(hudSource.includes('hud-summary__status-line--time'))
+  assert.ok(styleSource.includes('.hud-summary__status-line--time'))
 })
 
 test('nearest auto-attack target returns null when no active enemies are available', () => {
@@ -1425,10 +1530,11 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
 })
 
 test('game title and title control hints stay aligned with playable keyboard shortcuts', () => {
-  assert.equal(GAME_TITLE, '김동성의 살아남기')
+  assert.equal(GAME_TITLE, '김동성에게 살아남기')
   assert.deepEqual([...GAME_HEADER_CONTROL_HINTS], ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'])
   assert.match(GAMEPLAY_CONTROL_TIP, /I 인벤토리/)
   assert.match(GAMEPLAY_CONTROL_TIP, /Q 코덱스/)
+  assert.match(GAMEPLAY_CONTROL_TIP, /끝까지 버티기/)
 })
 
 test('stage selection views expose readable time-stage choices and current marker', () => {
@@ -1503,16 +1609,21 @@ test('arena frame stops immediately after any run-ending combat step', () => {
   )
 })
 
-test('arena enemy defeat applies player xp before outcome handling', () => {
+test('arena token pickup applies player xp before pachinko token enqueue', () => {
   const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
 
   assert.ok(
+    arenaSceneSource.includes('const playerXpResult = this.grantPlayerXpForEnemy(pickup.enemyId)'),
+    'collectPachinkoTokenPickup should grant run-local player XP only when the dropped token is collected',
+  )
+  assert.equal(
     arenaSceneSource.includes('const playerXpResult = this.grantPlayerXpForEnemy(enemy.config.id)'),
-    'damageEnemy should grant run-local player XP at the enemy defeat chokepoint',
+    false,
+    'damageEnemy must not level the player before the token is collected',
   )
   assert.ok(
     arenaSceneSource.includes('this.playerProgression = result.state'),
-    'grantPlayerXpForEnemy should update the scene progression state immediately',
+    'grantPlayerXpForEnemy should update the scene progression state on token pickup',
   )
   assert.ok(
     arenaSceneSource.includes('this.showPlayerLevelUpFeedback(result.level)'),
@@ -1814,6 +1925,134 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
   }
 })
 
+test('hud weapon modal renders the owned-weapon summary path with redesigned summary text', () => {
+  class FakeClassList {
+    toggle() {}
+  }
+
+  class FakeElement {
+    children = []
+    classList = new FakeClassList()
+    dataset = {}
+    disabled = false
+    style = {}
+    textContent = ''
+    assignments = 0
+    #innerHTML = ''
+    #regions = new Map()
+
+    constructor(tagName = 'div') {
+      this.tagName = tagName.toUpperCase()
+    }
+
+    get innerHTML() {
+      return this.#innerHTML
+    }
+
+    set innerHTML(value) {
+      this.assignments += 1
+      this.#innerHTML = value
+
+      if (value.includes('data-region="equipped-weapons"')) {
+        this.#regions.set('button[data-action="inventory-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="equipped-weapons"]', new FakeElement('div'))
+        this.#regions.set('[data-region="weapons"]', new FakeElement('div'))
+        this.#regions.set('[data-region="character-stats"]', new FakeElement('div'))
+      }
+      if (value.includes('data-region="stages"')) {
+        this.#regions.set('button[data-action="stage-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="stages"]', new FakeElement('div'))
+      }
+    }
+
+    addEventListener() {}
+    removeEventListener() {}
+    append(...nodes) { this.children.push(...nodes) }
+    replaceChildren(...nodes) { this.children = nodes }
+    querySelector(selector) { return this.#regions.get(selector) ?? null }
+    querySelectorAll() { return [] }
+  }
+
+  const previousDocument = globalThis.document
+  globalThis.document = {
+    createElement: (tagName) => new FakeElement(tagName),
+  }
+
+  try {
+    const root = new FakeElement('section')
+    const controller = new HudController(root)
+
+    controller.update({
+      title: 'NeoD 프로토타입',
+      subtitle: '무기 점검',
+      stats: ['체력: 10/10', '무기: 점검 중'],
+      inventory: ['젤 파편 × 1'],
+      recipes: ['합성 대기'],
+      objective: '무기 정보를 확인하세요.',
+      tip: 'WASD 이동 · J 대시',
+      status: '점검 중',
+      inventoryButtonLabel: '인벤토리 닫기',
+      inventoryButtonDisabled: false,
+      stageButtonLabel: '스테이지 선택',
+      stageButtonDisabled: false,
+      stageSelection: {
+        isOpen: false,
+        stages: [],
+      },
+      modal: {
+        isOpen: true,
+        items: [],
+        recipes: [],
+        weapons: [
+          {
+            id: 'spark-carbine',
+            stackKey: 'spark-carbine:2',
+            name: '오버드라이브 카빈',
+            description: '속도감 있는 전격 점사입니다.',
+            summary: '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사',
+            star: 2,
+            count: 1,
+            damage: 19,
+            fireRateMs: 131,
+            projectileSpeed: 792,
+            isEquipped: true,
+            tuningLabel: null,
+            canTune: false,
+            tuneDisabledReason: '튜닝 비활성',
+            canFuse: false,
+            fuseDisabledReason: '같은 별 2개가 필요합니다.',
+            hudIconKey: 'weapon-spark-carbine',
+            accentColor: 0xfff06a,
+          },
+        ],
+        characterStats: [],
+      },
+      pachinko: {
+        level: 1,
+        totalTokenXp: 0,
+        droppedTokens: 0,
+        queuedTokens: 0,
+        isTokenInFlight: false,
+        latestReward: null,
+      },
+    })
+
+    const weaponList = controller.weaponList
+    const firstWeaponEntry = weaponList.children[0]
+    const firstWeaponRow = firstWeaponEntry.children[1] ? firstWeaponEntry : firstWeaponEntry.children[0]
+    const actions = firstWeaponRow.children[1]
+    const meta = actions.children[0]
+
+    assert.equal(meta.textContent, '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사')
+  } finally {
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
+})
+
 test('elite drop table returns a tuning capsule', () => {
   assert.equal(
     resolveWeightedDrop(ENEMY_DEFINITIONS['prism-slime'].drops, () => 0),
@@ -1984,8 +2223,8 @@ test('player level combat stats raise health and weapon damage globally', () => 
   assert.equal(levelTenBlaster.playerDamageMultiplier, 1.45)
   assert.equal(levelTenBlaster.weaponSpecialTier, 1)
   assert.equal(levelTenBlaster.visualPowerTier, 1)
-  assert.match(levelTenBlaster.levelUpgradeLabel, /관통 2회/)
-  assert.match(levelTenBlaster.levelUpgradeDescription, /관통탄/)
+  assert.match(levelTenBlaster.levelUpgradeLabel, /범위 \+16%/)
+  assert.match(levelTenBlaster.levelUpgradeDescription, /관통탄처럼 진화/)
 })
 
 test('weapon milestone upgrades expand behavior every five and ten player levels', () => {
@@ -2025,7 +2264,7 @@ test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
 
   assert.ok(arenaSceneSource.includes('levelUpgradeLabel: effectiveWeapon.levelUpgradeLabel'))
   assert.ok(arenaSceneSource.includes('projectile.setScale(1 + visualTier * 0.08)'))
-  assert.ok(arenaSceneSource.includes('graphics.lineStyle(3 + visualTier'))
+  assert.ok(arenaSceneSource.includes('spawnMeleeSwingEffect(this'))
   assert.ok(hudSource.includes('weapon.levelUpgradeLabel'))
   assert.ok(hudSource.includes('weapon.levelUpgradeDescription'))
   assert.ok(hudSource.includes('weapon.identityLabel'))
@@ -2040,6 +2279,25 @@ test('arena damage feedback shows normal hits as numbers and critical hits with 
   assert.ok(arenaSceneSource.includes('label: `CRIT! ${damage}`'))
   assert.ok(arenaSceneSource.includes("color: '#f7fbff'"))
   assert.ok(arenaSceneSource.includes("color: '#ffd866'"))
+})
+
+test('combat effects are split out for chain lightning, projectile trails, and hazard range pulses', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+  const combatEffectsSource = readFileSync(resolve(TEST_DIR, '../src/scenes/arena/combatEffects.ts'), 'utf8')
+  const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
+  const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
+  const arcPlan = buildAttackPlan(levelTwentyArc, { x: 0, y: 0 }, { x: 10, y: 0 })
+  const mistPlan = buildAttackPlan(levelTwentyMist, { x: 0, y: 0 }, { x: 10, y: 0 })
+
+  assert.equal(arcPlan.projectiles[0]?.chain?.visualPowerTier, 2)
+  assert.equal(mistPlan.projectiles[0]?.hazardOnHit?.visualPowerTier, 2)
+  assert.ok(arenaSceneSource.includes('spawnChainLightningEffect('))
+  assert.ok(arenaSceneSource.includes('spawnProjectileTrailEffect('))
+  assert.ok(arenaSceneSource.includes('createHazardZoneEffect('))
+  assert.ok(combatEffectsSource.includes('drawJaggedLine'))
+  assert.ok(combatEffectsSource.includes('spawnHazardTickEffect'))
+  assert.ok(combatEffectsSource.includes('scene.add.graphics({ x, y })'))
+  assert.ok(combatEffectsSource.includes('scene.add.graphics({ x: point.x, y: point.y })'))
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {

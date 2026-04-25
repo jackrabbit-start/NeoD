@@ -1,6 +1,8 @@
 import type { EnemyId } from '../data/contentIds.js'
 
-export const PLAYER_LEVEL_XP_THRESHOLDS = [0, 5, 12, 22, 36] as const
+export const XP_DISPLAY_SCALE = 100 as const
+
+export const PLAYER_LEVEL_XP_THRESHOLDS = [0, 500, 1200, 2200, 3600] as const
 
 const MIN_PLAYER_LEVEL = 1
 const LAST_SEEDED_LEVEL = PLAYER_LEVEL_XP_THRESHOLDS.length
@@ -9,20 +11,20 @@ const LAST_SEEDED_LEVEL_XP_REQUIREMENT =
   PLAYER_LEVEL_XP_THRESHOLDS[LAST_SEEDED_LEVEL - 1] - PLAYER_LEVEL_XP_THRESHOLDS[LAST_SEEDED_LEVEL - 2]
 
 export const ENEMY_PLAYER_XP: Record<EnemyId, number> = {
-  slime: 1,
-  'spark-slime': 2,
-  'prism-slime': 5,
-  'dash-slime': 2,
-  'orbit-slime': 2,
-  'needle-wasp': 3,
-  'splitter-slime': 2,
-  'shard-sentinel': 3,
-  'mender-slime': 2,
-  'void-orb': 3,
-  'crusher-slime': 4,
-  'lantern-moth': 3,
-  'mirror-wisp': 3,
-  'siege-toad': 5,
+  slime: 100,
+  'spark-slime': 200,
+  'prism-slime': 500,
+  'dash-slime': 200,
+  'orbit-slime': 200,
+  'needle-wasp': 300,
+  'splitter-slime': 200,
+  'shard-sentinel': 300,
+  'mender-slime': 200,
+  'void-orb': 300,
+  'crusher-slime': 400,
+  'lantern-moth': 300,
+  'mirror-wisp': 300,
+  'siege-toad': 500,
   'slime-boss': 0,
 }
 
@@ -61,11 +63,11 @@ function getXpRequiredForLevel(level: number): number {
   }
 
   let threshold = LAST_SEEDED_LEVEL_XP
-  let xpToNextLevel = LAST_SEEDED_LEVEL_XP_REQUIREMENT + LAST_SEEDED_LEVEL
+  let xpToNextLevel = LAST_SEEDED_LEVEL_XP_REQUIREMENT + LAST_SEEDED_LEVEL * XP_DISPLAY_SCALE
 
   for (let currentLevel = LAST_SEEDED_LEVEL; currentLevel < targetLevel; currentLevel += 1) {
     threshold += xpToNextLevel
-    xpToNextLevel += currentLevel + 1
+    xpToNextLevel += (currentLevel + 1) * XP_DISPLAY_SCALE
   }
 
   return threshold

@@ -6,9 +6,9 @@ import { getEnemyTokenSummary } from './pachinkoRewards.js'
 export function getCodexState(isOpen: boolean): CodexState {
   return {
     isOpen,
-    title: '현장 코덱스',
-    subtitle: '공유 데이터 보기 · Q로 닫기',
-    hint: '현재 런의 보상 루프는 토큰 파친코 + 별 합성 + 레벨업 패시브 카드 선택을 사용합니다.',
+    title: '생존 코덱스',
+    subtitle: '추격 정보 확인 · Q로 닫기',
+    hint: '이번 생존 런은 토큰 파친코, 별 합성, 레벨업 패시브 카드로 추격 시간을 버티는 구조입니다.',
     items: [],
     recipes: [],
     enemies: Object.values(ENEMY_DEFINITIONS).map((enemy) => ({

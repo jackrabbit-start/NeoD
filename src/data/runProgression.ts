@@ -1,9 +1,9 @@
 import type { EnemyId, RunProgressionPhaseDefinition, RunSpawnEntryDefinition } from '../domain/types.js'
 
-export const RUN_PHASE_DURATION_MS = 60_000
-export const RUN_STAGE_DURATION_MS = RUN_PHASE_DURATION_MS
-export const RUN_DURATION_MS = 30 * RUN_PHASE_DURATION_MS
-export const FINAL_STAGE_START_MS = 25 * RUN_PHASE_DURATION_MS
+export const RUN_PHASE_DURATION_MS = 30_000
+export const RUN_STAGE_DURATION_MS = 60_000
+export const RUN_DURATION_MS = 30 * RUN_STAGE_DURATION_MS
+export const FINAL_STAGE_START_MS = 25 * RUN_STAGE_DURATION_MS
 
 const pressureNames = [
   '점액 적응',
@@ -47,14 +47,14 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
     { enemyId: 'slime', count: Math.max(2, 16 - clampedMinute) },
   ]
 
+  if (clampedMinute >= 1) {
+    weights.push({ enemyId: 'dash-slime', count: 2 + Math.min(7, clampedMinute) })
+  }
   if (clampedMinute >= 2) {
-    weights.push({ enemyId: 'dash-slime', count: 3 + Math.min(6, clampedMinute) })
+    weights.push({ enemyId: 'spark-slime', count: 2 + Math.floor(clampedMinute / 2) })
   }
-  if (clampedMinute >= 5) {
-    weights.push({ enemyId: 'spark-slime', count: 4 + Math.floor(clampedMinute / 3) })
-  }
-  if (clampedMinute >= 7) {
-    weights.push({ enemyId: 'splitter-slime', count: 3 + Math.floor((clampedMinute - 7) / 2) })
+  if (clampedMinute >= 3) {
+    weights.push({ enemyId: 'splitter-slime', count: 2 + Math.floor((clampedMinute - 3) / 2) })
   }
   if (clampedMinute >= 10) {
     weights.push({ enemyId: 'orbit-slime', count: 5 + Math.floor((clampedMinute - 10) / 3) })
@@ -90,25 +90,46 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
   return weights.filter((entry) => entry.count > 0)
 }
 
-function createPhase(minuteIndex: number): RunProgressionPhaseDefinition {
+function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
+  const minuteIndex = Math.floor(phaseIndex / 2)
+  const entries = entriesForMinute(minuteIndex).map((entry) => ({ ...entry }))
+  if (phaseIndex >= 1 && minuteIndex === 0) {
+    entries.push({ enemyId: 'dash-slime', count: 2 })
+  }
+  if (entries.length <= 1) {
+    return entries
+  }
+
+  const surgeIndex = (phaseIndex + minuteIndex) % entries.length
+  const surgeAmount = Math.max(1, Math.ceil((minuteIndex + 1) / 6))
+  entries[surgeIndex] = {
+    ...entries[surgeIndex],
+    count: entries[surgeIndex].count + surgeAmount,
+  }
+  return entries
+}
+
+function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
+  const minuteIndex = Math.floor(phaseIndex / 2)
   const stageIndex = minuteIndex
-  const startMs = minuteIndex * RUN_PHASE_DURATION_MS
+  const startMs = phaseIndex * RUN_PHASE_DURATION_MS
   const isFinale = startMs >= FINAL_STAGE_START_MS
   const oneTimeSpawns: EnemyId[] = startMs === FINAL_STAGE_START_MS ? ['slime-boss'] : []
   const phaseNumber = minuteIndex + 1
+  const halfLabel = phaseIndex % 2 === 0 ? '전반' : '후반'
 
   return {
-    id: `minute-${String(phaseNumber).padStart(2, '0')}`,
-    label: `${phaseNumber}분 · ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
+    id: `minute-${String(phaseNumber).padStart(2, '0')}-${phaseIndex % 2 === 0 ? 'a' : 'b'}`,
+    label: `${phaseNumber}분 ${halfLabel} · ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
     stageIndex,
     stageLabel: `${phaseNumber}분 ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
     minuteIndex,
     startMs,
     durationMs: RUN_PHASE_DURATION_MS,
-    entries: entriesForMinute(minuteIndex),
-    spawnIntervalMs: Math.max(360, 980 - minuteIndex * 22),
-    burstSize: Math.min(12, 4 + Math.floor(minuteIndex / 3)),
-    softEnemyCap: Math.min(100, 28 + minuteIndex * 3),
+    entries: entriesForPhase(phaseIndex),
+    spawnIntervalMs: Math.max(300, 880 - minuteIndex * 24),
+    burstSize: Math.min(16, 5 + Math.floor(minuteIndex / 3)),
+    softEnemyCap: Math.min(150, 36 + minuteIndex * 4),
     healthMultiplier: Number((1.15 + minuteIndex * 0.06).toFixed(2)),
     ...(oneTimeSpawns.length > 0 ? { oneTimeSpawns } : {}),
     ...(isFinale ? { isFinale } : {}),
@@ -117,5 +138,5 @@ function createPhase(minuteIndex: number): RunProgressionPhaseDefinition {
 
 export const RUN_PROGRESS_PHASES: RunProgressionPhaseDefinition[] = Array.from(
   { length: RUN_DURATION_MS / RUN_PHASE_DURATION_MS },
-  (_, minuteIndex) => createPhase(minuteIndex),
+  (_, phaseIndex) => createPhase(phaseIndex),
 )

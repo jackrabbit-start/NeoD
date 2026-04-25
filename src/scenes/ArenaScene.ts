@@ -45,14 +45,17 @@ import {
   type EnemyProjectileState,
 } from '../systems/enemyProjectiles.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import { getEnemyAttackMotionProfile, getEnemyHitMotionProfile } from '../systems/enemyMotion.js'
 import {
   getLootAttractionStep,
   getLootPickupPhase,
+  LOOT_ATTRACTION_RADIUS,
   LOOT_COLLECT_RADIUS,
 } from '../systems/lootPickup.js'
 import {
   createMapLayout,
   selectHeartItemSpawnPoint,
+  selectMagnetItemSpawnPoint,
   selectEnemySpawnPoint,
   type MapLayout,
 } from '../systems/mapLayout.js'
@@ -65,6 +68,17 @@ import {
   getNextHeartPickupSpawnAt,
   shouldSpawnHeartPickup,
 } from '../systems/healthPickups.js'
+import {
+  MAGNET_PICKUP_ATTRACTION_RADIUS,
+  MAGNET_PICKUP_COLOR,
+  MAGNET_PICKUP_DURATION_MS,
+  MAGNET_PICKUP_TEXTURE_KEY,
+  getInitialMagnetPickupSpawnAt,
+  getMagnetizedUntil,
+  getNextMagnetPickupSpawnAt,
+  isMagnetActive,
+  shouldSpawnMagnetPickup,
+} from '../systems/magnetPickups.js'
 import {
   getTopRightMiniMapBounds,
   projectWorldPointToMiniMap,
@@ -83,6 +97,7 @@ import {
   getPassiveEnemyDamageMultiplier,
   getPassiveIncomingDamageMultiplier,
   getPassiveCardChoices,
+  getPassivePachinkoActiveWeaponWeightMultiplier,
   getPassiveSummaryLines,
   getPassiveTokenXpMultiplier,
   resolveCriticalHit,
@@ -115,8 +130,10 @@ import {
   canLaunchPachinkoToken,
   getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
+  getPachinkoWeaponOddsRows,
   getPachinkoWeaponSynergySummary,
   getTokenXpForEnemy,
+  type PachinkoTokenProgressResult,
   resolvePachinkoSlotIndex,
   resolvePachinkoSlotReward,
   shouldEnemyGrantPachinkoToken,
@@ -155,6 +172,16 @@ import type {
   ProjectileSpawnSpec,
 } from '../systems/weaponBehaviors.js'
 import {
+  createHazardZoneEffect,
+  destroyHazardZoneEffect,
+  spawnChainLightningEffect,
+  spawnHazardTickEffect,
+  spawnMeleeSwingEffect,
+  spawnProjectileTrailEffect,
+  updateHazardZoneEffect,
+  type HazardZoneEffect,
+} from './arena/combatEffects.js'
+import {
   resolveEquippedWeaponPresentation,
   resolveEquippedWeaponTextureRefresh,
   resolveWeaponPresentationFacing,
@@ -162,6 +189,7 @@ import {
 import { deriveEffectiveWeaponStats } from '../systems/tuning.js'
 import {
   addWeaponStackWithAutoFusion,
+  canFuseWeaponStack,
   equipWeaponStack,
   formatWeaponStarLabel,
   getStackKey,
@@ -205,6 +233,8 @@ interface PlayerHealthBar {
   levelLabel: Phaser.GameObjects.Text
   xpBackground: Phaser.GameObjects.Rectangle
   xpFill: Phaser.GameObjects.Rectangle
+  enemyOddsBackground: Phaser.GameObjects.Rectangle
+  enemyOddsLabel: Phaser.GameObjects.Text
   width: number
   height: number
   xpWidth: number
@@ -295,6 +325,11 @@ interface PachinkoSlotVisualEntity {
   modifierLabel: Phaser.GameObjects.Text
 }
 
+interface PachinkoOddsVisualEntity {
+  icon: Phaser.GameObjects.Image
+  label: Phaser.GameObjects.Text
+}
+
 interface PachinkoLightEntity {
   visual: Phaser.GameObjects.Arc
   xRatio: number
@@ -302,6 +337,13 @@ interface PachinkoLightEntity {
 }
 
 interface HealthPickupEntity {
+  sprite: PhysicsImage
+  aura: Phaser.GameObjects.Arc
+  auraTween: Phaser.Tweens.Tween
+  isAttracting: boolean
+}
+
+interface MagnetPickupEntity {
   sprite: PhysicsImage
   aura: Phaser.GameObjects.Arc
   auraTween: Phaser.Tweens.Tween
@@ -322,9 +364,13 @@ interface ProjectileEntity {
   maxTravelDistance: number
   knockback: ProjectileSpawnSpec['knockback']
   chain?: ChainSpec
+  explosionOnHit?: HazardSpawnSpec
+  explosionOnExpire?: HazardSpawnSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
   impactBurstOnHit?: ImpactBurstSpec
+  visualPowerTier: number
+  trailCooldownMs: number
 }
 
 interface EnemyProjectileEntity extends EnemyProjectileState {
@@ -333,6 +379,7 @@ interface EnemyProjectileEntity extends EnemyProjectileState {
 
 interface HazardZoneEntity {
   visual: Phaser.GameObjects.Arc
+  effect: HazardZoneEffect
   x: number
   y: number
   radius: number
@@ -342,6 +389,8 @@ interface HazardZoneEntity {
   totalLifetimeMs: number
   tickEveryMs: number
   tickCountdownMs: number
+  tint: number
+  visualPowerTier?: number
 }
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
@@ -399,9 +448,15 @@ export class ArenaScene extends Phaser.Scene {
 
   private healthPickups: HealthPickupEntity[] = []
 
+  private magnetPickups: MagnetPickupEntity[] = []
+
   private pachinkoTokenPickups: PachinkoTokenPickupEntity[] = []
 
   private nextHeartPickupAt = 0
+
+  private nextMagnetPickupAt = 0
+
+  private magnetizedUntil = 0
 
   private projectiles: ProjectileEntity[] = []
 
@@ -502,6 +557,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private pachinkoSlotVisuals: PachinkoSlotVisualEntity[] = []
 
+  private pachinkoOddsVisuals: PachinkoOddsVisualEntity[] = []
+
   private pachinkoLights: PachinkoLightEntity[] = []
 
   private pachinkoQueueBadge?: Phaser.GameObjects.Rectangle
@@ -566,6 +623,7 @@ export class ArenaScene extends Phaser.Scene {
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
     this.createMiniMap()
     this.nextHeartPickupAt = getInitialHeartPickupSpawnAt(this.time.now)
+    this.nextMagnetPickupAt = getInitialMagnetPickupSpawnAt(this.time.now)
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
@@ -630,7 +688,8 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.updateHealthPickups(time, delta)
-    this.updatePachinkoTokenPickups(delta)
+    this.updateMagnetPickups(time, delta)
+    this.updatePachinkoTokenPickups(time, delta)
     this.updatePachinko()
     this.updateHazards(delta)
     if (this.isRunEnding) {
@@ -784,6 +843,15 @@ export class ArenaScene extends Phaser.Scene {
       graphics.fillCircle(dot.x, dot.y, 2.4)
     }
 
+    for (const pickup of this.magnetPickups) {
+      if (!pickup.sprite.active) {
+        continue
+      }
+      const dot = projectWorldPointToMiniMap(pickup.sprite, worldBounds, bounds)
+      graphics.fillStyle(MAGNET_PICKUP_COLOR, 0.95)
+      graphics.fillCircle(dot.x, dot.y, 2.5)
+    }
+
     for (const pickup of this.pachinkoTokenPickups) {
       if (!pickup.sprite.active) {
         continue
@@ -918,11 +986,11 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const projectileSpec of attackPlan.projectiles) {
-      this.spawnProjectile(projectileSpec, weapon.projectileTextureKey)
+      this.dispatchProjectileSpec(projectileSpec, weapon.projectileTextureKey)
     }
 
     for (const meleeSwing of attackPlan.meleeSwings) {
-      this.applyMeleeSwing(meleeSwing)
+      this.dispatchMeleeSwing(meleeSwing)
     }
 
     this.nextFireAt = time + attackPlan.cooldownMs
@@ -1064,6 +1132,7 @@ export class ArenaScene extends Phaser.Scene {
         )
 
         if (telegraphSpec) {
+          this.playEnemyAttackMotion(enemy)
           const visual = this.add
             .circle(telegraphSpec.x, telegraphSpec.y, telegraphSpec.radius, telegraphSpec.tint, 0.25)
             .setStrokeStyle(2, telegraphSpec.tint, 0.9)
@@ -1101,6 +1170,7 @@ export class ArenaScene extends Phaser.Scene {
         )
 
         if (projectiles.length > 0) {
+          this.playEnemyAttackMotion(enemy)
           enemy.spreadBurst = {
             visual: this.createSpreadBurstWarning(enemy, projectiles),
             projectiles,
@@ -1129,6 +1199,7 @@ export class ArenaScene extends Phaser.Scene {
         )
 
         if (beam) {
+          this.playEnemyAttackMotion(enemy)
           enemy.lineBeam = {
             visual: this.createLineBeamWarning(beam),
             beam,
@@ -1153,6 +1224,7 @@ export class ArenaScene extends Phaser.Scene {
         const projectiles = createEnemyRadialBurstProjectiles(attackBehavior)
 
         if (projectiles.length > 0) {
+          this.playEnemyAttackMotion(enemy)
           enemy.spreadBurst = {
             visual: this.createRadialBurstWarning(enemy, projectiles),
             projectiles,
@@ -1183,6 +1255,7 @@ export class ArenaScene extends Phaser.Scene {
 
       const touchingPlayer = distanceToPlayer < enemy.config.size / 2 + ENEMY_CONTACT_PADDING
       if (touchingPlayer) {
+        this.playEnemyAttackMotion(enemy)
         this.damagePlayer(enemy.config.contactDamage)
         if (this.isRunEnding) {
           return
@@ -1215,7 +1288,7 @@ export class ArenaScene extends Phaser.Scene {
 
       projectile.remainingLifetimeMs -= delta
       if (projectile.remainingLifetimeMs <= 0) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
         continue
       }
 
@@ -1225,7 +1298,7 @@ export class ArenaScene extends Phaser.Scene {
           this.mapLayout.worldBounds,
         )
       ) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
         continue
       }
 
@@ -1269,6 +1342,10 @@ export class ArenaScene extends Phaser.Scene {
             this.applyChainDamage(enemy, projectile.chain, projectile.damage)
           }
 
+          if (projectile.explosionOnHit) {
+            this.applyImpactExplosion(projectile.sprite.x, projectile.sprite.y, projectile.explosionOnHit)
+          }
+
           if (projectile.impactBurstOnHit) {
             this.applyImpactBurstDamage(enemy, projectile.impactBurstOnHit, projectile)
           }
@@ -1284,8 +1361,19 @@ export class ArenaScene extends Phaser.Scene {
         }
       }
 
+      projectile.trailCooldownMs = Math.max(0, projectile.trailCooldownMs - delta)
+      if ((projectile.chain || projectile.visualPowerTier > 0) && projectile.sprite.active && projectile.trailCooldownMs <= 0) {
+        spawnProjectileTrailEffect(
+          this,
+          { x: projectile.sprite.x, y: projectile.sprite.y },
+          projectile.tint,
+          projectile.visualPowerTier,
+        )
+        projectile.trailCooldownMs = projectile.chain ? 70 : 110
+      }
+
       if (didExpireAtRange && projectile.sprite.active) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
       }
     }
   }
@@ -1439,7 +1527,7 @@ export class ArenaScene extends Phaser.Scene {
         this.player.x,
         this.player.y,
       )
-      const pickupPhase = getLootPickupPhase(distance)
+      const pickupPhase = getLootPickupPhase(distance, this.getActiveLootAttractionRadius(time))
 
       if (pickupPhase === 'collect') {
         this.collectHeartPickup(pickup)
@@ -1447,7 +1535,7 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       if (pickupPhase === 'attract') {
-        this.applyHealthPickupAttraction(pickup, distance, delta)
+        this.applyHealthPickupAttraction(pickup, distance, delta, time)
         continue
       }
 
@@ -1457,10 +1545,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
 
-  private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number): void {
+  private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number, time: number): void {
     this.setHealthPickupAttractionStyle(pickup, true)
 
-    const attractionStep = getLootAttractionStep(distance, delta)
+    const attractionStep = getLootAttractionStep(distance, delta, this.getActiveLootAttractionRadius(time))
     const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
     if (distance <= 0 || travelDistance <= 0) {
       this.syncHealthPickupAura(pickup)
@@ -1529,7 +1617,114 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private updatePachinkoTokenPickups(delta: number): void {
+  private updateMagnetPickups(time: number, delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    const activePickups = this.magnetPickups.filter((pickup) => pickup.sprite.active).length
+    if (shouldSpawnMagnetPickup(time, this.nextMagnetPickupAt, activePickups)) {
+      this.spawnMagnetPickup()
+      this.nextMagnetPickupAt = getNextMagnetPickupSpawnAt(time)
+    }
+
+    for (const pickup of this.magnetPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyMagnetPickup(pickup)
+        continue
+      }
+
+      const distance = Phaser.Math.Distance.Between(
+        pickup.sprite.x,
+        pickup.sprite.y,
+        this.player.x,
+        this.player.y,
+      )
+      const pickupPhase = getLootPickupPhase(distance)
+
+      if (pickupPhase === 'collect') {
+        this.collectMagnetPickup(pickup, time)
+        continue
+      }
+
+      if (pickupPhase === 'attract') {
+        this.applyMagnetPickupAttraction(pickup, distance, delta)
+        continue
+      }
+
+      this.setMagnetPickupAttractionStyle(pickup, false)
+      this.syncMagnetPickupAura(pickup)
+    }
+  }
+
+  private applyMagnetPickupAttraction(pickup: MagnetPickupEntity, distance: number, delta: number): void {
+    this.setMagnetPickupAttractionStyle(pickup, true)
+
+    const attractionStep = getLootAttractionStep(distance, delta)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    if (distance <= 0 || travelDistance <= 0) {
+      this.syncMagnetPickupAura(pickup)
+      return
+    }
+
+    const travelRatio = travelDistance / distance
+    pickup.sprite.setPosition(
+      pickup.sprite.x + (this.player.x - pickup.sprite.x) * travelRatio,
+      pickup.sprite.y + (this.player.y - pickup.sprite.y) * travelRatio,
+    )
+    this.syncMagnetPickupAura(pickup)
+  }
+
+  private setMagnetPickupAttractionStyle(pickup: MagnetPickupEntity, isAttracting: boolean): void {
+    if (pickup.isAttracting === isAttracting) {
+      return
+    }
+
+    pickup.isAttracting = isAttracting
+
+    if (isAttracting) {
+      pickup.sprite.setScale(1.08)
+      pickup.sprite.setTint(0xffffff)
+      pickup.aura.setStrokeStyle(3, 0xffffff, 0.95)
+      return
+    }
+
+    pickup.sprite.setScale(0.9)
+    pickup.sprite.setTint(MAGNET_PICKUP_COLOR)
+    pickup.aura.setStrokeStyle(2, MAGNET_PICKUP_COLOR, 0.82)
+  }
+
+  private syncMagnetPickupAura(pickup: MagnetPickupEntity): void {
+    if (pickup.aura.active) {
+      pickup.aura.setPosition(pickup.sprite.x, pickup.sprite.y)
+    }
+  }
+
+  private collectMagnetPickup(pickup: MagnetPickupEntity, time: number): void {
+    this.magnetizedUntil = Math.max(this.magnetizedUntil, getMagnetizedUntil(time))
+    this.statusMessage = `자석 활성화: ${Math.round(MAGNET_PICKUP_DURATION_MS / 1000)}초 동안 주변 전리품을 끌어당깁니다.`
+    this.destroyMagnetPickup(pickup)
+  }
+
+  private destroyMagnetPickup(pickup: MagnetPickupEntity): void {
+    pickup.auraTween?.stop()
+
+    if (pickup.aura.active) {
+      pickup.aura.destroy()
+    }
+
+    if (pickup.sprite.active) {
+      pickup.sprite.destroy()
+    }
+  }
+
+  private getActiveLootAttractionRadius(time: number): number {
+    return isMagnetActive(time, this.magnetizedUntil)
+      ? MAGNET_PICKUP_ATTRACTION_RADIUS
+      : LOOT_ATTRACTION_RADIUS
+  }
+
+  private updatePachinkoTokenPickups(time: number, delta: number): void {
     if (this.isInteractionBlocked()) {
       return
     }
@@ -1546,7 +1741,7 @@ export class ArenaScene extends Phaser.Scene {
         this.player.x,
         this.player.y,
       )
-      const pickupPhase = getLootPickupPhase(distance)
+      const pickupPhase = getLootPickupPhase(distance, this.getActiveLootAttractionRadius(time))
 
       if (pickupPhase === 'collect') {
         this.collectPachinkoTokenPickup(pickup)
@@ -1554,7 +1749,7 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       if (pickupPhase === 'attract') {
-        this.applyPachinkoTokenAttraction(pickup, distance, delta)
+        this.applyPachinkoTokenAttraction(pickup, distance, delta, time)
         continue
       }
 
@@ -1567,10 +1762,11 @@ export class ArenaScene extends Phaser.Scene {
     pickup: PachinkoTokenPickupEntity,
     distance: number,
     delta: number,
+    time: number,
   ): void {
     this.setPachinkoTokenAttractionStyle(pickup, true)
 
-    const attractionStep = getLootAttractionStep(distance, delta)
+    const attractionStep = getLootAttractionStep(distance, delta, this.getActiveLootAttractionRadius(time))
     const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
     if (distance <= 0 || travelDistance <= 0) {
       this.syncPachinkoTokenAura(pickup)
@@ -1611,7 +1807,13 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private collectPachinkoTokenPickup(pickup: PachinkoTokenPickupEntity): void {
-    this.enqueuePachinkoToken(pickup.enemyId)
+    const playerXpResult = this.grantPlayerXpForEnemy(pickup.enemyId)
+    const tokenProgress = this.enqueuePachinkoToken(pickup.enemyId)
+    const xpMessage = playerXpResult.grantedXp > 0 ? ` · 캐릭터 XP +${playerXpResult.grantedXp}` : ''
+    const levelMessage = playerXpResult.didLevelUp ? ` · Lv.${playerXpResult.level}!` : ''
+    if (tokenProgress) {
+      this.statusMessage = `토큰 획득: 파친코 +${tokenProgress.grantedTokenXp} XP · 보상 Lv.${tokenProgress.rewardLevel}${xpMessage}${levelMessage}`
+    }
     this.destroyPachinkoTokenPickup(pickup)
   }
 
@@ -1701,6 +1903,40 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
+  private spawnMagnetPickup(): void {
+    const spawn = selectMagnetItemSpawnPoint(this.mapLayout.magnetItemSpawns, Math.random)
+    if (!spawn) {
+      return
+    }
+
+    const aura = this.add.circle(spawn.x, spawn.y, 18, MAGNET_PICKUP_COLOR, 0.2)
+    aura.setStrokeStyle(2, MAGNET_PICKUP_COLOR, 0.82)
+    aura.setBlendMode(Phaser.BlendModes.ADD)
+    aura.setDepth(3)
+    const auraTween = this.tweens.add({
+      targets: aura,
+      scale: { from: 0.82, to: 1.3 },
+      alpha: { from: 0.48, to: 0.9 },
+      duration: 620,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    })
+
+    const sprite = this.physics.add.image(spawn.x, spawn.y, MAGNET_PICKUP_TEXTURE_KEY)
+    sprite.setCircle(11)
+    sprite.setDepth(4)
+    sprite.setScale(0.9)
+    sprite.setTint(MAGNET_PICKUP_COLOR)
+    this.magnetPickups.push({
+      sprite,
+      aura,
+      auraTween,
+      isAttracting: false,
+    })
+  }
+
+
   private updateHazards(delta: number): void {
     if (this.isInteractionBlocked()) {
       return
@@ -1746,6 +1982,14 @@ export class ArenaScene extends Phaser.Scene {
             canCrit: true,
             baseDamage: hazard.baseDamage,
           })
+          spawnHazardTickEffect(this, {
+            radius: hazard.radius,
+            durationMs: hazard.totalLifetimeMs,
+            tickEveryMs: hazard.tickEveryMs,
+            damage: hazard.damage,
+            tint: hazard.tint,
+            visualPowerTier: hazard.visualPowerTier,
+          }, { x: enemy.sprite.x, y: enemy.sprite.y })
           if (this.isRunEnding || this.isInteractionBlocked()) {
             return
           }
@@ -1753,14 +1997,11 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       if (hazardStep.expired) {
-        hazard.visual.destroy()
+        destroyHazardZoneEffect(hazard.effect)
         continue
       }
 
-      hazard.visual.setFillStyle(
-        hazard.visual.fillColor,
-        Math.max(0.12, 0.3 * (hazard.remainingLifetimeMs / hazard.totalLifetimeMs)),
-      )
+      updateHazardZoneEffect(hazard.effect, hazard.remainingLifetimeMs / hazard.totalLifetimeMs)
     }
   }
 
@@ -1779,6 +2020,13 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
     this.healthPickups = this.healthPickups.filter((pickup) => pickup.sprite.active)
+
+    for (const pickup of this.magnetPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyMagnetPickup(pickup)
+      }
+    }
+    this.magnetPickups = this.magnetPickups.filter((pickup) => pickup.sprite.active)
 
     for (const pickup of this.pachinkoTokenPickups) {
       if (!pickup.sprite.active) {
@@ -1896,23 +2144,15 @@ export class ArenaScene extends Phaser.Scene {
     this.showDamageFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage, criticalHit.isCritical)
 
     if (enemy.currentHealth > 0) {
-      enemy.sprite.setScale(1.08)
-      this.tweens.add({
-        targets: enemy.sprite,
-        scale: 1,
-        duration: 100,
-      })
+      this.playEnemyHitMotion(enemy)
       return true
     }
 
-    const playerXpResult = this.grantPlayerXpForEnemy(enemy.config.id)
     const defeatOutcome = getDefeatedEnemyRunOutcome(enemy.config.id)
     const didDropPachinkoToken = defeatOutcome === 'continue' && shouldEnemyGrantPachinkoToken(enemy.config.id)
-    const xpMessage = playerXpResult.grantedXp > 0 ? ` · XP +${playerXpResult.grantedXp}` : ''
-    const levelMessage = playerXpResult.didLevelUp ? ` · Lv.${playerXpResult.level}!` : ''
     if (didDropPachinkoToken) {
       this.spawnPachinkoTokenPickup(enemy.sprite.x, enemy.sprite.y, enemy.config.id)
-      this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 토큰이 떨어졌습니다. 캐릭터로 먹으면 파친코에 투입됩니다.`
+      this.statusMessage = `${enemy.config.name} 처치. 토큰이 떨어졌습니다. 캐릭터로 먹으면 XP와 파친코 보상이 적용됩니다.`
     }
     if (enemy.telegraph?.visual.active) {
       enemy.telegraph.visual.destroy()
@@ -1936,7 +2176,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     if (!didDropPachinkoToken) {
-      this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 드롭을 계속 모으세요.`
+      this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
     }
     return true
   }
@@ -2147,7 +2387,12 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    this.pendingPassiveChoices = getPassiveCardChoices(level, this.passiveState)
+    this.pendingPassiveChoices = getPassiveCardChoices(
+      level,
+      this.passiveState,
+      Math.random,
+      this.getActiveWeaponId(),
+    )
     if (this.pendingPassiveChoices.length === 0) {
       this.statusMessage = `Lv.${level} 달성! 패시브 후보를 만들지 못해 전투를 계속합니다.`
       this.updateHud()
@@ -2221,6 +2466,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.setHealthPickupPulsePaused(shouldPause)
+    this.setMagnetPickupPulsePaused(shouldPause)
     this.setPachinkoTokenPulsePaused(shouldPause)
 
     this.freezeCombat(shouldPause)
@@ -2229,6 +2475,21 @@ export class ArenaScene extends Phaser.Scene {
 
   private setHealthPickupPulsePaused(shouldPause: boolean): void {
     for (const pickup of this.healthPickups) {
+      if (!pickup.auraTween) {
+        continue
+      }
+
+      if (shouldPause) {
+        pickup.auraTween.pause()
+        continue
+      }
+
+      pickup.auraTween.resume()
+    }
+  }
+
+  private setMagnetPickupPulsePaused(shouldPause: boolean): void {
+    for (const pickup of this.magnetPickups) {
       if (!pickup.auraTween) {
         continue
       }
@@ -2551,6 +2812,27 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(depth + 1)
       .setScrollFactor(0)
 
+    const enemyOddsBackground = this.add
+      .rectangle(viewport.width / 2, xpY + 19, Math.min(viewport.width - 28, 520), 21, 0x020713, 0.72)
+      .setOrigin(0.5)
+      .setStrokeStyle(1, 0xffd866, 0.34)
+      .setDepth(depth + 1)
+      .setScrollFactor(0)
+
+    const enemyOddsLabel = this.add
+      .text(viewport.width / 2, xpY + 19, '', {
+        color: '#ffe28a',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '10px',
+        fontStyle: '900',
+        align: 'center',
+        wordWrap: { width: Math.min(viewport.width - 44, 500) },
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + 2)
+      .setScrollFactor(0)
+      .setShadow(0, 1, '#020713', 3)
+
     return {
       background,
       fill,
@@ -2558,6 +2840,8 @@ export class ArenaScene extends Phaser.Scene {
       levelLabel,
       xpBackground,
       xpFill,
+      enemyOddsBackground,
+      enemyOddsLabel,
       width,
       height,
       xpWidth,
@@ -2586,6 +2870,28 @@ export class ArenaScene extends Phaser.Scene {
     levelLabel.setText(`Lv.${progression.level} · XP ${progression.xpIntoLevel}/${progression.xpToNextLevel}`)
     xpFill.setVisible(xpFillWidth > 0)
     xpFill.setDisplaySize(xpFillWidth, xpHeight - 2)
+    this.syncEnemyOddsHudText()
+  }
+
+  private syncEnemyOddsHudText(enemyChanceLines?: string[]): void {
+    if (!this.playerHealthBar) {
+      return
+    }
+
+    const phase = getRunPhaseByElapsedMs(this.runElapsedMs)
+    const rows = enemyChanceLines ?? getRunEnemySpawnChanceRows(phase).map(
+      (row) => `${row.enemyName} ${row.percentLabel}`,
+    )
+    const cappedRows = rows.slice(0, 4)
+    const extraCount = Math.max(0, rows.length - cappedRows.length)
+    const suffix = extraCount > 0 ? ` 외 ${extraCount}` : ''
+    const currentTimeLabel = formatRunTime(this.runElapsedMs)
+    const phaseLabel = phase.label.split(' · ')[0] ?? `${phase.minuteIndex + 1}분차`
+    const text = `현재 시간 ${currentTimeLabel} · 적 출현 확률 · ${phaseLabel} · ${cappedRows.join(' · ')}${suffix}`
+
+    this.playerHealthBar.enemyOddsLabel.setText(text)
+    this.playerHealthBar.enemyOddsBackground.setVisible(rows.length > 0)
+    this.playerHealthBar.enemyOddsLabel.setVisible(rows.length > 0)
   }
 
   private destroyPlayerHealthBar(): void {
@@ -2593,7 +2899,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    const { background, fill, label, levelLabel, xpBackground, xpFill } = this.playerHealthBar
+    const { background, fill, label, levelLabel, xpBackground, xpFill, enemyOddsBackground, enemyOddsLabel } = this.playerHealthBar
     if (background.active) {
       background.destroy()
     }
@@ -2611,6 +2917,12 @@ export class ArenaScene extends Phaser.Scene {
     }
     if (xpFill.active) {
       xpFill.destroy()
+    }
+    if (enemyOddsBackground.active) {
+      enemyOddsBackground.destroy()
+    }
+    if (enemyOddsLabel.active) {
+      enemyOddsLabel.destroy()
     }
 
     this.playerHealthBar = undefined
@@ -2667,6 +2979,8 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
     this.nextHeartPickupAt = 0
+    this.nextMagnetPickupAt = 0
+    this.magnetizedUntil = 0
     this.pachinkoTokenXp = initialState.pachinkoTokenXp
     this.latestPachinkoReward = null
     this.pachinkoRewardTableSeed = 0
@@ -2705,6 +3019,10 @@ export class ArenaScene extends Phaser.Scene {
       this.destroyHealthPickup(pickup)
     }
 
+    for (const pickup of this.magnetPickups) {
+      this.destroyMagnetPickup(pickup)
+    }
+
     for (const pickup of this.pachinkoTokenPickups) {
       this.destroyPachinkoTokenPickup(pickup)
     }
@@ -2723,7 +3041,7 @@ export class ArenaScene extends Phaser.Scene {
 
     for (const hazard of this.hazardZones) {
       if (hazard.visual.active) {
-        hazard.visual.destroy()
+        destroyHazardZoneEffect(hazard.effect)
       }
     }
 
@@ -2739,6 +3057,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.enemies = []
     this.healthPickups = []
+    this.magnetPickups = []
     this.pachinkoTokenPickups = []
     this.pachinkoTokenQueue = []
     this.activePachinkoTokens = []
@@ -2788,6 +3107,10 @@ export class ArenaScene extends Phaser.Scene {
     return getWeaponIdFromStackKey(this.activeWeaponKey)
   }
 
+  private getPachinkoActiveWeaponWeightMultiplier(): number {
+    return getPassivePachinkoActiveWeaponWeightMultiplier(this.passiveState)
+  }
+
   private updateHud(): void {
     const weaponId = this.getActiveWeaponId()
     const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
@@ -2801,16 +3124,20 @@ export class ArenaScene extends Phaser.Scene {
     const enemyChanceLines = getRunEnemySpawnChanceRows(currentPhase).map(
       (row) => `${row.enemyName} ${row.percentLabel}`,
     )
+    const visibleEnemyChanceLines = enemyChanceLines.slice(0, 5)
+    this.syncEnemyOddsHudText(enemyChanceLines)
     const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
 
     this.hud.update({
       title: GAME_TITLE,
-      subtitle: this.activeRunLabel || '슬라임 아레나 대기 중',
+      subtitle: this.activeRunLabel || '김동성의 추격장 진입 대기 중',
+      currentTimeLabel: formatRunTime(this.runElapsedMs),
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel} · 공격력 ×${playerStats.damageMultiplier.toFixed(2)}`,
         `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
-        `현재 시간: ${formatRunTime(this.runElapsedMs)}`,
+        `적 출현 확률 (${currentPhase.label.split(' · ')[0] ?? `${currentPhase.minuteIndex + 1}분차`})`,
+        ...visibleEnemyChanceLines,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
@@ -2820,11 +3147,12 @@ export class ArenaScene extends Phaser.Scene {
       inventory: [
         `파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`,
         `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`,
+        isMagnetActive(this.time.now, this.magnetizedUntil) ? '자석 효과 활성화' : '자석 효과 대기',
       ],
-      recipes: ['같은 무기·같은 별 3개는 자동으로 다음 별 등급이 됩니다.'],
+      recipes: this.getFusionSummaryLines(),
       objective: this.isFinaleActive
-        ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
-        : '30분 생존 압박을 버티며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
+        ? '마지막 추격 파도를 돌파하고 30:00 전에 결전을 끝내 살아남으세요.'
+        : '김동성의 추격에서 30분 동안 버티며 토큰으로 무기를 키우고 생존 루프를 이어가세요.',
       tip: GAMEPLAY_CONTROL_TIP,
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
@@ -2843,6 +3171,9 @@ export class ArenaScene extends Phaser.Scene {
           name: choice.name,
           description: choice.description,
           effectSummary: choice.effectSummary,
+          grade: choice.grade,
+          gradeLabel: choice.gradeLabel,
+          iconKey: choice.iconKey,
         })),
       },
       pachinko: {
@@ -2854,7 +3185,7 @@ export class ArenaScene extends Phaser.Scene {
         isTokenInFlight: this.activePachinkoTokens.length > 0,
         latestReward: this.latestPachinkoReward,
         synergy: getPachinkoWeaponSynergySummary(weaponId),
-        enemyOdds: [`${currentPhase.minuteIndex + 1}분차`, ...enemyChanceLines],
+        enemyOdds: [currentPhase.label.split(' · ')[0] ?? `${currentPhase.minuteIndex + 1}분차`, ...enemyChanceLines],
       },
       modal: {
         isOpen: this.isInventoryOpen,
@@ -2932,6 +3263,62 @@ export class ArenaScene extends Phaser.Scene {
     ]
   }
 
+  private getFusionSummaryLines(): string[] {
+    const eligible = sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).filter((stack) =>
+      canFuseWeaponStack(this.weaponStacks, getStackKey(stack)),
+    )
+    if (eligible.length === 0) {
+      return ['같은 무기와 같은 별 2개를 모으면 합성 가능']
+    }
+
+    return eligible.map((stack) => {
+      const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
+      return `${WEAPON_DEFINITIONS[stack.weaponId].name} ${'★'.repeat(stack.star)} 합성 가능 · ${getWeaponSummary(effectiveWeapon)}`
+    })
+  }
+
+  private playEnemyAttackMotion(enemy: EnemyEntity): void {
+    const profile = getEnemyAttackMotionProfile(enemy.config.id, enemy.config.attackBehavior)
+    enemy.sprite.setTint(profile.tint ?? enemy.config.tint)
+    this.tweens.add({
+      targets: enemy.sprite,
+      scaleX: profile.scaleX,
+      scaleY: profile.scaleY,
+      angle: profile.angle,
+      duration: profile.durationMs,
+      yoyo: true,
+      onComplete: () => {
+        if (!enemy.sprite.active) {
+          return
+        }
+        enemy.sprite.setScale(1)
+        enemy.sprite.setAngle(0)
+        enemy.sprite.clearTint()
+      },
+    })
+  }
+
+  private playEnemyHitMotion(enemy: EnemyEntity): void {
+    const profile = getEnemyHitMotionProfile(enemy.config.id)
+    enemy.sprite.setTintFill(profile.tint ?? 0xffffff)
+    this.tweens.add({
+      targets: enemy.sprite,
+      scaleX: profile.scaleX,
+      scaleY: profile.scaleY,
+      angle: profile.angle,
+      duration: profile.durationMs,
+      yoyo: true,
+      onComplete: () => {
+        if (!enemy.sprite.active) {
+          return
+        }
+        enemy.sprite.setScale(1)
+        enemy.sprite.setAngle(0)
+        enemy.sprite.clearTint()
+      },
+    })
+  }
+
 
   private getActiveWeaponLabel(): string {
     const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
@@ -2939,7 +3326,7 @@ export class ArenaScene extends Phaser.Scene {
     return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${formatWeaponStarLabel(stack.star)}` : ''}`
   }
 
-  private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): void {
+  private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): PachinkoTokenProgressResult | null {
     const tokenMultiplier = getPassiveTokenXpMultiplier(this.passiveState)
     const nextProgress = applyEnemyPachinkoTokenProgress(
       {
@@ -2950,14 +3337,14 @@ export class ArenaScene extends Phaser.Scene {
       tokenMultiplier,
     )
     if (!nextProgress.didEnqueue) {
-      return
+      return null
     }
 
     this.pachinkoTokenXp = nextProgress.totalTokenXp
     this.pachinkoTokenQueue = nextProgress.queuedTokenXp
-    this.statusMessage = `파친코 토큰 획득: +${nextProgress.grantedTokenXp} XP · 보상 Lv.${nextProgress.rewardLevel}`
     this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
+    return nextProgress
   }
 
   private updatePachinko(): void {
@@ -3057,6 +3444,7 @@ export class ArenaScene extends Phaser.Scene {
       this.pachinkoRewardTableSeed,
       this.playerProgression.level,
       this.getActiveWeaponId(),
+      this.getPachinkoActiveWeaponWeightMultiplier(),
     )
     const fusionResult = addWeaponStackWithAutoFusion(
       { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
@@ -3113,6 +3501,19 @@ export class ArenaScene extends Phaser.Scene {
     return Math.min(fallbackInsideX, Math.max(leftmostVisibleCenter, preferredOutsideX))
   }
 
+  private getPachinkoOddsHudPosition(index: number): { x: number; y: number } {
+    const viewport = this.getViewportSize()
+    const metrics = getPlayerHealthBarMetrics(viewport.width, viewport.height)
+    const startX = Math.min(viewport.width - 120, metrics.x + metrics.width + 28)
+    const startY = metrics.y + 2
+    const column = index % 5
+    const row = Math.floor(index / 5)
+    return {
+      x: startX + column * 52,
+      y: startY + row * 18,
+    }
+  }
+
   private syncPachinkoBoard(): RectBounds {
     const rect = this.getPachinkoWorldRect()
     const previousRect = this.pachinkoBoardRect
@@ -3155,6 +3556,8 @@ export class ArenaScene extends Phaser.Scene {
     this.pachinkoQueueLabel
       ?.setPosition(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET)
       .setText(`대기\n${this.pachinkoTokenQueue.length}`)
+
+    this.syncPachinkoOddsVisuals(rect)
 
     for (const light of this.pachinkoLights) {
       if (!light.visual.active) {
@@ -3272,8 +3675,61 @@ export class ArenaScene extends Phaser.Scene {
       this.pachinkoLaneDividers.push({ visual: laneDivider, xRatio })
       this.pachinkoVisuals.push(laneDivider)
     }
+    this.createPachinkoOddsVisuals(rect)
     this.createPachinkoSlotVisuals(rect)
     this.syncPachinkoBoard()
+  }
+
+  private createPachinkoOddsVisuals(_rect: RectBounds): void {
+    const rows = getPachinkoWeaponOddsRows(
+      this.pachinkoTokenXp,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+      this.getActiveWeaponId(),
+      this.getPachinkoActiveWeaponWeightMultiplier(),
+    )
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index]
+      const { x, y } = this.getPachinkoOddsHudPosition(index)
+      const icon = this.add.image(x, y, row.iconKey)
+        .setDepth(63)
+        .setDisplaySize(14, 14)
+        .setScrollFactor(0)
+      const label = this.add.text(x + 12, y, row.percentLabel, {
+        color: '#dbeafe',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '8px',
+        fontStyle: '700',
+      }).setOrigin(0, 0.5).setDepth(63).setScrollFactor(0)
+
+      this.pachinkoOddsVisuals.push({ icon, label })
+      this.pachinkoVisuals.push(icon, label)
+    }
+  }
+
+  private syncPachinkoOddsVisuals(_rect: RectBounds): void {
+    const rows = getPachinkoWeaponOddsRows(
+      this.pachinkoTokenXp,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+      this.getActiveWeaponId(),
+      this.getPachinkoActiveWeaponWeightMultiplier(),
+    )
+
+    for (let index = 0; index < this.pachinkoOddsVisuals.length; index += 1) {
+      const visual = this.pachinkoOddsVisuals[index]
+      const row = rows[index]
+      if (!visual || !row) {
+        continue
+      }
+
+      const { x, y } = this.getPachinkoOddsHudPosition(index)
+      visual.icon.setTexture(row.iconKey).setPosition(x, y).setDisplaySize(14, 14)
+      visual.label.setPosition(x + 12, y).setText(row.percentLabel)
+    }
   }
 
   private createPachinkoSlotVisuals(rect: RectBounds): void {
@@ -3283,6 +3739,7 @@ export class ArenaScene extends Phaser.Scene {
       this.pachinkoRewardTableSeed,
       this.playerProgression.level,
       this.getActiveWeaponId(),
+      this.getPachinkoActiveWeaponWeightMultiplier(),
     )) {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
@@ -3329,6 +3786,7 @@ export class ArenaScene extends Phaser.Scene {
       this.pachinkoRewardTableSeed,
       this.playerProgression.level,
       this.getActiveWeaponId(),
+      this.getPachinkoActiveWeaponWeightMultiplier(),
     )
     for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
       const visual = this.pachinkoSlotVisuals[index]
@@ -3372,6 +3830,7 @@ export class ArenaScene extends Phaser.Scene {
     this.pachinkoPinEntities = []
     this.pachinkoLaneDividers = []
     this.pachinkoSlotVisuals = []
+    this.pachinkoOddsVisuals = []
     this.pachinkoLights = []
     for (const visual of this.pachinkoVisuals) {
       if (visual.active) {
@@ -3393,7 +3852,8 @@ export class ArenaScene extends Phaser.Scene {
 
 
   private spawnProjectile(projectileSpec: ProjectileSpawnSpec, textureKey: string): void {
-    const projectile = this.physics.add.image(this.player.x, this.player.y, textureKey)
+    const projectileOrigin = projectileSpec.origin ?? { x: this.player.x, y: this.player.y }
+    const projectile = this.physics.add.image(projectileOrigin.x, projectileOrigin.y, textureKey)
     const visualTier = Math.max(0, projectileSpec.visualPowerTier ?? 0)
     projectile.setTint(projectileSpec.tint)
     projectile.setCircle(projectileSpec.radius)
@@ -3414,21 +3874,39 @@ export class ArenaScene extends Phaser.Scene {
       remainingLifetimeMs: projectileSpec.lifetimeMs,
       remainingHits: projectileSpec.maxHits,
       hitEnemyIds: new Set<number>(),
-      origin: { x: this.player.x, y: this.player.y },
+      origin: projectileOrigin,
       direction: projectileSpec.direction,
       maxTravelDistance: projectileSpec.maxTravelDistance,
       knockback: projectileSpec.knockback,
       chain: projectileSpec.chain,
+      explosionOnHit: projectileSpec.explosionOnHit,
+      explosionOnExpire: projectileSpec.explosionOnExpire,
       hazardOnHit: projectileSpec.hazardOnHit,
       hazardOnExpire: projectileSpec.hazardOnExpire,
       impactBurstOnHit: projectileSpec.impactBurstOnHit,
+      visualPowerTier: visualTier,
+      trailCooldownMs: 0,
     })
+  }
+
+  private dispatchProjectileSpec(projectileSpec: ProjectileSpawnSpec, textureKey: string): void {
+    if ((projectileSpec.delayMs ?? 0) > 0) {
+      this.time.delayedCall(projectileSpec.delayMs ?? 0, () => {
+        if (!this.player.active || this.isRunEnding || this.isInteractionBlocked()) {
+          return
+        }
+        this.spawnProjectile(projectileSpec, textureKey)
+      })
+      return
+    }
+
+    this.spawnProjectile(projectileSpec, textureKey)
   }
 
   private applyMeleeSwing(swing: MeleeSwingSpec): void {
     const affectedEnemyIds = new Set(
       collectTargetsInCleave(
-        { x: this.player.x, y: this.player.y },
+        swing.origin ?? { x: this.player.x, y: this.player.y },
         swing.direction,
         swing.range,
         swing.arcDegrees,
@@ -3465,30 +3943,23 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private dispatchMeleeSwing(swing: MeleeSwingSpec): void {
+    if ((swing.delayMs ?? 0) > 0) {
+      this.time.delayedCall(swing.delayMs ?? 0, () => {
+        if (!this.player.active || this.isRunEnding || this.isInteractionBlocked()) {
+          return
+        }
+        this.applyMeleeSwing(swing)
+      })
+      return
+    }
+
+    this.applyMeleeSwing(swing)
+  }
+
   private spawnMeleeSwingVisual(swing: MeleeSwingSpec): void {
-    const graphics = this.add.graphics({ x: this.player.x, y: this.player.y })
-    const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
-    const visualTier = Math.max(0, swing.visualPowerTier ?? 0)
-
-    graphics.fillStyle(swing.tint, Math.min(0.44, 0.28 + visualTier * 0.04))
-    graphics.lineStyle(3 + visualTier, swing.tint, Math.min(0.9, 0.65 + visualTier * 0.05))
-    graphics.beginPath()
-    graphics.moveTo(0, 0)
-    graphics.slice(0, 0, swing.range, -halfArcRadians, halfArcRadians, false)
-    graphics.closePath()
-    graphics.fillPath()
-    graphics.strokePath()
-    graphics.setRotation(Math.atan2(swing.direction.y, swing.direction.x))
-    graphics.setDepth(0.7)
-
-    this.tweens.add({
-      targets: graphics,
-      alpha: 0,
-      scaleX: 1.08 + visualTier * 0.03,
-      scaleY: 1.08 + visualTier * 0.03,
-      duration: swing.visualDurationMs,
-      onComplete: () => graphics.destroy(),
-    })
+    const swingOrigin = swing.origin ?? { x: this.player.x, y: this.player.y }
+    spawnMeleeSwingEffect(this, swingOrigin, swing)
   }
 
   private applyDirectProjectileKnockback(enemy: EnemyEntity, projectile: ProjectileEntity): void {
@@ -3509,8 +3980,8 @@ export class ArenaScene extends Phaser.Scene {
     const result = resolveKnockbackHit({
       source: 'melee-swing',
       direction: {
-        x: enemy.sprite.x - this.player.x,
-        y: enemy.sprite.y - this.player.y,
+        x: enemy.sprite.x - (swing.origin?.x ?? this.player.x),
+        y: enemy.sprite.y - (swing.origin?.y ?? this.player.y),
       },
       fallbackDirection: swing.direction,
       weapon: swing.knockback,
@@ -3605,9 +4076,17 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
-  private destroyProjectile(projectile: ProjectileEntity, hazard?: HazardSpawnSpec): void {
+  private destroyProjectile(
+    projectile: ProjectileEntity,
+    hazard?: HazardSpawnSpec,
+    explosion?: HazardSpawnSpec,
+  ): void {
     if (!projectile.sprite.active) {
       return
+    }
+
+    if (explosion) {
+      this.applyImpactExplosion(projectile.sprite.x, projectile.sprite.y, explosion)
     }
 
     if (hazard) {
@@ -3618,10 +4097,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnHazardZone(x: number, y: number, hazard: HazardSpawnSpec): void {
-    const visual = this.add.circle(x, y, hazard.radius, hazard.tint, 0.3).setDepth(0.4)
+    const effect = createHazardZoneEffect(this, x, y, hazard)
 
     this.hazardZones.push({
-      visual,
+      visual: effect.core,
+      effect,
       x,
       y,
       radius: hazard.radius,
@@ -3631,7 +4111,47 @@ export class ArenaScene extends Phaser.Scene {
       totalLifetimeMs: hazard.durationMs,
       tickEveryMs: hazard.tickEveryMs,
       tickCountdownMs: hazard.tickEveryMs,
+      tint: hazard.tint,
+      visualPowerTier: hazard.visualPowerTier,
     })
+  }
+
+  private applyImpactExplosion(x: number, y: number, explosion: HazardSpawnSpec): void {
+    const impactedIds = new Set(
+      collectTargetsInRadius(
+        { x, y },
+        explosion.radius,
+        this.enemies
+          .filter((enemy) => enemy.sprite.active)
+          .map((enemy) => ({
+            id: enemy.runtimeId,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            radius: enemy.config.size / 2,
+          })),
+      ),
+    )
+
+    const visual = this.add.circle(x, y, explosion.radius, explosion.tint, 0.22).setDepth(0.62)
+    this.tweens.add({
+      targets: visual,
+      alpha: 0,
+      scaleX: 1.22,
+      scaleY: 1.22,
+      duration: 110,
+      onComplete: () => visual.destroy(),
+    })
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active || !impactedIds.has(enemy.runtimeId)) {
+        continue
+      }
+
+      this.damageEnemy(enemy, explosion.damage)
+      if (this.isRunEnding) {
+        return
+      }
+    }
   }
 
   private applyChainDamage(
@@ -3662,6 +4182,14 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
+      spawnChainLightningEffect(
+        this,
+        { x: primaryEnemy.sprite.x, y: primaryEnemy.sprite.y },
+        { x: target.sprite.x, y: target.sprite.y },
+        chain,
+        target.config.tint,
+        chainIndex,
+      )
       const chainBaseDamage = getChainDamage(baseDamage, chainIndex + 1, chain.falloff)
       this.damageEnemy(target, chainBaseDamage, {
         canCrit: true,

@@ -1,12 +1,16 @@
 import type {
+  WeaponBurstFireBehavior,
   WeaponChainBehavior,
   WeaponDefinition,
+  WeaponImpactAoeBehavior,
   WeaponImpactBurstBehavior,
   WeaponKnockbackDefinition,
   WeaponMeleeCleaveBehavior,
   WeaponPierceBehavior,
+  WeaponSplitShotBehavior,
   WeaponSprayHazardBehavior,
   WeaponVolleyBehavior,
+  WeaponZoneControlBehavior,
 } from '../domain/types.js'
 
 export interface Point {
@@ -27,12 +31,14 @@ export interface HazardSpawnSpec {
   tickEveryMs: number
   damage: number
   tint: number
+  visualPowerTier?: number
 }
 
 export interface ChainSpec {
   maxChains: number
   range: number
   falloff: number
+  visualPowerTier?: number
 }
 
 export interface ImpactBurstSpec {
@@ -44,6 +50,8 @@ export interface ImpactBurstSpec {
 }
 
 export interface ProjectileSpawnSpec {
+  delayMs?: number
+  origin?: Point
   direction: Point
   speed: number
   damage: number
@@ -54,6 +62,8 @@ export interface ProjectileSpawnSpec {
   maxHits: number
   knockback: WeaponKnockbackDefinition
   chain?: ChainSpec
+  explosionOnHit?: HazardSpawnSpec
+  explosionOnExpire?: HazardSpawnSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
   impactBurstOnHit?: ImpactBurstSpec
@@ -61,6 +71,8 @@ export interface ProjectileSpawnSpec {
 }
 
 export interface MeleeSwingSpec {
+  delayMs?: number
+  origin?: Point
   direction: Point
   damage: number
   tint: number
@@ -76,6 +88,13 @@ export interface AttackPlan {
   cooldownMs: number
   projectiles: ProjectileSpawnSpec[]
   meleeSwings: MeleeSwingSpec[]
+}
+
+export interface WeaponAttackContract {
+  family: string
+  geometry: string
+  cadence: string
+  followUp: string
 }
 
 export interface ChainCandidate {
@@ -163,21 +182,24 @@ const rotate = (vector: Point, degrees: number): Point => {
 
 const createHazardSpec = (
   weapon: WeaponDefinition,
-  behavior: WeaponSprayHazardBehavior,
+  behavior: WeaponSprayHazardBehavior | WeaponZoneControlBehavior,
 ): HazardSpawnSpec => ({
-  radius: behavior.hazardRadius,
-  durationMs: behavior.hazardDurationMs,
-  tickEveryMs: behavior.hazardTickMs,
-  damage: behavior.hazardDamage,
+  radius: behavior.kind === 'zone-control' ? behavior.zoneRadius : behavior.hazardRadius,
+  durationMs: behavior.kind === 'zone-control' ? behavior.zoneDurationMs : behavior.hazardDurationMs,
+  tickEveryMs: behavior.kind === 'zone-control' ? behavior.zoneTickMs : behavior.hazardTickMs,
+  damage: behavior.kind === 'zone-control' ? behavior.zoneDamage : behavior.hazardDamage,
   tint: weapon.projectileTint,
+  visualPowerTier: weapon.visualPowerTier,
 })
 
 const createBaseProjectile = (
   weapon: WeaponDefinition,
+  origin: Point,
   direction: Point,
   lifetimeMs: number,
   overrides: Partial<ProjectileSpawnSpec> = {},
 ): ProjectileSpawnSpec => ({
+  origin,
   direction,
   speed: weapon.projectileSpeed,
   damage: weapon.damage,
@@ -193,6 +215,7 @@ const createBaseProjectile = (
 
 const createSprayProjectiles = (
   weapon: WeaponDefinition,
+  origin: Point,
   direction: Point,
   behavior: WeaponSprayHazardBehavior,
 ): ProjectileSpawnSpec[] => {
@@ -204,7 +227,7 @@ const createSprayProjectiles = (
     const offset = (index - centerIndex) * behavior.spreadDegrees
     const spreadDirection = normalize(rotate(direction, offset))
 
-    return createBaseProjectile(weapon, spreadDirection, behavior.projectileLifetimeMs, {
+    return createBaseProjectile(weapon, origin, spreadDirection, behavior.projectileLifetimeMs, {
       damage,
       speed: Math.round(weapon.projectileSpeed * 0.78),
       hazardOnHit: hazard,
@@ -213,20 +236,69 @@ const createSprayProjectiles = (
   })
 }
 
+const createSplitProjectiles = (
+  weapon: WeaponDefinition,
+  origin: Point,
+  direction: Point,
+  behavior: WeaponSplitShotBehavior,
+): ProjectileSpawnSpec[] => {
+  const centerIndex = (behavior.projectileCount - 1) / 2
+  const damage = Math.max(1, Math.round(weapon.damage * (behavior.damageMultiplier ?? 1)))
+  const speed = Math.max(1, Math.round(weapon.projectileSpeed * (behavior.speedMultiplier ?? 1)))
+  const delayStep = Math.max(0, behavior.shotDelayMs ?? 0)
+
+  return Array.from({ length: behavior.projectileCount }, (_, index) => {
+    const offset = (index - centerIndex) * behavior.spreadDegrees
+    const splitDirection = normalize(rotate(direction, offset))
+
+    return createBaseProjectile(weapon, origin, splitDirection, behavior.projectileLifetimeMs, {
+      delayMs: delayStep > 0 ? delayStep * index : 0,
+      damage,
+      speed,
+      maxHits: behavior.maxHits ?? 1,
+    })
+  })
+}
+
+const createBurstProjectiles = (
+  weapon: WeaponDefinition,
+  origin: Point,
+  direction: Point,
+  behavior: WeaponBurstFireBehavior,
+): ProjectileSpawnSpec[] => {
+  const damage = Math.max(1, Math.round(weapon.damage * (behavior.damageMultiplier ?? 1)))
+  const speed = Math.max(1, Math.round(weapon.projectileSpeed * (behavior.speedMultiplier ?? 1)))
+
+  return Array.from({ length: behavior.shotsPerBurst }, (_, index) => {
+    const offsetDegrees =
+      behavior.spreadDegrees != null && behavior.spreadDegrees > 0
+        ? (index - (behavior.shotsPerBurst - 1) / 2) * behavior.spreadDegrees
+        : 0
+    const burstDirection = normalize(rotate(direction, offsetDegrees))
+
+    return createBaseProjectile(weapon, origin, burstDirection, behavior.projectileLifetimeMs, {
+      delayMs: index * behavior.shotIntervalMs,
+      damage,
+      speed,
+    })
+  })
+}
+
 const createVolleyProjectiles = (
   weapon: WeaponDefinition,
+  origin: Point,
   direction: Point,
   behavior: WeaponVolleyBehavior,
 ): ProjectileSpawnSpec[] => {
   const centerIndex = (behavior.projectileCount - 1) / 2
   const volleyDamage = Math.max(1, Math.round(weapon.damage * behavior.damageMultiplier))
-  const speed = Math.round(weapon.projectileSpeed * behavior.speedMultiplier)
+  const speed = Math.max(1, Math.round(weapon.projectileSpeed * behavior.speedMultiplier))
 
   return Array.from({ length: behavior.projectileCount }, (_, index) => {
     const offset = (index - centerIndex) * behavior.spreadDegrees
     const spreadDirection = normalize(rotate(direction, offset))
 
-    return createBaseProjectile(weapon, spreadDirection, behavior.projectileLifetimeMs, {
+    return createBaseProjectile(weapon, origin, spreadDirection, behavior.projectileLifetimeMs, {
       damage: volleyDamage,
       speed,
       maxHits: behavior.maxHits,
@@ -236,34 +308,62 @@ const createVolleyProjectiles = (
 
 const createPierceProjectile = (
   weapon: WeaponDefinition,
+  origin: Point,
   direction: Point,
   behavior: WeaponPierceBehavior,
 ): ProjectileSpawnSpec =>
-  createBaseProjectile(weapon, direction, behavior.projectileLifetimeMs, {
+  createBaseProjectile(weapon, origin, direction, behavior.projectileLifetimeMs, {
     maxHits: behavior.maxHits,
   })
 
 const createChainProjectile = (
   weapon: WeaponDefinition,
+  origin: Point,
   direction: Point,
   behavior: WeaponChainBehavior,
 ): ProjectileSpawnSpec =>
-  createBaseProjectile(weapon, direction, behavior.projectileLifetimeMs, {
+  createBaseProjectile(weapon, origin, direction, behavior.projectileLifetimeMs, {
     chain: {
       maxChains: behavior.maxChains,
       range: behavior.chainRange,
       falloff: behavior.chainFalloff,
+      visualPowerTier: weapon.visualPowerTier,
     },
   })
 
+const createImpactExplosionSpec = (
+  weapon: WeaponDefinition,
+  behavior: WeaponImpactAoeBehavior,
+): HazardSpawnSpec => ({
+  radius: behavior.explosionRadius,
+  durationMs: 1,
+  tickEveryMs: 1,
+  damage: behavior.explosionDamage,
+  tint: weapon.projectileTint,
+})
+
+const createImpactProjectile = (
+  weapon: WeaponDefinition,
+  origin: Point,
+  direction: Point,
+  behavior: WeaponImpactAoeBehavior,
+): ProjectileSpawnSpec => {
+  const explosion = createImpactExplosionSpec(weapon, behavior)
+  return createBaseProjectile(weapon, origin, direction, behavior.projectileLifetimeMs, {
+    explosionOnHit: explosion,
+    explosionOnExpire: explosion,
+  })
+}
+
 const createImpactBurstProjectile = (
   weapon: WeaponDefinition,
+  origin: Point,
   direction: Point,
   behavior: WeaponImpactBurstBehavior,
 ): ProjectileSpawnSpec => {
   const splashDamage = Math.max(1, Math.round(weapon.damage * behavior.splashDamageMultiplier))
 
-  return createBaseProjectile(weapon, direction, behavior.projectileLifetimeMs, {
+  return createBaseProjectile(weapon, origin, direction, behavior.projectileLifetimeMs, {
     impactBurstOnHit: {
       radius: behavior.splashRadius,
       damage: splashDamage,
@@ -274,11 +374,27 @@ const createImpactBurstProjectile = (
   })
 }
 
+const createZoneControlProjectile = (
+  weapon: WeaponDefinition,
+  origin: Point,
+  direction: Point,
+  behavior: WeaponZoneControlBehavior,
+): ProjectileSpawnSpec => {
+  const zone = createHazardSpec(weapon, behavior)
+  return createBaseProjectile(weapon, origin, direction, behavior.projectileLifetimeMs, {
+    speed: Math.max(1, Math.round(weapon.projectileSpeed * (behavior.speedMultiplier ?? 1))),
+    hazardOnHit: zone,
+    hazardOnExpire: zone,
+  })
+}
+
 const createMeleeSwing = (
   weapon: WeaponDefinition,
+  origin: Point,
   direction: Point,
   behavior: WeaponMeleeCleaveBehavior,
 ): MeleeSwingSpec => ({
+  origin,
   direction,
   damage: weapon.damage,
   tint: weapon.projectileTint,
@@ -312,44 +428,68 @@ export function buildAttackPlan(
     case 'single':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: [createBaseProjectile(weapon, direction, weapon.attackBehavior.projectileLifetimeMs)],
+        projectiles: [createBaseProjectile(weapon, origin, direction, weapon.attackBehavior.projectileLifetimeMs)],
         meleeSwings: [],
       }
     case 'spray-hazard':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: createSprayProjectiles(weapon, direction, weapon.attackBehavior),
+        projectiles: createSprayProjectiles(weapon, origin, direction, weapon.attackBehavior),
+        meleeSwings: [],
+      }
+    case 'split-shot':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: createSplitProjectiles(weapon, origin, direction, weapon.attackBehavior),
+        meleeSwings: [],
+      }
+    case 'burst-fire':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: createBurstProjectiles(weapon, origin, direction, weapon.attackBehavior),
         meleeSwings: [],
       }
     case 'volley':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: createVolleyProjectiles(weapon, direction, weapon.attackBehavior),
+        projectiles: createVolleyProjectiles(weapon, origin, direction, weapon.attackBehavior),
         meleeSwings: [],
       }
     case 'pierce':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: [createPierceProjectile(weapon, direction, weapon.attackBehavior)],
+        projectiles: [createPierceProjectile(weapon, origin, direction, weapon.attackBehavior)],
         meleeSwings: [],
       }
     case 'chain':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: [createChainProjectile(weapon, direction, weapon.attackBehavior)],
+        projectiles: [createChainProjectile(weapon, origin, direction, weapon.attackBehavior)],
+        meleeSwings: [],
+      }
+    case 'impact-aoe':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: [createImpactProjectile(weapon, origin, direction, weapon.attackBehavior)],
+        meleeSwings: [],
+      }
+    case 'zone-control':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: [createZoneControlProjectile(weapon, origin, direction, weapon.attackBehavior)],
         meleeSwings: [],
       }
     case 'impact-burst':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: [createImpactBurstProjectile(weapon, direction, weapon.attackBehavior)],
+        projectiles: [createImpactBurstProjectile(weapon, origin, direction, weapon.attackBehavior)],
         meleeSwings: [],
       }
     case 'melee-cleave':
       return {
         cooldownMs: weapon.fireRateMs,
         projectiles: [],
-        meleeSwings: [createMeleeSwing(weapon, direction, weapon.attackBehavior)],
+        meleeSwings: [createMeleeSwing(weapon, origin, direction, weapon.attackBehavior)],
       }
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in buildAttackPlan')
@@ -370,6 +510,10 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
       return '기본 사격'
     case 'spray-hazard':
       return '산성 분사'
+    case 'split-shot':
+      return '분기 사격'
+    case 'burst-fire':
+      return '연속 점사'
     case 'volley':
       return '연속 발사'
     case 'pierce':
@@ -377,7 +521,10 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
     case 'chain':
       return '연쇄 번개'
     case 'impact-burst':
+    case 'impact-aoe':
       return '충격 폭발'
+    case 'zone-control':
+      return '제어 지대'
     case 'melee-cleave':
       return '전방 참격'
     default:
@@ -412,9 +559,13 @@ export function getWeaponOutputGeometry(weapon: WeaponDefinition): WeaponOutputG
   switch (weapon.attackBehavior.kind) {
     case 'single':
     case 'impact-burst':
+    case 'impact-aoe':
       return 'single-shot'
     case 'spray-hazard':
+    case 'zone-control':
       return 'hazard-zone'
+    case 'split-shot':
+    case 'burst-fire':
     case 'volley':
       return 'multi-volley'
     case 'pierce':
@@ -431,13 +582,17 @@ export function getWeaponOutputGeometry(weapon: WeaponDefinition): WeaponOutputG
 export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponSpecialEffectProfile {
   switch (weapon.attackBehavior.kind) {
     case 'spray-hazard':
+    case 'zone-control':
       return 'hazard-linger'
     case 'chain':
       return 'chain-bounce'
     case 'impact-burst':
+    case 'impact-aoe':
       return 'impact-splash'
     case 'melee-cleave':
       return weapon.knockback.force >= 110 ? 'high-knockback' : 'none'
+    case 'split-shot':
+    case 'burst-fire':
     case 'volley':
       return weapon.knockback.force >= 80 ? 'high-knockback' : 'none'
     case 'single':
@@ -454,6 +609,10 @@ export function getWeaponSummary(weapon: WeaponDefinition): string {
   switch (weapon.attackBehavior.kind) {
     case 'single':
       return `피해 ${weapon.damage} · 단발 견제 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'split-shot':
+      return `갈래당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.projectileCount}갈래 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'burst-fire':
+      return `탄당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.shotsPerBurst}점사 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'spray-hazard':
       return `피해 ${weapon.damage} · 장판 압박 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'volley':
@@ -464,10 +623,98 @@ export function getWeaponSummary(weapon: WeaponDefinition): string {
       return `피해 ${weapon.damage} · 연쇄 ${weapon.attackBehavior.maxChains}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'impact-burst':
       return `피해 ${weapon.damage} · 착탄 폭발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'impact-aoe':
+      return `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.explosionDamage} · 반경 ${weapon.attackBehavior.explosionRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'zone-control':
+      return `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'melee-cleave':
       return `피해 ${weapon.damage} · 전방 ${weapon.attackBehavior.arcDegrees}° · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponSummary')
+  }
+}
+
+export function getWeaponAttackContract(weapon: WeaponDefinition): WeaponAttackContract {
+  switch (weapon.attackBehavior.kind) {
+    case 'split-shot':
+      return {
+        family: 'split-shot',
+        geometry: `${weapon.attackBehavior.projectileCount}-way:${weapon.attackBehavior.spreadDegrees}`,
+        cadence: `cooldown:${weapon.fireRateMs}:delay:${weapon.attackBehavior.shotDelayMs ?? 0}`,
+        followUp: (weapon.attackBehavior.shotDelayMs ?? 0) > 0 ? 'delayed-second-pass' : 'none',
+      }
+    case 'burst-fire':
+      return {
+        family: 'burst-fire',
+        geometry: `line-burst:${weapon.attackBehavior.shotsPerBurst}:${weapon.attackBehavior.spreadDegrees ?? 0}`,
+        cadence: `cooldown:${weapon.fireRateMs}:interval:${weapon.attackBehavior.shotIntervalMs}`,
+        followUp: 'burst-sequence',
+      }
+    case 'spray-hazard':
+      return {
+        family: 'spray-hazard',
+        geometry: `spread:${weapon.attackBehavior.projectileCount}:${weapon.attackBehavior.spreadDegrees}:radius:${weapon.attackBehavior.hazardRadius}`,
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: 'puddle-hazard',
+      }
+    case 'volley':
+      return {
+        family: 'volley',
+        geometry: `fan:${weapon.attackBehavior.projectileCount}:${weapon.attackBehavior.spreadDegrees}`,
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: 'instant-volley',
+      }
+    case 'pierce':
+      return {
+        family: 'pierce',
+        geometry: `line:maxHits:${weapon.attackBehavior.maxHits}`,
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: 'multi-hit-pierce',
+      }
+    case 'chain':
+      return {
+        family: 'chain',
+        geometry: `single-line:range:${weapon.attackBehavior.chainRange}`,
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: `chain:${weapon.attackBehavior.maxChains}`,
+      }
+    case 'impact-burst':
+      return {
+        family: 'impact-burst',
+        geometry: `single-shell:radius:${weapon.attackBehavior.splashRadius}`,
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: 'impact-splash',
+      }
+    case 'impact-aoe':
+      return {
+        family: 'impact-aoe',
+        geometry: `single-shell:radius:${weapon.attackBehavior.explosionRadius}`,
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: 'impact-explosion',
+      }
+    case 'zone-control':
+      return {
+        family: 'zone-control',
+        geometry: `single-zone:${weapon.attackBehavior.zoneRadius}:${weapon.attackBehavior.zoneDurationMs}`,
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: 'linger-zone',
+      }
+    case 'melee-cleave':
+      return {
+        family: 'melee-cleave',
+        geometry: `arc:${weapon.attackBehavior.arcDegrees}:range:${weapon.attackBehavior.range}`,
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: 'none',
+      }
+    case 'single':
+      return {
+        family: 'single',
+        geometry: 'single-line',
+        cadence: `cooldown:${weapon.fireRateMs}`,
+        followUp: 'none',
+      }
+    default:
+      return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponAttackContract')
   }
 }
 
