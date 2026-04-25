@@ -99,6 +99,8 @@ export interface MeleeSwingSpec {
   tint: number
   range: number
   arcDegrees: number
+  hitShape?: 'arc' | 'box'
+  boxWidth?: number
   visualDurationMs: number
   maxTargets: number
   knockback: WeaponKnockbackDefinition
@@ -488,6 +490,8 @@ const createComboMeleeSwings = (
     tint: weapon.projectileTint,
     range: step.range,
     arcDegrees: step.arcDegrees,
+    hitShape: step.hitShape ?? 'arc',
+    boxWidth: step.boxWidth,
     visualDurationMs: step.visualDurationMs,
     maxTargets: step.maxTargets,
     knockback: {
@@ -1106,6 +1110,54 @@ export function collectTargetsInCleave(
       }
     })
     .filter((target) => target.inRange && target.inArc)
+    .sort((left, right) => {
+      if (left.centerDistance !== right.centerDistance) {
+        return left.centerDistance - right.centerDistance
+      }
+
+      return left.id - right.id
+    })
+    .slice(0, maxTargets)
+    .map((target) => target.id)
+}
+
+export function collectTargetsInBox(
+  source: Point,
+  direction: Point,
+  range: number,
+  width: number,
+  targets: CircularTarget[],
+  maxTargets: number = Number.POSITIVE_INFINITY,
+): number[] {
+  const normalizedDirection = normalize(direction)
+  if (normalizedDirection.x === 0 && normalizedDirection.y === 0) {
+    return []
+  }
+
+  const perpendicular = {
+    x: -normalizedDirection.y,
+    y: normalizedDirection.x,
+  }
+  const halfWidth = Math.max(1, width) / 2
+
+  return targets
+    .map((target) => {
+      const offset = {
+        x: target.x - source.x,
+        y: target.y - source.y,
+      }
+      const forward = offset.x * normalizedDirection.x + offset.y * normalizedDirection.y
+      const lateral = Math.abs(offset.x * perpendicular.x + offset.y * perpendicular.y)
+      const centerDistance = Math.hypot(offset.x, offset.y)
+
+      return {
+        id: target.id,
+        centerDistance,
+        inForwardBand: forward >= -target.radius && forward <= range + target.radius,
+        inWidthBand: lateral <= halfWidth + target.radius,
+      }
+    })
+    .filter((target) => target.inForwardBand && target.inWidthBand)
     .sort((left, right) => {
       if (left.centerDistance !== right.centerDistance) {
         return left.centerDistance - right.centerDistance

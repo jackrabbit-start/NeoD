@@ -2464,6 +2464,8 @@ test('combat effects are split out for projectile trails and lingering hazard pu
   assert.equal(mistPlan.projectiles[0]?.hazardOnHit?.visualPowerTier, 2)
   assert.ok(arenaSceneSource.includes('spawnProjectileTrailEffect('))
   assert.ok(arenaSceneSource.includes('createHazardZoneEffect('))
+  assert.ok(arenaSceneSource.includes("weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'"))
+  assert.ok(arenaSceneSource.includes('this.lastPlayerMoveDirection.x'))
   assert.ok(combatEffectsSource.includes('spawnHazardTickEffect'))
   assert.ok(combatEffectsSource.includes('scene.add.graphics({ x, y })'))
   assert.ok(combatEffectsSource.includes('scene.add.container(point.x, point.y)'))

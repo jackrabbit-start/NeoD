@@ -376,10 +376,10 @@ export function spawnExplosionEffect(scene: Phaser.Scene, x: number, y: number, 
 }
 
 export function spawnMeleeSwingEffect(scene: Phaser.Scene, origin: Point, swing: MeleeSwingSpec): void {
-  const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
   const visualTier = getCombatEffectPowerTier(swing.visualPowerTier)
   const rotation = Math.atan2(swing.direction.y, swing.direction.x)
   const container = scene.add.container(origin.x, origin.y).setRotation(rotation).setDepth(0.7)
+  const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
 
   if (swing.healOnHit && swing.arcDegrees >= 300) {
     const sandTint = mixColor(swing.tint, 0xffb45a, 0.58)
@@ -422,6 +422,37 @@ export function spawnMeleeSwingEffect(scene: Phaser.Scene, origin: Point, swing:
       scaleY: 1.08 + visualTier * 0.03,
       duration: swing.visualDurationMs + 60,
       ease: 'Cubic.Out',
+      onComplete: () => container.destroy(),
+    })
+    return
+  }
+
+  if (swing.hitShape === 'box') {
+    const graphics = scene.add.graphics()
+    const highlight = scene.add.graphics()
+    const width = swing.boxWidth ?? Math.max(18, swing.range * 0.45)
+    const halfWidth = width / 2
+
+    graphics.fillStyle(swing.tint, Math.min(0.4, 0.2 + visualTier * 0.04))
+    graphics.fillRoundedRect(0, -halfWidth, swing.range, width, Math.min(12, halfWidth))
+    graphics.lineStyle(4 + visualTier, mixColor(swing.tint, 0xffffff, 0.2), 0.5)
+    graphics.strokeRoundedRect(0, -halfWidth, swing.range, width, Math.min(12, halfWidth))
+
+    highlight.lineStyle(2 + visualTier * 0.6, 0xffffff, 0.72)
+    highlight.lineBetween(0, 0, swing.range, 0)
+    highlight.lineStyle(1.5, mixColor(swing.tint, 0xffffff, 0.36), 0.4)
+    highlight.lineBetween(swing.range * 0.15, -halfWidth * 0.55, swing.range * 0.92, -halfWidth * 0.55)
+    highlight.lineBetween(swing.range * 0.15, halfWidth * 0.55, swing.range * 0.92, halfWidth * 0.55)
+
+    container.add([graphics, highlight])
+    scene.tweens.add({
+      targets: container,
+      alpha: 0,
+      x: container.x + swing.direction.x * 10,
+      y: container.y + swing.direction.y * 10,
+      scaleX: 1.05 + visualTier * 0.03,
+      duration: swing.visualDurationMs,
+      ease: 'Quad.Out',
       onComplete: () => container.destroy(),
     })
     return

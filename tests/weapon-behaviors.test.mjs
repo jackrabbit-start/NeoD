@@ -8,6 +8,7 @@ import {
   applyProjectileHitState,
   buildAttackPlan,
   canProjectileHitEnemy,
+  collectTargetsInBox,
   collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
@@ -182,7 +183,7 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
           zoneDamage: 24,
           zoneTriggerMode: 'trigger-explode',
           armingDelayMs: 140,
-          speedMultiplier: 0.52,
+          speedMultiplier: 0.18,
         },
       },
       'slime-glaive': {
@@ -214,9 +215,9 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
           kind: 'combo-melee',
           stepIntervalMs: 68,
           steps: [
-            { damageMultiplier: 0.75, range: 58, arcDegrees: 42, visualDurationMs: 82, maxTargets: 1 },
-            { damageMultiplier: 0.82, range: 60, arcDegrees: 46, visualDurationMs: 86, maxTargets: 1 },
-            { damageMultiplier: 0.92, range: 68, arcDegrees: 58, visualDurationMs: 94, maxTargets: 2, knockbackMultiplier: 1.1 },
+            { damageMultiplier: 0.75, range: 58, arcDegrees: 24, hitShape: 'box', boxWidth: 26, visualDurationMs: 82, maxTargets: 1 },
+            { damageMultiplier: 0.82, range: 60, arcDegrees: 24, hitShape: 'box', boxWidth: 28, visualDurationMs: 86, maxTargets: 1 },
+            { damageMultiplier: 0.92, range: 68, arcDegrees: 28, hitShape: 'box', boxWidth: 34, visualDurationMs: 94, maxTargets: 2, knockbackMultiplier: 1.1 },
             { damageMultiplier: 1.55, range: 78, arcDegrees: 112, visualDurationMs: 118, maxTargets: 4, knockbackMultiplier: 1.6 },
           ],
         },
@@ -316,6 +317,8 @@ test('melee cleave and combo weapons remain actionable and identifiable', () => 
   assert.equal(buildAttackPlan(arc, { x: 0, y: 0 }, { x: 0, y: 10 }).projectiles[0].ricochet.maxBounces, 4)
   assert.equal(buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 1)
   assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 4)
+  assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings[0]?.hitShape, 'box')
+  assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.at(-1)?.hitShape, 'arc')
   assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.at(-1).maxTargets, 4)
   assert.equal(getWeaponOutputGeometry(glaive), 'wide-cleave')
   assert.equal(getWeaponOutputGeometry(prism), 'combo-melee')
@@ -385,6 +388,22 @@ test('radius and cleave helpers collect expected targets', () => {
         { id: 1, x: 40, y: 0, radius: 8 },
         { id: 2, x: 40, y: 30, radius: 8 },
         { id: 3, x: -20, y: 0, radius: 8 },
+      ],
+      2,
+    ),
+    [1],
+  )
+
+  assert.deepEqual(
+    collectTargetsInBox(
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      40,
+      20,
+      [
+        { id: 1, x: 18, y: 4, radius: 4 },
+        { id: 2, x: 18, y: 18, radius: 4 },
+        { id: 3, x: 55, y: 0, radius: 4 },
       ],
       2,
     ),
