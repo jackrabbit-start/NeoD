@@ -78,6 +78,7 @@ export interface WeaponDefinition {
   description: string
   identityLabel?: string
   identityHint?: string
+  range?: number
   damage: number
   fireRateMs: number
   projectileSpeed: number

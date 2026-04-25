@@ -38,6 +38,7 @@ import {
   deriveEffectiveWeaponStats,
   resolveTuningSelection,
 } from '../.tmp-test/src/systems/tuning.js'
+import { getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.js'
 import {
   applyRecipeSelection,
   equipOwnedWeapon,
@@ -279,7 +280,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(acidRecipes), [
-    '산성 분사기 [부식 압박] → 피해 20 · 초당 4발 · 부식 압박 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
+    '산성 분사기 [부식 압박] → 피해 20 · 초당 4발 · 사거리 130 · 부식 압박 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
   ])
 
   const sparkRecipes = getActionableRecipes(
@@ -298,10 +299,10 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(sparkRecipes), [
-    '스파크 카빈 [고속 전격] → 피해 15 · 초당 7발 · 고속 전격 (안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.)',
+    '스파크 카빈 [고속 전격] → 피해 15 · 초당 7발 · 사거리 560 · 고속 전격 (안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.)',
   ])
   assert.deepEqual(describeAvailableRecipes(mistRecipes), [
-    '안개 소용돌이 [안개 제어] → 피해 14 · 초당 4발 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
+    '안개 소용돌이 [안개 제어] → 피해 14 · 초당 4발 · 사거리 190 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
   ])
 })
 
@@ -559,6 +560,51 @@ test('auto-attack shot gating respects interaction pause, cooldown, and target a
       directionY: 0.8,
       distanceSq: 25,
     },
+  )
+})
+
+test('auto-attack target selection respects active weapon range and target radius', () => {
+  const origin = { x: 0, y: 0 }
+
+  assert.equal(
+    resolveNearestAutoAttackTarget(
+      origin,
+      [
+        { x: 80, y: 0, radius: 5, isActive: true },
+        { x: 50, y: 0, radius: 5, isActive: false },
+      ],
+      40,
+    ),
+    null,
+  )
+
+  assert.deepEqual(
+    resolveNearestAutoAttackTarget(
+      origin,
+      [
+        { x: 80, y: 0, radius: 5, isActive: true },
+        { x: 45, y: 0, radius: 10, isActive: true },
+        { x: 20, y: 0, radius: 5, isActive: false },
+      ],
+      40,
+    ),
+    {
+      x: 45,
+      y: 0,
+      directionX: 1,
+      directionY: 0,
+      distanceSq: 2025,
+    },
+  )
+
+  assert.equal(
+    resolveAutoAttackShot(origin, [{ x: 70, y: 0, radius: 5, isActive: true }], {
+      isInteractionBlocked: false,
+      time: 1000,
+      nextFireAt: 0,
+      maxRange: 40,
+    }),
+    null,
   )
 })
 
@@ -996,6 +1042,7 @@ test('effective melee weapon tuning updates nested behavior immutably', () => {
   assert.equal(quick.fireRateMs, Math.round(baseWeapon.fireRateMs * 0.9))
   assert.equal(stabilized.attackBehavior.kind, 'melee-cleave')
   assert.equal(stabilized.attackBehavior.range, baseBehavior.range + 18)
+  assert.equal(getWeaponAttackRange(stabilized), baseBehavior.range + 18)
   assert.notEqual(stabilized.attackBehavior, baseBehavior)
   assert.deepEqual(WEAPON_DEFINITIONS['slime-glaive'], baseWeapon)
 })
