@@ -71,6 +71,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private cursors!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
 
+  private inventoryKey!: Phaser.Input.Keyboard.Key
+
   private codexKey!: Phaser.Input.Keyboard.Key
 
   private enemies: EnemyEntity[] = []
@@ -173,6 +175,7 @@ export class ArenaScene extends Phaser.Scene {
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D,
     }) as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
+    this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
 
     this.startWave(0)
@@ -181,6 +184,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   update(time: number): void {
+    this.handleInventoryToggle()
     this.handleCodexToggle()
     this.handlePlayerMovement()
     this.handleFiring(time)
@@ -198,6 +202,14 @@ export class ArenaScene extends Phaser.Scene {
 
   private isInteractionBlocked(): boolean {
     return this.isInventoryOpen || this.isCodexOpen
+  }
+
+  private handleInventoryToggle(): void {
+    if (!Phaser.Input.Keyboard.JustDown(this.inventoryKey)) {
+      return
+    }
+
+    this.toggleInventory()
   }
 
   private handleCodexToggle(): void {
