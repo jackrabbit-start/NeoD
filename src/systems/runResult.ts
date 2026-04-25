@@ -1,11 +1,15 @@
-import type { HudState } from '../domain/types.js'
+import type { HudState, RunEndReason } from '../domain/types.js'
+import { formatRunTime } from './runProgression.js'
 
 export type RunOutcome = 'win' | 'loss'
 
 export interface RunResultPayload {
   outcome: RunOutcome
   weaponName: string
-  wavesCleared: number
+  elapsedMs: number
+  stageReachedLabel: string
+  finaleReached: boolean
+  endReason?: RunEndReason
 }
 
 export interface RunResultPresentation {
@@ -23,21 +27,34 @@ export interface RunResultPresentation {
 
 export function createRunResultPresentation(payload: RunResultPayload): RunResultPresentation {
   const isWin = payload.outcome === 'win'
+  const isTimeout = payload.endReason === 'timeout'
   const restartPrompt = '재시작 버튼을 눌러 새 런을 시작하세요'
 
   return {
-    title: isWin ? '런 클리어' : '런 실패',
+    title: isWin ? '런 클리어' : isTimeout ? '시간 종료' : '런 실패',
     subtitle: isWin
-      ? '크라운 슬라임을 쓰러뜨리고 토큰 파친코 런 결과가 정리되었습니다.'
-      : '런이 중단되었습니다. 토큰 보상과 무기 별 합성 루트를 다시 점검해 보세요.',
+      ? '크라운 슬라임을 쓰러뜨리고 30분 생존 런 결과가 정리되었습니다.'
+      : isTimeout
+        ? '30:00에 도달했지만 크라운 슬라임을 쓰러뜨리지 못했습니다.'
+        : '런이 중단되었습니다. 토큰 보상과 무기 별 합성 루트를 다시 점검해 보세요.',
     backgroundColor: isWin ? '#171f3f' : '#2b1220',
     accentColor: isWin ? '#a6ffd0' : '#ff9db8',
-    status: isWin ? '크라운 슬라임 격파 · 런 종료' : '전투 불능 · 런 종료',
-    objective: isWin ? '클리어 완료. 전리품 기록을 확인하고 다음 런을 준비하세요.' : '장비를 다시 정비해 보스 클리어에 다시 도전하세요.',
+    status: isWin
+      ? '크라운 슬라임 격파 · 런 종료'
+      : isTimeout
+        ? '30:00 타임아웃 · 런 종료'
+        : '전투 불능 · 런 종료',
+    objective: isWin
+      ? '클리어 완료. 전리품 기록을 확인하고 다음 런을 준비하세요.'
+      : isTimeout
+        ? '다음 런에서는 25:00 피날레 이후 크라운 슬라임을 더 빠르게 마무리하세요.'
+        : '장비를 다시 정비해 보스 클리어에 다시 도전하세요.',
     statLines: [
-      `결과: ${isWin ? '클리어' : '실패'}`,
+      `결과: ${isWin ? '클리어' : isTimeout ? '시간 종료' : '실패'}`,
       `최종 무기: ${payload.weaponName}`,
-      `돌파 웨이브: ${payload.wavesCleared}`,
+      `생존 시간: ${formatRunTime(payload.elapsedMs)}`,
+      `도달 단계: ${payload.stageReachedLabel}`,
+      `피날레 진입: ${payload.finaleReached ? '예' : '아니오'}`,
     ],
     inventoryLines: [isWin ? '보스는 추가 토큰을 주지 않고 클리어를 확정합니다.' : '미해결 토큰은 런 종료와 함께 정리됩니다.'],
     recipeLines: ['같은 무기·같은 별 2개 합성으로 다음 별 등급을 노리는 루프입니다.'],

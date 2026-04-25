@@ -102,12 +102,21 @@ import {
   getWaveSpawnSequence,
   isBossEnemyId,
   isBossWaveReady,
-  shouldAdvanceWave,
 } from '../.tmp-test/src/systems/waves.js'
 import {
-  getSkippedRegularWaveCount,
+  getStageSelectionStartElapsedMs,
   getStageSelectionViews,
 } from '../.tmp-test/src/systems/stageSelection.js'
+import {
+  FINAL_STAGE_START_MS,
+  RUN_DURATION_MS,
+  formatRunTime,
+  getRunPhaseByElapsedMs,
+  getRunSpawnCapacity,
+  getUnknownRunEnemyIds,
+  isFinaleActive,
+  isRunTimedOut,
+} from '../.tmp-test/src/systems/runProgression.js'
 import {
   createRunResultHudState,
   createRunResultPresentation,
@@ -322,11 +331,11 @@ test('new arena runs start from the clean baseline state', () => {
   assert.equal(state.playerMaxHealth, 100)
   assert.equal(state.playerSpeed, 220)
   assert.equal(state.nextFireAt, 0)
-  assert.equal(state.remainingSpawns, 0)
-  assert.equal(state.currentWaveIndex, 0)
-  assert.equal(state.activeWaveLabel, '')
-  assert.equal(state.wavesCleared, 0)
-  assert.equal(state.isBossActive, false)
+  assert.equal(state.runElapsedMs, 0)
+  assert.equal(state.currentStageIndex, 0)
+  assert.equal(state.activeRunLabel, '')
+  assert.equal(state.activeEnemySoftCap, 0)
+  assert.equal(state.isFinaleActive, false)
   assert.equal(state.lastPlayerHitAt, 0)
   assert.equal(state.nextEnemyRuntimeId, 1)
 })
@@ -777,10 +786,20 @@ test('equipping an owned weapon only changes the active weapon id', () => {
   )
 })
 
-test('wave progression only advances when the current wave is fully cleared', () => {
-  assert.equal(shouldAdvanceWave(1, 0), false)
-  assert.equal(shouldAdvanceWave(0, 2), false)
-  assert.equal(shouldAdvanceWave(0, 0), true)
+test('run progression advances by elapsed time instead of enemy clear state', () => {
+  const firstPhase = getRunPhaseByElapsedMs(0)
+  const secondMinute = getRunPhaseByElapsedMs(60_000)
+  const finale = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
+
+  assert.equal(firstPhase.minuteIndex, 0)
+  assert.equal(secondMinute.minuteIndex, 1)
+  assert.equal(finale.isFinale, true)
+  assert.equal(finale.oneTimeSpawns?.includes('slime-boss'), true)
+  assert.equal(isFinaleActive(FINAL_STAGE_START_MS), true)
+  assert.equal(isRunTimedOut(RUN_DURATION_MS), true)
+  assert.equal(formatRunTime(RUN_DURATION_MS), '30:00')
+  assert.deepEqual(getUnknownRunEnemyIds(), [])
+  assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
 })
 
 test('nearest auto-attack target returns null when no active enemies are available', () => {
@@ -1041,34 +1060,35 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
-test('stage selection views expose readable wave choices and current marker', () => {
-  const stages = getStageSelectionViews(2)
+test('stage selection views expose readable time-stage choices and current marker', () => {
+  const stages = getStageSelectionViews(15 * 60_000)
 
-  assert.equal(stages.length, 5)
-  assert.equal(stages[2]?.isCurrent, true)
-  assert.match(stages[2]?.description ?? '', /침날개 벌레/)
+  assert.equal(stages.length, 6)
+  assert.equal(stages[3]?.isCurrent, true)
+  assert.match(stages[3]?.description ?? '', /침날개 벌레/)
   assert.equal(stages.at(-1)?.isBoss, true)
   assert.match(stages.at(-1)?.description ?? '', /보스 결전/)
+  assert.equal(stages.at(-1)?.startElapsedMs, FINAL_STAGE_START_MS)
 })
 
-test('stage selection skipped clear count preserves boss result accounting', () => {
-  assert.equal(getSkippedRegularWaveCount(0), 0)
-  assert.equal(getSkippedRegularWaveCount(2), 2)
-  assert.equal(getSkippedRegularWaveCount(4), 4)
-  assert.equal(getSkippedRegularWaveCount(99), 4)
+test('stage selection maps choices to time offsets instead of wave clears', () => {
+  assert.equal(getStageSelectionStartElapsedMs(0), 0)
+  assert.equal(getStageSelectionStartElapsedMs(2), 10 * 60_000)
+  assert.equal(getStageSelectionStartElapsedMs(5), FINAL_STAGE_START_MS)
+  assert.equal(getStageSelectionStartElapsedMs(99), null)
 })
 
 test('boss win result presentation is explicit and reward-neutral', () => {
-  const presentation = createRunResultPresentation({
+  const payload = {
     outcome: 'win',
     weaponName: '스타터 블래스터',
-    wavesCleared: 4,
-  })
-  const hudState = createRunResultHudState({
-    outcome: 'win',
-    weaponName: '스타터 블래스터',
-    wavesCleared: 4,
-  })
+    elapsedMs: FINAL_STAGE_START_MS + 30_000,
+    stageReachedLabel: '6막 크라운 피날레',
+    finaleReached: true,
+    endReason: 'boss-defeated',
+  }
+  const presentation = createRunResultPresentation(payload)
+  const hudState = createRunResultHudState(payload)
 
   assert.equal(presentation.title, '런 클리어')
   assert.match(presentation.subtitle, /크라운 슬라임/)
@@ -1076,7 +1096,9 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   assert.deepEqual(presentation.statLines, [
     '결과: 클리어',
     '최종 무기: 스타터 블래스터',
-    '돌파 웨이브: 4',
+    '생존 시간: 25:30',
+    '도달 단계: 6막 크라운 피날레',
+    '피날레 진입: 예',
   ])
   assert.ok(presentation.inventoryLines.every((line) => !/해금|unlock/i.test(line)))
   assert.equal(hudState.title, '런 클리어')
@@ -1113,13 +1135,26 @@ test('loss result presentation keeps restart guidance distinct from boss clear',
   const presentation = createRunResultPresentation({
     outcome: 'loss',
     weaponName: '스타터 블래스터',
-    wavesCleared: 2,
+    elapsedMs: 12 * 60_000,
+    stageReachedLabel: '3막 전격 혼합',
+    finaleReached: false,
+    endReason: 'player-defeated',
+  })
+  const timeoutPresentation = createRunResultPresentation({
+    outcome: 'loss',
+    weaponName: '스타터 블래스터',
+    elapsedMs: RUN_DURATION_MS,
+    stageReachedLabel: '6막 크라운 피날레',
+    finaleReached: true,
+    endReason: 'timeout',
   })
 
   assert.equal(presentation.title, '런 실패')
   assert.match(presentation.statLines[0] ?? '', /실패/)
   assert.match(presentation.objective, /다시 도전/)
   assert.match(presentation.restartPrompt, /새 런/)
+  assert.equal(timeoutPresentation.title, '시간 종료')
+  assert.match(timeoutPresentation.status, /타임아웃/)
 })
 
 test('result scene restart is button-driven instead of R-key driven', () => {

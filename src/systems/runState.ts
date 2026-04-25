@@ -17,11 +17,11 @@ export interface ArenaRunState {
   playerMaxHealth: number
   playerSpeed: number
   nextFireAt: number
-  remainingSpawns: number
-  currentWaveIndex: number
-  activeWaveLabel: string
-  wavesCleared: number
-  isBossActive: boolean
+  runElapsedMs: number
+  currentStageIndex: number
+  activeRunLabel: string
+  activeEnemySoftCap: number
+  isFinaleActive: boolean
   statusMessage: string
   lastPlayerHitAt: number
   nextEnemyRuntimeId: number
@@ -43,11 +43,11 @@ export function createInitialArenaRunState(): ArenaRunState {
     playerMaxHealth: 100,
     playerSpeed: 220,
     nextFireAt: 0,
-    remainingSpawns: 0,
-    currentWaveIndex: 0,
-    activeWaveLabel: '',
-    wavesCleared: 0,
-    isBossActive: false,
+    runElapsedMs: 0,
+    currentStageIndex: 0,
+    activeRunLabel: '',
+    activeEnemySoftCap: 0,
+    isFinaleActive: false,
     statusMessage: 'WASD 이동과 J 대시로 회피하며 토큰을 파친코 보상으로 바꾸세요.',
     lastPlayerHitAt: 0,
     nextEnemyRuntimeId: 1,

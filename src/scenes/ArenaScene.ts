@@ -4,6 +4,7 @@ import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import type {
   EnemyDefinition,
   HudOwnedWeaponView,
+  RunEndReason,
   WeaponId,
   WeaponStack,
   WeaponStackKey,
@@ -120,15 +121,22 @@ import {
   parseWeaponStackKey,
   sortWeaponStacks,
 } from '../systems/weaponOwnership.js'
-import { getSkippedRegularWaveCount, getStageSelectionViews } from '../systems/stageSelection.js'
-import { getDefeatedEnemyRunOutcome, getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
+import { getStageSelectionStartElapsedMs, getStageSelectionViews } from '../systems/stageSelection.js'
+import { getDefeatedEnemyRunOutcome } from '../systems/waves.js'
+import {
+  formatRunTime,
+  getRunPhaseByElapsedMs,
+  getRunStageIndex,
+  getRunStageReachedLabel,
+  isFinaleActive as isRunFinaleActive,
+  RUN_DURATION_MS,
+} from '../systems/runProgression.js'
 import { resolveAutoAttackShot } from './arena/autoAttack.js'
 import {
-  createWaveAdvancePlan,
-  setSpawnLoopPaused,
-  startWaveRuntime,
-  type WaveStatePatch,
-} from './arena/waveRuntime.js'
+  advanceRunProgressionRuntime,
+  createRunProgressionRuntime,
+  type RunProgressionRuntimeState,
+} from './arena/runProgressionRuntime.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
 type PhysicsSprite = Phaser.Physics.Arcade.Sprite
@@ -259,6 +267,7 @@ const PACHINKO_TOKEN_COLOR = 0xffd866
 
 interface ArenaSceneStartData {
   startWaveIndex?: number
+  startElapsedMs?: number
 }
 
 export class ArenaScene extends Phaser.Scene {
@@ -330,17 +339,17 @@ export class ArenaScene extends Phaser.Scene {
 
   private nextFireAt = 0
 
-  private remainingSpawns = 0
+  private runElapsedMs = 0
 
-  private currentWaveIndex = 0
+  private currentStageIndex = 0
 
-  private activeWaveLabel = ''
+  private activeRunLabel = ''
 
-  private wavesCleared = 0
+  private activeEnemySoftCap = 0
 
-  private spawnTimer?: Phaser.Time.TimerEvent
+  private runProgressionState: RunProgressionRuntimeState = createRunProgressionRuntime()
 
-  private isBossActive = false
+  private isFinaleActive = false
 
   private statusMessage = 'WASD로 이동하고 J 대시로 회피하는 동안 무기가 자동으로 발사됩니다.'
 
@@ -378,7 +387,7 @@ export class ArenaScene extends Phaser.Scene {
 
   create(data: ArenaSceneStartData = {}): void {
     this.resetRunState()
-    const startWaveIndex = this.resolveStartWaveIndex(data.startWaveIndex)
+    const startElapsedMs = this.resolveStartElapsedMs(data)
 
     this.hud = this.game.registry.get('hud') as HudController
     this.codex = this.game.registry.get('codex') as CodexController
@@ -442,8 +451,7 @@ export class ArenaScene extends Phaser.Scene {
       this.scale.off(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
     })
 
-    this.wavesCleared = getSkippedRegularWaveCount(startWaveIndex)
-    this.startWave(startWaveIndex)
+    this.startRunProgression(startElapsedMs)
     this.syncMiniMap(this.time.now, true)
     this.updateHud()
     this.updateCodex()
@@ -484,8 +492,12 @@ export class ArenaScene extends Phaser.Scene {
     this.cleanupDestroyedEntities()
     this.syncMiniMap(time)
 
-    if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
-      this.advanceWave()
+    if (!this.isInteractionBlocked()) {
+      this.advanceRunProgression(delta)
+      if (this.runElapsedMs >= RUN_DURATION_MS && !this.isRunEnding) {
+        this.endRun('loss', 'timeout')
+        return
+      }
     }
 
     this.updateHud()
@@ -496,12 +508,17 @@ export class ArenaScene extends Phaser.Scene {
     return this.isInventoryOpen || this.isCodexOpen || this.isStageSelectOpen
   }
 
-  private resolveStartWaveIndex(startWaveIndex?: number): number {
-    if (startWaveIndex === undefined || !Number.isInteger(startWaveIndex)) {
+  private resolveStartElapsedMs(data: ArenaSceneStartData): number {
+    if (data.startElapsedMs !== undefined && Number.isFinite(data.startElapsedMs)) {
+      return Math.max(0, Math.min(RUN_DURATION_MS - 1, Math.floor(data.startElapsedMs)))
+    }
+
+    const startStageIndex = data.startWaveIndex
+    if (startStageIndex === undefined || !Number.isInteger(startStageIndex)) {
       return 0
     }
 
-    return getWaveByIndex(startWaveIndex) ? startWaveIndex : 0
+    return getStageSelectionStartElapsedMs(startStageIndex) ?? 0
   }
 
   private getViewportSize(): ViewportSize {
@@ -1493,35 +1510,30 @@ export class ArenaScene extends Phaser.Scene {
     this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
   }
 
-  private startWave(index: number): void {
-    startWaveRuntime(index, {
-      applyState: (patch) => this.applyWaveStatePatch(patch),
-      clearSpawnLoop: () => {
-        this.spawnTimer?.remove(false)
-        this.spawnTimer = undefined
-      },
-      scheduleSpawnLoop: ({ delayMs, repeat, onTick }) => {
-        this.spawnTimer = this.time.addEvent({
-          delay: delayMs,
-          repeat,
-          callback: onTick,
-        })
-      },
-      spawnEnemy: (enemyId) => this.spawnEnemy(enemyId),
-    })
+  private startRunProgression(startElapsedMs: number): void {
+    this.runProgressionState = createRunProgressionRuntime(startElapsedMs)
+    this.runElapsedMs = startElapsedMs
+    this.applyRunPhaseState(getRunPhaseByElapsedMs(startElapsedMs))
+    this.advanceRunProgression(0)
   }
 
-  private advanceWave(): void {
-    const advancePlan = createWaveAdvancePlan(this.currentWaveIndex)
-    if (!advancePlan) {
-      return
+  private advanceRunProgression(deltaMs: number): void {
+    const result = advanceRunProgressionRuntime(
+      this.runProgressionState,
+      deltaMs,
+      this.enemies.length,
+    )
+    this.runProgressionState = result.state
+    this.runElapsedMs = result.state.elapsedMs
+    this.applyRunPhaseState(result.activePhase)
+
+    for (const enemyId of result.spawnedEnemyIds) {
+      this.spawnEnemy(enemyId)
     }
 
-    if (advancePlan.shouldIncrementWavesCleared) {
-      this.wavesCleared += 1
+    if (result.statusMessage) {
+      this.statusMessage = result.statusMessage
     }
-
-    this.startWave(advancePlan.nextWaveIndex)
   }
 
   private spawnEnemy(enemyId: EnemyDefinition['id']): void {
@@ -1604,7 +1616,7 @@ export class ArenaScene extends Phaser.Scene {
     enemy.sprite.destroy()
 
     if (defeatOutcome === 'win') {
-      this.endRun('win')
+      this.endRun('win', 'boss-defeated')
       return true
     }
 
@@ -1640,7 +1652,7 @@ export class ArenaScene extends Phaser.Scene {
     })
 
     if (this.playerHealth <= 0) {
-      this.endRun('loss')
+      this.endRun('loss', 'player-defeated')
     }
   }
 
@@ -1691,7 +1703,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.isStageSelectOpen = true
     this.applyInteractionPause(true)
-    this.statusMessage = '스테이지 선택이 열렸습니다. 시작할 웨이브를 고르면 런이 새로 시작됩니다.'
+    this.statusMessage = '스테이지 선택이 열렸습니다. 시작할 시간대를 고르면 런이 새로 시작됩니다.'
     this.updateHud()
   }
 
@@ -1707,13 +1719,14 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleStageSelection(stageIndex: number): void {
-    if (!this.isStageSelectOpen || this.isRunEnding || !getWaveByIndex(stageIndex)) {
+    const startElapsedMs = getStageSelectionStartElapsedMs(stageIndex)
+    if (!this.isStageSelectOpen || this.isRunEnding || startElapsedMs === null) {
       return
     }
 
     this.isStageSelectOpen = false
     this.applyInteractionPause(false)
-    this.scene.restart({ startWaveIndex: stageIndex })
+    this.scene.restart({ startWaveIndex: stageIndex, startElapsedMs })
   }
 
   private applyInteractionPause(shouldPause: boolean): void {
@@ -1732,7 +1745,6 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
 
-    setSpawnLoopPaused(this.spawnTimer, shouldPause)
     this.setHealthPickupPulsePaused(shouldPause)
     this.setPachinkoTokenPulsePaused(shouldPause)
 
@@ -2019,11 +2031,12 @@ export class ArenaScene extends Phaser.Scene {
     this.playerDashDirection.set(1, 0)
     this.lastPlayerMoveDirection.set(1, 0)
     this.nextFireAt = initialState.nextFireAt
-    this.remainingSpawns = initialState.remainingSpawns
-    this.currentWaveIndex = initialState.currentWaveIndex
-    this.activeWaveLabel = initialState.activeWaveLabel
-    this.wavesCleared = initialState.wavesCleared
-    this.isBossActive = initialState.isBossActive
+    this.runElapsedMs = initialState.runElapsedMs
+    this.currentStageIndex = initialState.currentStageIndex
+    this.activeRunLabel = initialState.activeRunLabel
+    this.activeEnemySoftCap = initialState.activeEnemySoftCap
+    this.runProgressionState = createRunProgressionRuntime(initialState.runElapsedMs)
+    this.isFinaleActive = initialState.isFinaleActive
     this.statusMessage = initialState.statusMessage
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
@@ -2031,8 +2044,6 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private destroyRunEntities(): void {
-    this.spawnTimer?.remove(false)
-    this.spawnTimer = undefined
     this.enemySpacingCollider?.destroy()
     this.enemySpacingCollider = undefined
     this.destroyPlayerHealthBar()
@@ -2104,30 +2115,31 @@ export class ArenaScene extends Phaser.Scene {
     this.mapVisuals = []
   }
 
-  private endRun(outcome: RunOutcome): void {
+  private endRun(outcome: RunOutcome, endReason: RunEndReason): void {
     if (this.isRunEnding) {
       return
     }
 
     this.isRunEnding = true
-    this.spawnTimer?.remove(false)
-    this.spawnTimer = undefined
     this.isInventoryOpen = false
     this.isCodexOpen = false
     this.isStageSelectOpen = false
     this.codex.update(getCodexState(false))
     this.physics.world.pause()
     this.freezeCombat(true)
-    const payload = this.createResultPayload(outcome)
+    const payload = this.createResultPayload(outcome, endReason)
     this.hud.update(createRunResultHudState(payload))
     this.scene.start('result', payload)
   }
 
-  private createResultPayload(outcome: RunOutcome): RunResultPayload {
+  private createResultPayload(outcome: RunOutcome, endReason?: RunEndReason): RunResultPayload {
     return {
       outcome,
       weaponName: this.getActiveWeaponLabel(),
-      wavesCleared: this.wavesCleared,
+      elapsedMs: this.runElapsedMs,
+      stageReachedLabel: getRunStageReachedLabel(this.runElapsedMs),
+      finaleReached: isRunFinaleActive(this.runElapsedMs),
+      endReason,
     }
   }
 
@@ -2143,18 +2155,19 @@ export class ArenaScene extends Phaser.Scene {
 
     this.hud.update({
       title: 'NeoD',
-      subtitle: this.activeWaveLabel || '슬라임 아레나 대기 중',
+      subtitle: this.activeRunLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `무기: ${weapon.name} ${'★'.repeat(activeStar)} · ${getWeaponSummary(weapon)}`,
-        `생존한 적: ${this.enemies.length}`,
-        `남은 출현: ${this.remainingSpawns}`,
+        `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
+        `현재 단계: ${this.currentStageIndex + 1}막`,
+        `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
       ],
       inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`],
       recipes: this.getFusionSummaryLines(),
-      objective: this.isBossActive
-        ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
-        : '웨이브를 돌파하며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
+      objective: this.isFinaleActive
+        ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
+        : '30분 생존 압박을 버티며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
       tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 떨어진 토큰을 먹으면 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스 · 스테이지 선택 버튼',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
@@ -2163,7 +2176,7 @@ export class ArenaScene extends Phaser.Scene {
       stageButtonDisabled: this.isInventoryOpen || this.isCodexOpen || this.isRunEnding,
       stageSelection: {
         isOpen: this.isStageSelectOpen,
-        stages: getStageSelectionViews(this.currentWaveIndex),
+        stages: getStageSelectionViews(this.runElapsedMs),
       },
       pachinko: {
         level: getPachinkoRewardLevel(this.pachinkoTokenXp),
@@ -2186,32 +2199,11 @@ export class ArenaScene extends Phaser.Scene {
     this.codex.update(getCodexState(this.isCodexOpen))
   }
 
-  private applyWaveStatePatch({
-    currentWaveIndex,
-    activeWaveLabel,
-    remainingSpawns,
-    statusMessage,
-    isBossActive,
-  }: WaveStatePatch): void {
-    if (currentWaveIndex !== undefined) {
-      this.currentWaveIndex = currentWaveIndex
-    }
-
-    if (activeWaveLabel !== undefined) {
-      this.activeWaveLabel = activeWaveLabel
-    }
-
-    if (remainingSpawns !== undefined) {
-      this.remainingSpawns = remainingSpawns
-    }
-
-    if (statusMessage !== undefined) {
-      this.statusMessage = statusMessage
-    }
-
-    if (isBossActive !== undefined) {
-      this.isBossActive = isBossActive
-    }
+  private applyRunPhaseState(phase: ReturnType<typeof getRunPhaseByElapsedMs>): void {
+    this.currentStageIndex = getRunStageIndex(this.runElapsedMs)
+    this.activeRunLabel = phase.label
+    this.activeEnemySoftCap = phase.softEnemyCap
+    this.isFinaleActive = phase.isFinale === true
   }
 
   private getOwnedWeaponViews(): HudOwnedWeaponView[] {
