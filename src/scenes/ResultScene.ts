@@ -112,7 +112,7 @@ export class ResultScene extends Phaser.Scene {
       restartButtonLabel.setText('시작 중...')
       this.input.off(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)
       this.scene.stop('arena')
-      this.scene.start('arena', { startElapsedMs: 0 })
+      this.scene.start('start')
     }
     const isInsideRestartButton = (pointer: Phaser.Input.Pointer): boolean =>
       pointer.x >= restartButton.x - restartButtonWidth / 2 &&

@@ -1718,8 +1718,12 @@ test('result scene restart is button-driven instead of R-key driven', () => {
     'ResultScene restart handler should stop any stale arena scene before returning to a fresh start flow',
   )
   assert.ok(
-    resultSceneSource.includes(`this.scene.start('arena', { startElapsedMs: 0 })`),
-    'ResultScene restart handler should start a fresh arena run at 00:00',
+    resultSceneSource.includes(`this.scene.start('start')`),
+    'ResultScene restart handler should return to the start screen so the next run starts only after explicit input',
+  )
+  assert.ok(
+    !resultSceneSource.includes(`this.scene.start('arena', { startElapsedMs: 0 })`),
+    'ResultScene restart must not bypass the start screen',
   )
   assert.ok(
     resultSceneSource.includes(`const restartButtonY = Math.max(48, height - 48)`),
