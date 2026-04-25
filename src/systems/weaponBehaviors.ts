@@ -305,6 +305,35 @@ const createSplitProjectiles = (
   })
 }
 
+const createRicochetProjectiles = (
+  weapon: WeaponDefinition,
+  origin: Point,
+  direction: Point,
+  lifetimeMs: number,
+  ricochet: WeaponRicochetDefinition,
+  execute?: WeaponExecuteDefinition,
+  summonOnKill?: WeaponSummonOnKillDefinition,
+): ProjectileSpawnSpec[] => {
+  const projectileCount = Math.max(1, ricochet.projectileCount ?? 1)
+  const centerIndex = (projectileCount - 1) / 2
+  const spreadDegrees = ricochet.spreadDegrees ?? 0
+  const speedVariance = ricochet.speedVariance ?? 0
+
+  return Array.from({ length: projectileCount }, (_, index) => {
+    const offset = spreadDegrees > 0 ? (index - centerIndex) * spreadDegrees : 0
+    const rotatedDirection = normalize(rotate(direction, offset))
+    const varianceRatio = centerIndex === 0 ? 0 : (index - centerIndex) / Math.max(centerIndex, 1)
+    const speed = Math.max(1, Math.round(weapon.projectileSpeed * (1 + speedVariance * varianceRatio)))
+
+    return createBaseProjectile(weapon, origin, rotatedDirection, lifetimeMs, {
+      speed,
+      ricochet,
+      execute,
+      summonOnKill,
+    })
+  })
+}
+
 const createBurstProjectiles = (
   weapon: WeaponDefinition,
   origin: Point,
@@ -525,15 +554,25 @@ export function buildAttackPlan(
     case 'single':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: [
-          createBaseProjectile(weapon, origin, direction, weapon.attackBehavior.projectileLifetimeMs, {
-            distanceScaling: weapon.attackBehavior.distanceScaling,
-            execute: weapon.attackBehavior.execute,
-            boomerang: weapon.attackBehavior.boomerang,
-            ricochet: weapon.attackBehavior.ricochet,
-            summonOnKill: weapon.attackBehavior.summonOnKill,
-          }),
-        ],
+        projectiles: weapon.attackBehavior.ricochet
+          ? createRicochetProjectiles(
+              weapon,
+              origin,
+              direction,
+              weapon.attackBehavior.projectileLifetimeMs,
+              weapon.attackBehavior.ricochet,
+              weapon.attackBehavior.execute,
+              weapon.attackBehavior.summonOnKill,
+            )
+          : [
+              createBaseProjectile(weapon, origin, direction, weapon.attackBehavior.projectileLifetimeMs, {
+                distanceScaling: weapon.attackBehavior.distanceScaling,
+                execute: weapon.attackBehavior.execute,
+                boomerang: weapon.attackBehavior.boomerang,
+                ricochet: weapon.attackBehavior.ricochet,
+                summonOnKill: weapon.attackBehavior.summonOnKill,
+              }),
+            ],
         meleeSwings: [],
       }
     case 'spray-hazard':
@@ -810,7 +849,7 @@ export function getWeaponSummary(weapon: WeaponDefinition): string {
   const range = getWeaponAttackRange(weapon)
 
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
-    return `피해 ${weapon.damage} · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    return `피해 ${weapon.damage} · 공 ${weapon.attackBehavior.ricochet.projectileCount ?? 1}개 · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
   }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.summonOnKill) {
     return `피해 ${weapon.damage} · 처치 시 아군화 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
@@ -860,7 +899,7 @@ export function getWeaponAttackContract(weapon: WeaponDefinition): WeaponAttackC
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
     return {
       family: 'ricochet-single',
-      geometry: `bounce:${weapon.attackBehavior.ricochet.maxBounces}:range:${weapon.attackBehavior.ricochet.bounceRange}`,
+      geometry: `bounce:${weapon.attackBehavior.ricochet.maxBounces}:count:${weapon.attackBehavior.ricochet.projectileCount ?? 1}:range:${weapon.attackBehavior.ricochet.bounceRange}`,
       cadence: `cooldown:${weapon.fireRateMs}`,
       followUp: 'target-hop',
     }

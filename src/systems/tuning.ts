@@ -41,10 +41,10 @@ export interface TuningSelectionResult {
   effectId: TuningEffectId
 }
 
-export const STAR_DAMAGE_MULTIPLIER_STEP = 0.18
-export const STAR_FIRE_RATE_MULTIPLIER_STEP = 0.06
-export const STAR_PROJECTILE_SPEED_MULTIPLIER_STEP = 0.08
-export const STAR_MELEE_RANGE_STEP = 6
+export const STAR_DAMAGE_MULTIPLIER_STEP = 0.1
+export const STAR_FIRE_RATE_MULTIPLIER_STEP = 0
+export const STAR_PROJECTILE_SPEED_MULTIPLIER_STEP = 0
+export const STAR_MELEE_RANGE_STEP = 0
 
 export interface EffectiveWeaponStats extends WeaponDefinition {
   tuningEffectId?: TuningEffectId
@@ -142,20 +142,7 @@ export function deriveEffectiveWeaponStats(
         : weapon.attackBehavior
     : weapon.attackBehavior
   const attackBehavior = applyPlayerLevelWeaponMilestones(
-    baseAttackBehavior.kind === 'melee-cleave' && starBonusSteps > 0
-      ? {
-          ...baseAttackBehavior,
-          range: baseAttackBehavior.range + STAR_MELEE_RANGE_STEP * starBonusSteps,
-        }
-      : baseAttackBehavior.kind === 'combo-melee' && starBonusSteps > 0
-        ? {
-            ...baseAttackBehavior,
-            steps: baseAttackBehavior.steps.map((step) => ({
-              ...step,
-              range: step.range + STAR_MELEE_RANGE_STEP * starBonusSteps,
-            })),
-          }
-        : baseAttackBehavior,
+    applyStarWeaponScaling(baseAttackBehavior, star),
     playerStats,
   )
   const baseRange = typeof weapon.range === 'number'
@@ -197,6 +184,153 @@ export function deriveEffectiveWeaponStats(
   }
 
   return effectiveWeapon
+}
+
+function applyStarWeaponScaling(
+  behavior: WeaponDefinition['attackBehavior'],
+  star: WeaponStar,
+): WeaponDefinition['attackBehavior'] {
+  const normalizedStar = Math.max(1, star)
+  const milestoneBonus = Math.floor(normalizedStar / 3)
+  const overdriveBonus = normalizedStar >= 6 ? Math.floor((normalizedStar - 6) / 3) + 1 : 0
+  if (milestoneBonus <= 0 && overdriveBonus <= 0) {
+    return behavior
+  }
+
+  switch (behavior.kind) {
+    case 'single':
+      if (behavior.ricochet) {
+        return {
+          ...behavior,
+          projectileLifetimeMs: behavior.projectileLifetimeMs + 60 * milestoneBonus + 80 * overdriveBonus,
+          ricochet: {
+            ...behavior.ricochet,
+            maxBounces: behavior.ricochet.maxBounces + milestoneBonus,
+            bounceRange: behavior.ricochet.bounceRange + 24 * milestoneBonus + 28 * overdriveBonus,
+            damageMultiplierPerBounce: Math.min(1, (behavior.ricochet.damageMultiplierPerBounce ?? 1) + 0.01 * overdriveBonus),
+            speedMultiplierPerBounce: Math.min(1, (behavior.ricochet.speedMultiplierPerBounce ?? 1) + 0.01 * overdriveBonus),
+            projectileCount: Math.max(1, (behavior.ricochet.projectileCount ?? 1) + milestoneBonus),
+            spreadDegrees: Math.min(18, (behavior.ricochet.spreadDegrees ?? 0) + overdriveBonus * 1.5),
+            speedVariance: Math.min(0.45, (behavior.ricochet.speedVariance ?? 0) + overdriveBonus * 0.05),
+          },
+          summonOnKill: behavior.summonOnKill
+            ? {
+                ...behavior.summonOnKill,
+                maxMinions: behavior.summonOnKill.maxMinions + milestoneBonus,
+                durationMs: behavior.summonOnKill.durationMs + 500 * milestoneBonus + 700 * overdriveBonus,
+                speed: behavior.summonOnKill.speed + 10 * overdriveBonus,
+                damage: behavior.summonOnKill.damage + overdriveBonus,
+                attackIntervalMs: Math.max(180, behavior.summonOnKill.attackIntervalMs - 25 * overdriveBonus),
+              }
+            : behavior.summonOnKill,
+        }
+      }
+      if (behavior.summonOnKill) {
+        return {
+          ...behavior,
+          summonOnKill: {
+            ...behavior.summonOnKill,
+            maxMinions: behavior.summonOnKill.maxMinions + milestoneBonus,
+            durationMs: behavior.summonOnKill.durationMs + 500 * milestoneBonus + 700 * overdriveBonus,
+            speed: behavior.summonOnKill.speed + 10 * overdriveBonus,
+            damage: behavior.summonOnKill.damage + overdriveBonus,
+            attackIntervalMs: Math.max(180, behavior.summonOnKill.attackIntervalMs - 25 * overdriveBonus),
+          },
+        }
+      }
+      return behavior
+    case 'burst-fire':
+      return {
+        ...behavior,
+        shotsPerBurst: behavior.shotsPerBurst + milestoneBonus,
+        shotIntervalMs: Math.max(20, behavior.shotIntervalMs - 4 * overdriveBonus),
+        spreadDegrees: (behavior.spreadDegrees ?? 0) + overdriveBonus,
+      }
+    case 'split-shot':
+      return {
+        ...behavior,
+        projectileCount: behavior.projectileCount + milestoneBonus,
+        spreadDegrees: behavior.spreadDegrees + overdriveBonus,
+        shotDelayMs: behavior.shotDelayMs === undefined ? undefined : Math.max(0, behavior.shotDelayMs - 2 * overdriveBonus),
+      }
+    case 'spray-hazard':
+      return {
+        ...behavior,
+        projectileCount: behavior.projectileCount + milestoneBonus,
+        spreadDegrees: behavior.spreadDegrees + overdriveBonus,
+        hazardRadius: behavior.hazardRadius + 8 * milestoneBonus + 10 * overdriveBonus,
+        hazardDurationMs: behavior.hazardDurationMs + 180 * milestoneBonus + 220 * overdriveBonus,
+      }
+    case 'pierce':
+      return {
+        ...behavior,
+        maxHits: behavior.maxHits + milestoneBonus,
+      }
+    case 'chain':
+      return {
+        ...behavior,
+        maxChains: behavior.maxChains + milestoneBonus,
+        chainRange: behavior.chainRange + 16 * milestoneBonus + 20 * overdriveBonus,
+        chainFalloff: Math.max(0.35, behavior.chainFalloff - 0.02 * overdriveBonus),
+      }
+    case 'volley':
+      return {
+        ...behavior,
+        projectileCount: behavior.projectileCount + milestoneBonus,
+        spreadDegrees: behavior.spreadDegrees + overdriveBonus,
+      }
+    case 'impact-burst':
+      return {
+        ...behavior,
+        splashRadius: behavior.splashRadius + 8 * milestoneBonus + 12 * overdriveBonus,
+      }
+    case 'impact-aoe':
+      return {
+        ...behavior,
+        explosionRadius: behavior.explosionRadius + 10 * milestoneBonus + 14 * overdriveBonus,
+      }
+    case 'zone-control':
+      return {
+        ...behavior,
+        zoneRadius: behavior.zoneRadius + 8 * milestoneBonus + 12 * overdriveBonus,
+        zoneDurationMs: behavior.zoneDurationMs + 220 * milestoneBonus + 320 * overdriveBonus,
+        armingDelayMs: behavior.armingDelayMs === undefined ? undefined : Math.max(60, behavior.armingDelayMs - 15 * overdriveBonus),
+      }
+    case 'deploy-turret':
+      return {
+        ...behavior,
+        deploy: {
+          ...behavior.deploy,
+          maxTurrets: behavior.deploy.maxTurrets + milestoneBonus,
+          durationMs: behavior.deploy.durationMs + 650 * milestoneBonus + 850 * overdriveBonus,
+          range: behavior.deploy.range + 20 * milestoneBonus + 28 * overdriveBonus,
+          fireRateMs: Math.max(180, behavior.deploy.fireRateMs - 30 * overdriveBonus),
+          projectileSpeed: behavior.deploy.projectileSpeed + 25 * overdriveBonus,
+          projectileDamage: behavior.deploy.projectileDamage + overdriveBonus,
+        },
+      }
+    case 'melee-cleave':
+      return {
+        ...behavior,
+        range: behavior.range + 10 * milestoneBonus + 12 * overdriveBonus,
+        arcDegrees: Math.min(360, behavior.arcDegrees + 18 * overdriveBonus),
+        maxTargets: behavior.maxTargets + milestoneBonus,
+        healOnHit: behavior.healOnHit === undefined ? undefined : behavior.healOnHit + Math.max(1, overdriveBonus),
+      }
+    case 'combo-melee':
+      return {
+        ...behavior,
+        stepIntervalMs: Math.max(52, behavior.stepIntervalMs - 6 * milestoneBonus - 10 * overdriveBonus),
+        steps: behavior.steps.map((step, index) => ({
+          ...step,
+          range: step.range + (index === behavior.steps.length - 1 ? 8 : 3) * milestoneBonus + (index === behavior.steps.length - 1 ? 10 : 4) * overdriveBonus,
+          maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? milestoneBonus : 0),
+          damageMultiplier: step.damageMultiplier + (index === behavior.steps.length - 1 ? 0.08 * overdriveBonus : 0.03 * overdriveBonus),
+        })),
+      }
+    default:
+      return behavior
+  }
 }
 
 function getWeaponLevelUpgradeLabel(
