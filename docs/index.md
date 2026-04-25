@@ -10,6 +10,7 @@ Content-oriented catalog for the repo documentation wiki.
 - [wiki/stack-foundation.md](wiki/stack-foundation.md): locked stack decision for the browser-first Phaser prototype.
 - [wiki/parallel-ai-worktrees.md](wiki/parallel-ai-worktrees.md): branch, worktree, Ralph, and PR workflow for parallel AI execution.
 - [wiki/post-interview-context-workflow.md](wiki/post-interview-context-workflow.md): manual post-deep-interview context capture workflow for lessons, changed files, and durable wiki synthesis.
+- [wiki/ui-overlay-rendering.md](wiki/ui-overlay-rendering.md): DOM-backed overlay rendering rules for preserving scroll/focus state during Phaser frame-loop updates.
 
 ## Schema Pages
 

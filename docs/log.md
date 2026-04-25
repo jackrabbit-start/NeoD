@@ -19,3 +19,9 @@
 - Added `docs/wiki/difficulty-survival-pressure.md` to synthesize the difficulty-too-low interview, plan, implementation, and PR #25.
 - Updated `docs/index.md` so future agents can find the balance guidance.
 - Source artifacts: `.omx/specs/deep-interview-difficulty-too-low.md`, `.omx/interviews/difficulty-too-low-20260425T101734Z.md`, and `.omx/context/post-interview-difficulty-survival-pressure-20260425T105130Z.md`.
+
+## [2026-04-25] ui | Added overlay rendering lifecycle rule
+
+- Added `docs/wiki/ui-overlay-rendering.md` to preserve the Codex scroll-reset lesson for future DOM-backed overlays.
+- Updated `docs/index.md` so future agents can find the UI overlay rendering rule.
+- Source artifacts: `.omx/context/post-interview-codex-scroll-reset-20260425T105023Z.md` and PR #24.
