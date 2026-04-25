@@ -20,6 +20,7 @@ export function describeAvailableRecipes(recipes: AvailableRecipe[]): string[] {
   }
 
   return recipes.map(
-    ({ recipe, weapon }) => `${recipe.name} → ${getWeaponSummary(weapon)} (${recipe.note})`,
+    ({ recipe, weapon }) =>
+      `${recipe.name} [${recipe.identityLabel}] → ${getWeaponSummary(weapon)} (${recipe.note})`,
   )
 }

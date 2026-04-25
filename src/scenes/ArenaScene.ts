@@ -1186,6 +1186,8 @@ export class ArenaScene extends Phaser.Scene {
     return recipes.map(({ recipe, weapon }) => ({
       id: recipe.id,
       name: recipe.name,
+      identityLabel: recipe.identityLabel,
+      identityHint: recipe.identityHint,
       outputWeaponId: recipe.outputWeaponId,
       outputWeaponName: weapon.name,
       damage: weapon.damage,

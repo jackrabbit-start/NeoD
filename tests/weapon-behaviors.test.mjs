@@ -40,16 +40,80 @@ test('frost lance plan preserves a piercing projectile', () => {
   assert.equal(plan.projectiles[0]?.maxHits, 3)
   assert.deepEqual(plan.projectiles[0]?.knockback, WEAPON_DEFINITIONS['frost-lance'].knockback)
   assert.equal(plan.projectiles[0]?.hazardOnHit, undefined)
-  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['frost-lance']), '관통 사격')
+  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['frost-lance']), '정밀 관통')
+})
+
+test('weapon identity labels prefer metadata and retain behavior fallback', () => {
+  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['arc-loom']), '연쇄 제압')
+
+  const fallbackFrost = {
+    ...WEAPON_DEFINITIONS['frost-lance'],
+    identityLabel: undefined,
+  }
+
+  assert.equal(getWeaponIdentityLabel(fallbackFrost), '관통 사격')
 })
 
 test('arc loom summary and chain damage expose crowd-control identity', () => {
   const weapon = WEAPON_DEFINITIONS['arc-loom']
   const summary = getWeaponSummary(weapon)
 
-  assert.match(summary, /연쇄 번개/)
+  assert.match(summary, /연쇄 제압/)
   assert.equal(getChainDamage(24, 1, 0.65), 16)
   assert.equal(getChainDamage(24, 2, 0.65), 10)
+})
+
+test('spark carbine is a fast single-shot electric branch', () => {
+  const starter = WEAPON_DEFINITIONS['starter-blaster']
+  const storm = WEAPON_DEFINITIONS['storm-cannon']
+  const spark = WEAPON_DEFINITIONS['spark-carbine']
+  const plan = buildAttackPlan(spark, { x: 0, y: 0 }, { x: 100, y: 0 })
+
+  assert.equal(spark.attackBehavior.kind, 'single')
+  assert.equal(getWeaponIdentityLabel(spark), '고속 전격')
+  assert.ok(spark.fireRateMs < starter.fireRateMs)
+  assert.ok(spark.fireRateMs < storm.fireRateMs)
+  assert.ok(spark.projectileSpeed > starter.projectileSpeed)
+  assert.ok(spark.projectileSpeed > storm.projectileSpeed)
+  assert.ok(spark.damage < storm.damage)
+  assert.equal(plan.cooldownMs, spark.fireRateMs)
+  assert.equal(plan.projectiles.length, 1)
+  assert.equal(plan.projectiles[0]?.speed, spark.projectileSpeed)
+  assert.equal(plan.projectiles[0]?.lifetimeMs, 820)
+})
+
+test('mist vortex is a distinct spray hazard control branch', () => {
+  const acid = WEAPON_DEFINITIONS['acid-sprayer']
+  const mist = WEAPON_DEFINITIONS['mist-vortex']
+
+  assert.equal(acid.attackBehavior.kind, 'spray-hazard')
+  assert.equal(mist.attackBehavior.kind, 'spray-hazard')
+
+  const acidBehavior = acid.attackBehavior
+  const mistBehavior = mist.attackBehavior
+  const differingDimensions = [
+    mistBehavior.projectileCount !== acidBehavior.projectileCount,
+    mistBehavior.spreadDegrees !== acidBehavior.spreadDegrees,
+    mistBehavior.projectileLifetimeMs !== acidBehavior.projectileLifetimeMs,
+    mistBehavior.hazardRadius !== acidBehavior.hazardRadius,
+    mistBehavior.hazardDurationMs !== acidBehavior.hazardDurationMs,
+    mistBehavior.hazardTickMs !== acidBehavior.hazardTickMs,
+    mistBehavior.hazardDamage !== acidBehavior.hazardDamage,
+    mist.damage !== acid.damage,
+  ].filter(Boolean).length
+  const plan = buildAttackPlan(mist, { x: 0, y: 0 }, { x: 100, y: 0 })
+  const center = plan.projectiles[Math.floor(plan.projectiles.length / 2)]
+
+  assert.equal(getWeaponIdentityLabel(mist), '안개 제어')
+  assert.ok(differingDimensions >= 2)
+  assert.ok(mistBehavior.hazardRadius > acidBehavior.hazardRadius)
+  assert.ok(mistBehavior.hazardDurationMs > acidBehavior.hazardDurationMs)
+  assert.ok(mistBehavior.hazardDamage < acidBehavior.hazardDamage)
+  assert.equal(plan.projectiles.length, 5)
+  assert.equal(center?.hazardOnHit?.radius, mistBehavior.hazardRadius)
+  assert.equal(center?.hazardOnHit?.durationMs, mistBehavior.hazardDurationMs)
+  assert.equal(center?.hazardOnHit?.tickEveryMs, mistBehavior.hazardTickMs)
+  assert.equal(center?.hazardOnHit?.damage, mistBehavior.hazardDamage)
 })
 
 test('chain target selection is deterministic by distance then runtime id', () => {
@@ -139,5 +203,5 @@ test('codex summaries include weapon identity beyond raw stats', () => {
   const codex = getCodexState(true)
   const arcRecipe = codex.recipes.find((recipe) => recipe.output.id === 'arc-loom')
 
-  assert.match(arcRecipe?.output.summary ?? '', /연쇄 번개/)
+  assert.match(arcRecipe?.output.summary ?? '', /연쇄 제압/)
 })

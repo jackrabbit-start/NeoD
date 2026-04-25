@@ -62,6 +62,8 @@ export interface WeaponDefinition {
   id: WeaponId
   name: string
   description: string
+  identityLabel?: string
+  identityHint?: string
   damage: number
   fireRateMs: number
   projectileSpeed: number
@@ -77,6 +79,8 @@ export interface RecipeDefinition {
   name: string
   inputs: LootId[]
   outputWeaponId: WeaponId
+  identityLabel: string
+  identityHint: string
   note: string
 }
 
@@ -172,6 +176,8 @@ export interface HudOwnedItemView {
 export interface HudRecipeView {
   id: RecipeId
   name: string
+  identityLabel: string
+  identityHint: string
   outputWeaponId: WeaponId
   outputWeaponName: string
   damage: number
@@ -226,6 +232,8 @@ export interface CodexItemEntry {
 export interface CodexRecipeEntry {
   id: RecipeId
   name: string
+  identityLabel: string
+  identityHint: string
   note: string
   inputs: Array<{
     id: LootId

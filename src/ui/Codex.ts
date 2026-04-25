@@ -27,6 +27,7 @@ const renderRecipes = (recipes: CodexRecipeEntry[]) => `
         (recipe) => `
           <article class="codex-entry">
             <h3>${recipe.name}</h3>
+            <p><strong>${recipe.identityLabel}</strong> · ${recipe.identityHint}</p>
             <p class="codex-inline-list">
               ${recipe.inputs
                 .map((input) => `${renderSwatch(input.color)}${input.name}`)

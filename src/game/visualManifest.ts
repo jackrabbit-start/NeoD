@@ -112,6 +112,20 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     fallback: { radius: 5, color: 0xffd866 },
   },
   {
+    key: 'spark-projectile',
+    path: 'assets/projectiles/spark-projectile.svg',
+    width: 22,
+    height: 12,
+    fallback: { radius: 5, color: 0xfff06a },
+  },
+  {
+    key: 'mist-projectile',
+    path: 'assets/projectiles/mist-projectile.svg',
+    width: 22,
+    height: 14,
+    fallback: { radius: 6, color: 0xc4f1ff },
+  },
+  {
     key: 'gel-shard',
     path: 'assets/loot/gel-shard.svg',
     width: 14,
@@ -180,6 +194,18 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
   {
     key: 'weapon-arc-loom',
     path: getHudWeaponAssetPath('weapon-arc-loom'),
+    width: 96,
+    height: 96,
+  },
+  {
+    key: 'weapon-spark-carbine',
+    path: getHudWeaponAssetPath('weapon-spark-carbine'),
+    width: 96,
+    height: 96,
+  },
+  {
+    key: 'weapon-mist-vortex',
+    path: getHudWeaponAssetPath('weapon-mist-vortex'),
     width: 96,
     height: 96,
   },

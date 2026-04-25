@@ -218,6 +218,10 @@ export function buildAttackPlan(
 }
 
 export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
+  if (weapon.identityLabel) {
+    return weapon.identityLabel
+  }
+
   switch (weapon.attackBehavior.kind) {
     case 'spray-hazard':
       return '산성 분사'
