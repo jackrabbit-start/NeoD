@@ -25,3 +25,9 @@
 - Added `docs/wiki/ui-overlay-rendering.md` to preserve the Codex scroll-reset lesson for future DOM-backed overlays.
 - Updated `docs/index.md` so future agents can find the UI overlay rendering rule.
 - Source artifacts: `.omx/context/post-interview-codex-scroll-reset-20260425T105023Z.md` and PR #24.
+
+## [2026-04-25] gameplay-ui | Captured player health bar placement rule
+
+- Updated `docs/wiki/game-requirements.md` to record that moment-to-moment survival feedback should be visible in the gameplay canvas when it affects dodging/positioning.
+- Recorded the shipped player health bar as a compact Phaser canvas overlay with deterministic placement/fill helpers.
+- Source artifacts: `.omx/specs/deep-interview-health-bar-bottom.md`, `.omx/interviews/health-bar-bottom-20260425T013800Z.md`, `.omx/context/post-interview-health-bar-bottom-20260425T110701Z.md`, and PR #28.

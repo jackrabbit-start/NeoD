@@ -137,6 +137,8 @@ The game must support this loop:
 - Player-facing labels, combat prompts, status text, and run-result messaging should default to Korean in V1.
 - Internal ids, code symbols, and developer-facing documentation do not need to be localized unless a later prompt explicitly requires it.
 - Feedback can be debug-first in V1, but it must be readable
+- Moment-to-moment survival feedback should be visible in the gameplay view when it affects dodging or positioning. The shipped player health bar is a compact Phaser canvas element near the bottom of the arena; the external HUD health text may remain as a fallback, but future HUD cleanup should preserve in-combat readability.
+- Fixed player feedback overlays should use dedicated deterministic helper logic when their geometry differs from enemy-attached overlays. The player health bar uses `src/systems/playerHealthBar.ts` for bottom placement and clamped fill width tests.
 
 ## V1 Vertical Slice Bounds
 
