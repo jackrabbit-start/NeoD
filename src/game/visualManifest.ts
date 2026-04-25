@@ -79,6 +79,20 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     fallback: { radius: 12, color: 0xffdb6e },
   },
   {
+    key: 'prism-slime',
+    path: 'assets/units/prism-slime-idle-0.svg',
+    width: 30,
+    height: 30,
+    fallback: { radius: 14, color: 0xff9df3 },
+  },
+  {
+    key: 'prism-slime-idle-1',
+    path: 'assets/units/prism-slime-idle-1.svg',
+    width: 30,
+    height: 30,
+    fallback: { radius: 14, color: 0xff9df3 },
+  },
+  {
     key: 'dash-slime',
     path: 'assets/units/dash-slime-idle-0.svg',
     width: 28,
@@ -433,6 +447,7 @@ export const IDLE_ANIMATIONS: AnimationDefinition[] = [
   { key: 'player-move', frames: ['player-walk-0', 'player-walk-1'], frameRate: 8 },
   { key: 'slime-idle', frames: ['slime', 'slime-idle-1'], frameRate: 3 },
   { key: 'spark-slime-idle', frames: ['spark-slime', 'spark-slime-idle-1'], frameRate: 4 },
+  { key: 'prism-slime-idle', frames: ['prism-slime', 'prism-slime-idle-1'], frameRate: 4 },
   { key: 'dash-slime-idle', frames: ['dash-slime', 'dash-slime-idle-1'], frameRate: 7 },
   { key: 'orbit-slime-idle', frames: ['orbit-slime', 'orbit-slime-idle-1'], frameRate: 5 },
   { key: 'needle-wasp-idle', frames: ['needle-wasp', 'needle-wasp-idle-1'], frameRate: 7 },

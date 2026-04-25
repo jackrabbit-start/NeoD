@@ -1,9 +1,13 @@
 import type { CodexEnemyEntry, CodexItemEntry, CodexRecipeEntry, CodexState } from '../domain/types.js'
+import { getHudEnemyAssetPath } from '../game/visualManifest.js'
 
 const colorHex = (value: number) => `#${value.toString(16).padStart(6, '0')}`
 
 const renderSwatch = (color: number) =>
   `<span class="codex-swatch" style="--swatch:${colorHex(color)}"></span>`
+
+const renderEnemyIcon = (enemy: CodexEnemyEntry) =>
+  `<img class="codex-enemy-icon" src="${getHudEnemyAssetPath(enemy.iconKey)}" alt="" aria-hidden="true" loading="lazy" />`
 
 const renderItems = (items: CodexItemEntry[]) => items.length === 0
   ? '<p class="codex-empty">재료 아이콘 드롭은 숨김 처리되었습니다. 적 처치 토큰이 파친코 보상으로 전환됩니다.</p>'
@@ -54,7 +58,7 @@ const renderEnemies = (enemies: CodexEnemyEntry[]) => `
       .map(
         (enemy) => `
           <article class="codex-entry">
-            <h3>${renderSwatch(enemy.tint)}${enemy.name}</h3>
+            <h3>${renderEnemyIcon(enemy)}${enemy.name}</h3>
             <p>${enemy.description}</p>
             <p class="codex-meta">${enemy.stats.join(' · ')}</p>
             <p class="codex-inline-list">

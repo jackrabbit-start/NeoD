@@ -1466,9 +1466,12 @@ test('enemy names match college engineering life story beats', () => {
 
   const attendanceSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/slime-idle-0.svg'), 'utf8')
   const capstoneSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/siege-toad-idle-0.svg'), 'utf8')
+  const prismSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/prism-slime-idle-0.svg'), 'utf8')
   const professorSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/slime-boss-idle-0.svg'), 'utf8')
   assert.match(attendanceSvg, /<title>출석 체크 알림<\/title>/)
   assert.match(capstoneSvg, /<title>캡스톤 마감덩어리<\/title>/)
+  assert.match(prismSvg, /<title>A\+ 착각 노트<\/title>/)
+  assert.equal(ENEMY_DEFINITIONS['prism-slime'].textureKey, 'prism-slime')
   assert.match(professorSvg, /<title>최종 발표 교수님<\/title>/)
 })
 
@@ -1834,6 +1837,7 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
 
   const prismSlime = codex.enemies.find((enemy) => enemy.id === 'prism-slime')
   assert.ok(prismSlime)
+  assert.equal(prismSlime?.iconKey, 'prism-slime')
   assert.ok(prismSlime?.stats.some((stat) => stat.includes('보상 경험치 +180')))
 
   const dashSlime = codex.enemies.find((enemy) => enemy.id === 'dash-slime')
@@ -1849,6 +1853,7 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
 
   const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
   assert.ok(needleWasp)
+  assert.equal(needleWasp?.iconKey, 'needle-wasp')
   assert.ok(needleWasp?.description.includes('코드리뷰'))
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('부채꼴')))
   assert.deepEqual(needleWasp?.drops, [])
@@ -1910,6 +1915,8 @@ test('codex controller preserves scroll across repeated open renders', () => {
 
   element.scrollTop = 48
   controller.update(getCodexState(true))
+  assert.match(element.innerHTML, /codex-enemy-icon/)
+  assert.match(element.innerHTML, /assets\/units\/prism-slime-idle-0.svg/)
 
   assert.equal(element.scrollTop, 48)
   assert.equal(element.assignments, 1)
@@ -2498,7 +2505,7 @@ test('enemy visual metadata keeps immutable gameplay geometry while adding art h
     {
       slime: { size: 20, textureKey: 'slime', animationKey: 'slime-idle' },
       'spark-slime': { size: 22, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
-      'prism-slime': { size: 30, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
+      'prism-slime': { size: 30, textureKey: 'prism-slime', animationKey: 'prism-slime-idle' },
       'dash-slime': { size: 24, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
       'orbit-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
       'needle-wasp': { size: 24, textureKey: 'needle-wasp', animationKey: 'needle-wasp-idle' },

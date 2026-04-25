@@ -38,6 +38,7 @@ export interface PachinkoHudState {
 export type EnemyAnimationKey =
   | 'slime-idle'
   | 'spark-slime-idle'
+  | 'prism-slime-idle'
   | 'dash-slime-idle'
   | 'orbit-slime-idle'
   | 'needle-wasp-idle'
@@ -595,6 +596,7 @@ export interface CodexRecipeEntry {
 
 export interface CodexEnemyEntry {
   id: EnemyId
+  iconKey: string
   name: string
   description: string
   tint: number

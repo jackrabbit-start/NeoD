@@ -1094,6 +1094,16 @@ button {
   color: #8fb2ff;
 }
 
+.codex-enemy-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: middle;
+  margin-right: 8px;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
+}
+
 .codex-swatch {
   display: inline-block;
   width: 10px;

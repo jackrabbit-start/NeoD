@@ -86,8 +86,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     score: 60,
     tint: 0xff9df3,
     size: 30,
-    textureKey: 'spark-slime',
-    animationKey: 'spark-slime-idle',
+    textureKey: 'prism-slime',
+    animationKey: 'prism-slime-idle',
     knockback: {
       resistance: 0.35,
       weight: 1.45,
@@ -100,7 +100,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     },
     behaviorSummary: '빠르게 추적하며 큰 토큰 보상 경험치를 주는 시험 착각 덩어리입니다.',
     visual: {
-      portraitKey: 'spark-slime',
+      portraitKey: 'prism-slime',
     },
     drops: [{ itemId: 'tuning-capsule', weight: 1 }],
   },

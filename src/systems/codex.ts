@@ -13,6 +13,7 @@ export function getCodexState(isOpen: boolean): CodexState {
     recipes: [],
     enemies: Object.values(ENEMY_DEFINITIONS).map((enemy) => ({
       id: enemy.id,
+      iconKey: enemy.textureKey,
       name: enemy.name,
       description: enemy.description,
       tint: enemy.tint,
