@@ -115,6 +115,40 @@ test('passives modify hazard, burst, impact, and melee behavior safely with roll
   assert.equal(modifiedStorm.attackBehavior.explosionRadius, baseStorm.attackBehavior.explosionRadius)
 })
 
+test('duration, ricochet, summon, turret, and lifesteal card stats all feed weapon behavior', () => {
+  let state = {}
+  state = addPassiveCard(state, createPassiveCardChoice('linger-protocol', 12, createSequenceRandom([0.8, 0.7])))
+  state = addPassiveCard(state, createPassiveCardChoice('arc-playbook', 12, createSequenceRandom([0.9, 0.8])))
+  state = addPassiveCard(state, createPassiveCardChoice('siege-framework', 12, createSequenceRandom([0.75, 0.65])))
+  state = addPassiveCard(state, createPassiveCardChoice('slime-glaive-special', 12, createSequenceRandom([0.8, 0.7]), 'slime-glaive'))
+  state = addPassiveCard(state, createPassiveCardChoice('spark-carbine-special', 12, createSequenceRandom([0.6, 0.5]), 'spark-carbine'))
+  state = addPassiveCard(state, createPassiveCardChoice('needle-fan-special', 12, createSequenceRandom([0.7, 0.6]), 'needle-fan'))
+
+  const compiler = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['mist-vortex'], state)
+  assert.equal(compiler.attackBehavior.kind, 'zone-control')
+  assert.ok(compiler.attackBehavior.zoneDurationMs > WEAPON_DEFINITIONS['mist-vortex'].attackBehavior.zoneDurationMs)
+  assert.ok(compiler.attackBehavior.projectileLifetimeMs > WEAPON_DEFINITIONS['mist-vortex'].attackBehavior.projectileLifetimeMs)
+
+  const kickoff = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['arc-loom'], state)
+  assert.equal(kickoff.attackBehavior.kind, 'single')
+  assert.ok(kickoff.attackBehavior.ricochet.maxBounces > WEAPON_DEFINITIONS['arc-loom'].attackBehavior.ricochet.maxBounces)
+  assert.ok(kickoff.attackBehavior.ricochet.bounceRange > WEAPON_DEFINITIONS['arc-loom'].attackBehavior.ricochet.bounceRange)
+
+  const sentry = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['spark-carbine'], state)
+  assert.equal(sentry.attackBehavior.kind, 'deploy-turret')
+  assert.ok(sentry.attackBehavior.deploy.durationMs > WEAPON_DEFINITIONS['spark-carbine'].attackBehavior.deploy.durationMs)
+  assert.ok(sentry.attackBehavior.deploy.fireRateMs < WEAPON_DEFINITIONS['spark-carbine'].attackBehavior.deploy.fireRateMs)
+
+  const reanimator = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['needle-fan'], state)
+  assert.equal(reanimator.attackBehavior.kind, 'single')
+  assert.ok(reanimator.attackBehavior.summonOnKill.maxMinions > WEAPON_DEFINITIONS['needle-fan'].attackBehavior.summonOnKill.maxMinions)
+  assert.ok(reanimator.attackBehavior.summonOnKill.durationMs > WEAPON_DEFINITIONS['needle-fan'].attackBehavior.summonOnKill.durationMs)
+
+  const bloodReaver = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['slime-glaive'], state)
+  assert.equal(bloodReaver.attackBehavior.kind, 'melee-cleave')
+  assert.ok(bloodReaver.attackBehavior.healOnHit > WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.healOnHit)
+})
+
 test('critical-hit resolution stays deterministic from rolled passive state', () => {
   let critState = {}
   critState = addPassiveCard(critState, createPassiveCardChoice('keen-sense', 10, createSequenceRandom([0.95])))
