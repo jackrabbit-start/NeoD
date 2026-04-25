@@ -76,6 +76,27 @@ export function flattenRunPhaseEntries(phase: RunProgressionPhaseDefinition): En
   )
 }
 
+export function getRunEnemySpawnChanceRows(
+  phase: RunProgressionPhaseDefinition,
+): Array<{ enemyId: EnemyId; enemyName: string; count: number; ratio: number; percentLabel: string }> {
+  const total = phase.entries.reduce((sum, entry) => sum + Math.max(0, entry.count), 0)
+  if (total <= 0) {
+    return []
+  }
+
+  return phase.entries.map((entry) => {
+    const count = Math.max(0, entry.count)
+    const ratio = count / total
+    return {
+      enemyId: entry.enemyId,
+      enemyName: ENEMY_DEFINITIONS[entry.enemyId]?.name ?? entry.enemyId,
+      count,
+      ratio,
+      percentLabel: `${Math.round(ratio * 100)}%`,
+    }
+  })
+}
+
 export function getAllowedRunEnemyIds(
   phases: RunProgressionPhaseDefinition[] = RUN_PROGRESS_PHASES,
 ): EnemyId[] {

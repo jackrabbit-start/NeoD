@@ -74,6 +74,12 @@ import {
   deriveEffectiveWeaponStats,
   resolveTuningSelection,
 } from '../.tmp-test/src/systems/tuning.js'
+import {
+  BASE_PLAYER_MAX_HEALTH,
+  PLAYER_DAMAGE_MULTIPLIER_PER_LEVEL,
+  PLAYER_HEALTH_PER_LEVEL,
+  getPlayerLevelCombatStats,
+} from '../.tmp-test/src/systems/playerScaling.js'
 import { getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.js'
 import {
   STARTER_WEAPON_STACK_KEY,
@@ -117,6 +123,7 @@ import {
   FINAL_STAGE_START_MS,
   RUN_DURATION_MS,
   formatRunTime,
+  getRunEnemySpawnChanceRows,
   getRunPhaseByElapsedMs,
   getRunSpawnCapacity,
   getUnknownRunEnemyIds,
@@ -135,11 +142,16 @@ import {
   PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
   STAR_ODDS_BY_LEVEL,
   applyEnemyPachinkoTokenProgress,
+  applyPachinkoSlotModifier,
+  buildPachinkoSlotModifiers,
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
   getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
   getPachinkoStarRangeForPlayerLevel,
+  getPachinkoWeaponFamily,
+  getPachinkoWeaponFamilyLabel,
+  getPachinkoWeaponSynergySummary,
   getTokenXpForEnemy,
   resolvePachinkoLandingReward,
   resolvePachinkoReward,
@@ -605,6 +617,46 @@ test('pachinko slot table makes displayed bottom rewards exact', () => {
   })
 })
 
+test('pachinko weapon-family synergy marks mostly-upside bonus slots', () => {
+  assert.equal(getPachinkoWeaponFamily('slime-glaive'), 'melee')
+  assert.equal(getPachinkoWeaponFamilyLabel('melee'), '근접')
+  assert.equal(getPachinkoWeaponSynergySummary('slime-glaive'), '근접 계열: 젓가락워킹 글레이브 보너스 슬롯 등장')
+
+  const modifiers = buildPachinkoSlotModifiers('slime-glaive', 3)
+  assert.equal(modifiers.get(7), 'family')
+  assert.equal(modifiers.get(3), 'bonus')
+  assert.equal(modifiers.get(5), 'jackpot')
+
+  const synergizedSlots = buildPachinkoSlotRewards(14, PACHINKO_SLOT_COUNT, 0, 1, 'slime-glaive')
+  assert.equal(synergizedSlots[7].modifier?.kind, 'family')
+  assert.equal(synergizedSlots[7].weaponId, 'slime-glaive')
+  assert.equal(synergizedSlots[3].modifier?.kind, 'bonus')
+  assert.equal(synergizedSlots[5].modifier?.kind, 'jackpot')
+  assert.equal(synergizedSlots[5].weaponId, 'slime-glaive')
+})
+
+test('pachinko slot modifiers never punish the base reward', () => {
+  const baseReward = { weaponId: 'acid-sprayer', star: 4 }
+  assert.deepEqual(applyPachinkoSlotModifier(baseReward, 'family', 'spark-carbine'), {
+    weaponId: 'spark-carbine',
+    star: 4,
+  })
+  assert.deepEqual(applyPachinkoSlotModifier(baseReward, 'bonus', 'spark-carbine'), {
+    weaponId: 'acid-sprayer',
+    star: 5,
+  })
+  assert.deepEqual(applyPachinkoSlotModifier(baseReward, 'jackpot', 'spark-carbine'), {
+    weaponId: 'spark-carbine',
+    star: 5,
+  })
+
+  const familyLanding = resolvePachinkoLandingReward(14, 0.75, 0, 1, 'slime-glaive')
+  assert.deepEqual(familyLanding, {
+    weaponId: 'slime-glaive',
+    star: 2,
+  })
+})
+
 test('pachinko slot index clamps boundaries and live table timing', () => {
   assert.equal(PACHINKO_REWARD_TABLE_REFRESH_MS, 850)
   assert.equal(getPachinkoRewardTableSeed(0), 0)
@@ -1066,6 +1118,28 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   assert.equal(formatRunTime(RUN_DURATION_MS), '30:00')
   assert.deepEqual(getUnknownRunEnemyIds(), [])
   assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
+})
+
+test('run progression exposes per-enemy spawn chance rows for the current minute', () => {
+  const firstPhase = getRunPhaseByElapsedMs(0)
+  const latePhase = getRunPhaseByElapsedMs(24 * 60_000)
+  const firstRows = getRunEnemySpawnChanceRows(firstPhase)
+  const lateRows = getRunEnemySpawnChanceRows(latePhase)
+
+  assert.deepEqual(firstRows, [
+    {
+      enemyId: 'slime',
+      enemyName: '진흙 슬라임',
+      count: 16,
+      ratio: 1,
+      percentLabel: '100%',
+    },
+  ])
+  assert.ok(lateRows.length > 4)
+  assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
+  assert.ok(lateRows.some((row) => row.enemyId === 'void-orb'))
+  assert.equal(lateRows.reduce((sum, row) => sum + row.count, 0) > 0, true)
+  assert.equal(lateRows.reduce((sum, row) => sum + row.ratio, 0).toFixed(4), '1.0000')
 })
 
 test('nearest auto-attack target returns null when no active enemies are available', () => {
@@ -1860,6 +1934,58 @@ test('effective weapon stats scale by star grade for combat-visible fusion payof
   assert.equal(tunedThreeStar.fireRateMs, 182)
   assert.equal(glaiveThreeStar.attackBehavior.kind, 'melee-cleave')
   assert.equal(glaiveThreeStar.attackBehavior.range, WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.range + 12)
+})
+
+test('player level combat stats raise health and weapon damage globally', () => {
+  assert.equal(BASE_PLAYER_MAX_HEALTH, 100)
+  assert.equal(PLAYER_HEALTH_PER_LEVEL, 8)
+  assert.equal(PLAYER_DAMAGE_MULTIPLIER_PER_LEVEL, 0.05)
+
+  assert.deepEqual(getPlayerLevelCombatStats(1), {
+    level: 1,
+    maxHealth: 100,
+    damageMultiplier: 1,
+    weaponRangeMultiplier: 1,
+    weaponSpecialTier: 0,
+  })
+
+  assert.deepEqual(getPlayerLevelCombatStats(10), {
+    level: 10,
+    maxHealth: 172,
+    damageMultiplier: 1.45,
+    weaponRangeMultiplier: 1.16,
+    weaponSpecialTier: 1,
+  })
+
+  const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
+  assert.equal(levelTenBlaster.damage, 15)
+  assert.equal(levelTenBlaster.range, 487)
+  assert.equal(levelTenBlaster.playerDamageMultiplier, 1.45)
+  assert.equal(levelTenBlaster.weaponSpecialTier, 1)
+})
+
+test('weapon milestone upgrades expand behavior every five and ten player levels', () => {
+  const levelFiveGlaive = deriveEffectiveWeaponStats('slime-glaive', {}, 1, 5)
+  assert.equal(levelFiveGlaive.attackBehavior.kind, 'melee-cleave')
+  assert.equal(levelFiveGlaive.attackBehavior.range, 102)
+
+  const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
+  assert.equal(levelTenBlaster.attackBehavior.kind, 'pierce')
+  assert.equal(levelTenBlaster.attackBehavior.maxHits, 2)
+
+  const levelTwentyFrost = deriveEffectiveWeaponStats('frost-lance', {}, 1, 20)
+  assert.equal(levelTwentyFrost.attackBehavior.kind, 'pierce')
+  assert.equal(levelTwentyFrost.attackBehavior.maxHits, 5)
+
+  const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
+  assert.equal(levelTwentyArc.attackBehavior.kind, 'chain')
+  assert.equal(levelTwentyArc.attackBehavior.maxChains, 4)
+  assert.equal(levelTwentyArc.attackBehavior.chainRange, 172)
+
+  const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
+  assert.equal(levelTwentyMist.attackBehavior.kind, 'spray-hazard')
+  assert.equal(levelTwentyMist.attackBehavior.projectileCount, 7)
+  assert.equal(levelTwentyMist.attackBehavior.hazardRadius, 48)
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {
