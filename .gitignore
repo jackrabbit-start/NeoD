@@ -16,3 +16,4 @@ dist/
 coverage/
 .tmp-test/
 *.log
+.vercel
