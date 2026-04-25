@@ -80,8 +80,11 @@ import {
   addPassiveCard,
   applyPassivePlayerSpeed,
   applyPassiveWeaponEffects,
+  getPassiveEnemyDamageMultiplier,
+  getPassiveIncomingDamageMultiplier,
   getPassiveCardChoices,
   getPassiveSummaryLines,
+  getPassiveTokenXpMultiplier,
   resolveCriticalHit,
   type PassiveCardDefinition,
   type PassiveState,
@@ -1841,10 +1844,18 @@ export class ArenaScene extends Phaser.Scene {
       return false
     }
 
+    const passiveEnemyDamageMultiplier = getPassiveEnemyDamageMultiplier(
+      enemy.config.id === 'slime-boss',
+      this.passiveState,
+    )
+    const scaledBaseDamage = Math.max(
+      1,
+      Math.round((options?.baseDamage ?? damage) * passiveEnemyDamageMultiplier),
+    )
     const criticalHit = options?.canCrit
-      ? resolveCriticalHit(options.baseDamage ?? damage, this.passiveState)
+      ? resolveCriticalHit(scaledBaseDamage, this.passiveState)
       : {
-          damage,
+          damage: scaledBaseDamage,
           isCritical: false,
           critChance: 0,
           critDamageMultiplier: 1,
@@ -2007,10 +2018,15 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
+    const scaledDamage = Math.max(
+      1,
+      Math.round(damage * getPassiveIncomingDamageMultiplier(this.passiveState)),
+    )
+
     this.lastPlayerHitAt = now
-    this.playerHealth = Math.max(0, this.playerHealth - damage)
+    this.playerHealth = Math.max(0, this.playerHealth - scaledDamage)
     this.syncPlayerHealthBar()
-    this.statusMessage = `플레이어가 ${damage} 피해를 받았습니다. 계속 움직이세요.`
+    this.statusMessage = `플레이어가 ${scaledDamage} 피해를 받았습니다. 계속 움직이세요.`
     this.player.setAlpha(0.55)
     this.tweens.add({
       targets: this.player,
@@ -2115,7 +2131,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    this.passiveState = addPassiveCard(this.passiveState, selected.id)
+    this.passiveState = addPassiveCard(this.passiveState, selected)
     this.playerSpeed = applyPassivePlayerSpeed(220, this.passiveState)
     this.isPassiveSelectionOpen = false
     this.pendingPassiveChoices = []
@@ -2846,12 +2862,14 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): void {
+    const tokenMultiplier = getPassiveTokenXpMultiplier(this.passiveState)
     const nextProgress = applyEnemyPachinkoTokenProgress(
       {
         totalTokenXp: this.pachinkoTokenXp,
         queuedTokenXp: this.pachinkoTokenQueue,
       },
       enemyId,
+      tokenMultiplier,
     )
     if (!nextProgress.didEnqueue) {
       return
