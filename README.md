@@ -40,6 +40,8 @@ Parallel AI worktree setup is documented in `docs/wiki/parallel-ai-worktrees.md`
 
 Pushes merged into `ai-dev` trigger `.github/workflows/vercel-ai-dev-deploy.yml`, which installs dependencies, runs `pnpm typecheck`, `pnpm test`, and `pnpm build`, then publishes a Vercel production deployment through the Vercel CLI.
 
+The repo also disables Vercel's built-in Git auto-deploy path in `vercel.json`, so GitHub Actions remains the single deployment mechanism.
+
 Configure these GitHub repository secrets before enabling the workflow:
 
 - `VERCEL_TOKEN`
