@@ -2844,7 +2844,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.hud.update({
       title: GAME_TITLE,
-      subtitle: this.activeRunLabel || '슬라임 아레나 대기 중',
+      subtitle: this.activeRunLabel || '김동성의 추격장 진입 대기 중',
       currentTimeLabel: formatRunTime(this.runElapsedMs),
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
@@ -2864,8 +2864,8 @@ export class ArenaScene extends Phaser.Scene {
       ],
       recipes: this.getFusionSummaryLines(),
       objective: this.isFinaleActive
-        ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
-        : '30분 생존 압박을 버티며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
+        ? '마지막 추격 파도를 돌파하고 30:00 전에 결전을 끝내 살아남으세요.'
+        : '김동성의 추격에서 30분 동안 버티며 토큰으로 무기를 키우고 생존 루프를 이어가세요.',
       tip: GAMEPLAY_CONTROL_TIP,
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
