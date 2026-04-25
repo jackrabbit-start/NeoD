@@ -40,7 +40,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     range: 240,
     damage: 11,
     fireRateMs: 420,
-    projectileSpeed: 460,
+    projectileSpeed: 420,
     projectileTint: 0xc1ff72,
     projectileTextureKey: 'acid-projectile',
     knockback: {
@@ -49,10 +49,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
     attackBehavior: {
       kind: 'spray-hazard',
-      projectileCount: 3,
-      spreadDegrees: 11,
-      projectileLifetimeMs: 360,
-      hazardRadius: 34,
+      projectileCount: 4,
+      spreadDegrees: 15,
+      projectileLifetimeMs: 300,
+      hazardRadius: 40,
       hazardDurationMs: 1400,
       hazardTickMs: 220,
       hazardDamage: 6,
@@ -108,8 +108,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     attackBehavior: {
       kind: 'split-shot',
       projectileCount: 8,
-      spreadDegrees: 9,
-      projectileLifetimeMs: 260,
+      spreadDegrees: 11,
+      projectileLifetimeMs: 240,
+      shotDelayMs: 10,
       damageMultiplier: 0.84,
       speedMultiplier: 0.96,
       maxHits: 1,
@@ -128,7 +129,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     range: 430,
     damage: 12,
     fireRateMs: 360,
-    projectileSpeed: 560,
+    projectileSpeed: 500,
     projectileTint: 0xffd866,
     projectileTextureKey: 'arc-projectile',
     knockback: {
@@ -137,12 +138,12 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
     attackBehavior: {
       kind: 'single',
-      projectileLifetimeMs: 1600,
+      projectileLifetimeMs: 1800,
       ricochet: {
         maxBounces: 4,
-        bounceRange: 210,
+        bounceRange: 240,
         damageMultiplierPerBounce: 0.94,
-        speedMultiplierPerBounce: 1.03,
+        speedMultiplierPerBounce: 0.98,
       },
     },
     visual: {
@@ -169,8 +170,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     attackBehavior: {
       kind: 'deploy-turret',
       projectileLifetimeMs: 620,
-      impactDamage: 3,
-      speedMultiplier: 0.9,
+      impactDamage: 1,
+      speedMultiplier: 0.68,
       deploy: {
         maxTurrets: 2,
         durationMs: 5200,
@@ -227,7 +228,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     damage: 17,
     fireRateMs: 560,
     projectileSpeed: 0,
-    projectileTint: 0x7dffb0,
+    projectileTint: 0xf4c542,
     projectileTextureKey: 'arc-projectile',
     knockback: {
       force: 118,
@@ -243,7 +244,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
     visual: {
       hudIconKey: 'weapon-slime-glaive',
-      accentColor: 0x7dffb0,
+      accentColor: 0xf4c542,
     },
   },
   'prism-cutter': {
@@ -327,6 +328,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     attackBehavior: {
       kind: 'single',
       projectileLifetimeMs: 760,
+      execute: {
+        thresholdRatio: 0.28,
+        damageMultiplier: 1.9,
+      },
       summonOnKill: {
         maxMinions: 3,
         durationMs: 4200,

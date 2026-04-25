@@ -564,6 +564,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private nextBloodReaverAuraTickAt = 0
 
+  private nextBloodReaverAuraSweepAt = 0
+
   private runElapsedMs = 0
 
   private currentStageIndex = 0
@@ -1100,32 +1102,32 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    const radius = Math.max(28, Math.round(behavior.range * 0.62))
-    const tint = weapon.projectileTint
+    const radius = Math.max(28, Math.round(behavior.range * 0.64))
+    const auraCoreTint = 0x8f4d1d
+    const auraRingTint = 0xf4c542
 
     if (!this.bloodReaverAuraCore?.active) {
-      this.bloodReaverAuraCore = this.add.circle(this.player.x, this.player.y, radius, tint, 0.08).setDepth(0.55)
-      this.bloodReaverAuraRing = this.add.circle(this.player.x, this.player.y, radius * 1.08, tint, 0)
-        .setStrokeStyle(3, 0xffc06b, 0.38)
+      this.bloodReaverAuraCore = this.add.circle(this.player.x, this.player.y, radius, auraCoreTint, 0.14)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(0.55)
+      this.bloodReaverAuraRing = this.add.circle(this.player.x, this.player.y, radius * 1.12, auraRingTint, 0)
+        .setStrokeStyle(5, 0xffdd7a, 0.44)
+        .setBlendMode(Phaser.BlendModes.ADD)
         .setDepth(0.58)
 
       this.tweens.add({
         targets: [this.bloodReaverAuraCore, this.bloodReaverAuraRing],
-        scaleX: 1.06,
-        scaleY: 1.06,
-        alpha: { from: 0.28, to: 0.12 },
+        scaleX: 1.08,
+        scaleY: 1.08,
+        alpha: { from: 0.34, to: 0.16 },
         yoyo: true,
         repeat: -1,
-        duration: 260,
+        duration: 300,
       })
     }
 
     this.bloodReaverAuraCore?.setPosition(this.player.x, this.player.y).setRadius(radius)
-    this.bloodReaverAuraRing?.setPosition(this.player.x, this.player.y).setRadius(radius * 1.08)
-
-    if (time < this.nextBloodReaverAuraTickAt) {
-      return
-    }
+    this.bloodReaverAuraRing?.setPosition(this.player.x, this.player.y).setRadius(radius * 1.12)
 
     const impactedIds = new Set(
       collectTargetsInRadius(
@@ -1142,8 +1144,23 @@ export class ArenaScene extends Phaser.Scene {
       ),
     )
 
-    if (impactedIds.size > 0) {
-      const auraDamage = Math.max(1, Math.round(weapon.damage * 0.18))
+    if (impactedIds.size === 0) {
+      return
+    }
+
+    if (time >= this.nextBloodReaverAuraTickAt) {
+      const auraDamage = Math.max(1, Math.round(weapon.damage * 0.08))
+      this.bloodReaverAuraCore?.setFillStyle(auraCoreTint, 0.2)
+      this.bloodReaverAuraRing?.setStrokeStyle(6, 0xffdd7a, 0.56)
+      this.tweens.add({
+        targets: [this.bloodReaverAuraCore, this.bloodReaverAuraRing].filter(Boolean),
+        scaleX: 1.14,
+        scaleY: 1.14,
+        alpha: { from: 0.46, to: 0.18 },
+        duration: 140,
+        yoyo: true,
+      })
+
       for (const enemy of this.enemies) {
         if (!enemy.sprite.active || !impactedIds.has(enemy.runtimeId)) {
           continue
@@ -1156,9 +1173,41 @@ export class ArenaScene extends Phaser.Scene {
           return
         }
       }
+
+      this.nextBloodReaverAuraTickAt = time + 180
     }
 
-    this.nextBloodReaverAuraTickAt = time + 240
+    if (time >= this.nextBloodReaverAuraSweepAt) {
+      const sweepDamage = Math.max(1, Math.round(weapon.damage * 0.68))
+      spawnMeleeSwingEffect(this, { x: this.player.x, y: this.player.y }, {
+        origin: { x: this.player.x, y: this.player.y },
+        direction: { x: this.lastPlayerMoveDirection.x, y: this.lastPlayerMoveDirection.y },
+        damage: sweepDamage,
+        tint: 0xf4c542,
+        range: Math.round(radius * 1.26),
+        arcDegrees: 360,
+        visualDurationMs: 190,
+        maxTargets: impactedIds.size,
+        knockback: weapon.knockback,
+        healOnHit: 1,
+        visualPowerTier: weapon.visualPowerTier,
+      })
+      for (const enemy of this.enemies) {
+        if (!enemy.sprite.active || !impactedIds.has(enemy.runtimeId)) {
+          continue
+        }
+        this.damageEnemy(enemy, sweepDamage, {
+          ignoreRecentHit: true,
+          baseDamage: sweepDamage,
+        })
+        this.playerHealth = Math.min(this.playerMaxHealth, this.playerHealth + 1)
+        if (this.isRunEnding) {
+          return
+        }
+      }
+
+      this.nextBloodReaverAuraSweepAt = time + 720
+    }
   }
 
   private destroyBloodReaverAura(): void {
@@ -1170,6 +1219,8 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.bloodReaverAuraCore = undefined
     this.bloodReaverAuraRing = undefined
+    this.nextBloodReaverAuraTickAt = 0
+    this.nextBloodReaverAuraSweepAt = 0
   }
 
   private updateEnemies(delta: number): void {
@@ -3732,6 +3783,7 @@ export class ArenaScene extends Phaser.Scene {
     this.nextPachinkoTokenRuntimeId = 1
     this.lastPachinkoTokenLaunchAt = 0
     this.nextBloodReaverAuraTickAt = 0
+    this.nextBloodReaverAuraSweepAt = 0
     this.projectiles = []
     this.enemyProjectiles = []
     this.hazardZones = []

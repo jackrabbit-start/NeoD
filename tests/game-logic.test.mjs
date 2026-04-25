@@ -2346,7 +2346,7 @@ test('effective weapon stats scale by star grade for combat-visible fusion payof
 
   assert.equal(fiveStar.damage, 19)
   assert.equal(fiveStar.fireRateMs, 319)
-  assert.equal(fiveStar.projectileSpeed, 607)
+  assert.equal(fiveStar.projectileSpeed, 554)
   assert.ok(fiveStar.damage > oneStar.damage)
   assert.ok(fiveStar.fireRateMs < oneStar.fireRateMs)
   assert.ok(fiveStar.projectileSpeed > oneStar.projectileSpeed)
@@ -2403,7 +2403,7 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
   const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
   assert.equal(levelTwentyArc.attackBehavior.kind, 'single')
   assert.equal(levelTwentyArc.attackBehavior.ricochet?.maxBounces, 4)
-  assert.equal(levelTwentyArc.attackBehavior.ricochet?.bounceRange, 210)
+  assert.equal(levelTwentyArc.attackBehavior.ricochet?.bounceRange, 240)
 
   const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
   assert.equal(levelTwentyMist.attackBehavior.kind, 'zone-control')

@@ -75,16 +75,16 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
         range: 240,
         damage: 11,
         fireRateMs: 420,
-        projectileSpeed: 460,
+        projectileSpeed: 420,
         projectileTextureKey: 'acid-projectile',
         hudIconKey: 'weapon-acid-sprayer',
         knockback: { force: 58, durationMs: 86 },
         attackBehavior: {
           kind: 'spray-hazard',
-          projectileCount: 3,
-          spreadDegrees: 11,
-          projectileLifetimeMs: 360,
-          hazardRadius: 34,
+          projectileCount: 4,
+          spreadDegrees: 15,
+          projectileLifetimeMs: 300,
+          hazardRadius: 40,
           hazardDurationMs: 1400,
           hazardTickMs: 220,
           hazardDamage: 6,
@@ -116,8 +116,9 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
         attackBehavior: {
           kind: 'split-shot',
           projectileCount: 8,
-          spreadDegrees: 9,
-          projectileLifetimeMs: 260,
+          spreadDegrees: 11,
+          projectileLifetimeMs: 240,
+          shotDelayMs: 10,
           damageMultiplier: 0.84,
           speedMultiplier: 0.96,
           maxHits: 1,
@@ -127,18 +128,18 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
         range: 430,
         damage: 12,
         fireRateMs: 360,
-        projectileSpeed: 560,
+        projectileSpeed: 500,
         projectileTextureKey: 'arc-projectile',
         hudIconKey: 'weapon-arc-loom',
         knockback: { force: 84, durationMs: 94 },
         attackBehavior: {
           kind: 'single',
-          projectileLifetimeMs: 1600,
+          projectileLifetimeMs: 1800,
           ricochet: {
             maxBounces: 4,
-            bounceRange: 210,
+            bounceRange: 240,
             damageMultiplierPerBounce: 0.94,
-            speedMultiplierPerBounce: 1.03,
+            speedMultiplierPerBounce: 0.98,
           },
         },
       },
@@ -153,8 +154,8 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
         attackBehavior: {
           kind: 'deploy-turret',
           projectileLifetimeMs: 620,
-          impactDamage: 3,
-          speedMultiplier: 0.9,
+          impactDamage: 1,
+          speedMultiplier: 0.68,
           deploy: {
             maxTurrets: 2,
             durationMs: 5200,
@@ -233,6 +234,10 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
         attackBehavior: {
           kind: 'single',
           projectileLifetimeMs: 760,
+          execute: {
+            thresholdRatio: 0.28,
+            damageMultiplier: 1.9,
+          },
           summonOnKill: {
             maxMinions: 3,
             durationMs: 4200,
@@ -294,6 +299,7 @@ test('deploy, summon, zone, split, and ricochet weapons expose distinct plans', 
   assert.equal(needle.attackBehavior.kind, 'single')
   assert.equal(needlePlan.projectiles.length, 1)
   assert.equal(needlePlan.projectiles[0].summonOnKill?.maxMinions, 3)
+  assert.equal(needlePlan.projectiles[0].execute?.thresholdRatio, 0.28)
 
   assert.equal(mist.attackBehavior.kind, 'zone-control')
   assert.equal(mistPlan.projectiles[0].hazardOnHit?.radius, 44)
@@ -302,6 +308,7 @@ test('deploy, summon, zone, split, and ricochet weapons expose distinct plans', 
 
   assert.equal(storm.attackBehavior.kind, 'split-shot')
   assert.equal(stormPlan.projectiles.length, 8)
+  assert.equal(stormPlan.projectiles[1].delayMs, 10)
   assert.ok(Math.abs(stormPlan.projectiles[0].direction.y) > 0)
 
   assert.equal(arc.attackBehavior.kind, 'single')

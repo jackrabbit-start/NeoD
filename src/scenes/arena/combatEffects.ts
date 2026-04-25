@@ -382,45 +382,67 @@ export function spawnMeleeSwingEffect(scene: Phaser.Scene, origin: Point, swing:
   const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
 
   if (swing.healOnHit && swing.arcDegrees >= 300) {
-    const sandTint = mixColor(swing.tint, 0xffb45a, 0.58)
-    const aura = scene.add.circle(0, 0, Math.max(18, swing.range * 0.42), sandTint, 0.16)
-    const outer = scene.add.graphics()
-    const inner = scene.add.graphics()
-    const slashes = scene.add.graphics()
+    const sunCore = 0xf4c542
+    const sunEdge = 0xffe18a
+    const bronze = 0x8f4d1d
+    const blood = 0xb91c1c
+    const aura = scene.add.circle(0, 0, Math.max(22, swing.range * 0.42), bronze, 0.22)
+    const ring = scene.add.graphics()
+    const dust = scene.add.graphics()
+    const sweep = scene.add.graphics()
+    const highlight = scene.add.graphics()
 
-    outer.lineStyle(12 + visualTier * 1.8, sandTint, 0.24)
-    outer.strokeCircle(0, 0, swing.range * 0.68)
-    outer.lineStyle(5 + visualTier, swing.tint, 0.34)
-    outer.strokeCircle(0, 0, swing.range * 0.88)
-
-    inner.fillStyle(swing.tint, 0.18 + visualTier * 0.025)
-    inner.slice(0, 0, swing.range * 0.9, 0, Math.PI * 2, false)
-    inner.fillPath()
-    inner.lineStyle(3, 0xffffff, 0.26)
-    inner.strokeCircle(0, 0, swing.range * 0.54)
+    ring.fillStyle(bronze, 0.12)
+    ring.fillCircle(0, 0, swing.range * 0.94)
+    ring.lineStyle(16 + visualTier * 2.4, sunCore, 0.34)
+    ring.strokeCircle(0, 0, swing.range * 0.72)
+    ring.lineStyle(7 + visualTier, sunEdge, 0.68)
+    ring.strokeCircle(0, 0, swing.range * 0.94)
+    ring.lineStyle(2.5 + visualTier * 0.3, blood, 0.22)
+    ring.strokeCircle(0, 0, swing.range * 0.44)
 
     for (let index = 0; index < 3; index += 1) {
-      const angle = ((Math.PI * 2) / 3) * index
-      const start = angle - 0.42
-      const end = angle + 0.42
-      slashes.lineStyle(10 + visualTier, sandTint, 0.22)
-      slashes.beginPath()
-      slashes.slice(0, 0, swing.range * 0.92, start, end, false)
-      slashes.strokePath()
-      slashes.lineStyle(4 + visualTier * 0.4, mixColor(swing.tint, 0xffffff, 0.34), 0.58)
-      slashes.beginPath()
-      slashes.slice(0, 0, swing.range * 0.76, start + 0.08, end - 0.08, false)
-      slashes.strokePath()
+      const start = Phaser.Math.DegToRad(index * 120 - 46)
+      const end = Phaser.Math.DegToRad(index * 120 + 38)
+      sweep.lineStyle(18 + visualTier * 1.8, sunCore, 0.26)
+      sweep.beginPath()
+      sweep.slice(0, 0, swing.range * 0.9, start, end, false)
+      sweep.strokePath()
+      sweep.lineStyle(9 + visualTier, sunEdge, 0.7)
+      sweep.beginPath()
+      sweep.slice(0, 0, swing.range * 0.78, start + 0.08, end - 0.12, false)
+      sweep.strokePath()
     }
 
-    container.add([aura, inner, outer, slashes])
+    highlight.lineStyle(3 + visualTier * 0.4, 0xffffff, 0.6)
+    for (let index = 0; index < 6; index += 1) {
+      const angle = Phaser.Math.DegToRad(index * 60)
+      highlight.lineBetween(
+        Math.cos(angle) * swing.range * 0.18,
+        Math.sin(angle) * swing.range * 0.18,
+        Math.cos(angle) * swing.range * 0.88,
+        Math.sin(angle) * swing.range * 0.88,
+      )
+    }
+
+    dust.fillStyle(sunEdge, 0.1)
+    for (let index = 0; index < 10; index += 1) {
+      const angle = Phaser.Math.DegToRad(index * 36)
+      dust.fillCircle(
+        Math.cos(angle) * swing.range * 0.62,
+        Math.sin(angle) * swing.range * 0.62,
+        2 + (index % 3),
+      )
+    }
+
+    container.add([aura, ring, dust, sweep, highlight])
     scene.tweens.add({
       targets: container,
       alpha: 0,
-      rotation: rotation + Phaser.Math.DegToRad(42),
-      scaleX: 1.08 + visualTier * 0.03,
-      scaleY: 1.08 + visualTier * 0.03,
-      duration: swing.visualDurationMs + 60,
+      rotation: rotation + Phaser.Math.DegToRad(260),
+      scaleX: 1.16 + visualTier * 0.05,
+      scaleY: 1.16 + visualTier * 0.05,
+      duration: swing.visualDurationMs + 110,
       ease: 'Cubic.Out',
       onComplete: () => container.destroy(),
     })
