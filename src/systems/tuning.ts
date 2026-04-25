@@ -47,14 +47,14 @@ export const STAR_FIRE_RATE_MULTIPLIER_STEP = 0
 export const STAR_PROJECTILE_SPEED_MULTIPLIER_STEP = 0
 export const STAR_MELEE_RANGE_STEP = 0
 
-const MAX_COMBO_MELEE_STEPS = 6
+const MAX_COMBO_MELEE_STEPS = 8
 
 type ComboMeleeSteps = Extract<WeaponDefinition['attackBehavior'], { kind: 'combo-melee' }>['steps']
 
 function extendComboMeleeSteps(steps: ComboMeleeSteps, extraSteps: number): ComboMeleeSteps {
   const normalizedExtraSteps = Math.max(0, Math.floor(extraSteps))
   if (normalizedExtraSteps <= 0 || steps.length >= MAX_COMBO_MELEE_STEPS) {
-    return steps
+    return shapeComboMeleeSteps(steps)
   }
 
   const nextSteps = [...steps]
@@ -69,7 +69,28 @@ function extendComboMeleeSteps(steps: ComboMeleeSteps, extraSteps: number): Comb
     })
   }
 
-  return nextSteps
+  return shapeComboMeleeSteps(nextSteps)
+}
+
+function shapeComboMeleeSteps(steps: ComboMeleeSteps): ComboMeleeSteps {
+  if (steps.length < 5) {
+    return steps
+  }
+
+  const coneIndex = Math.floor((steps.length - 1) / 2)
+  return steps.map((step, index) => {
+    if (index !== coneIndex) {
+      return step
+    }
+
+    return {
+      ...step,
+      hitShape: 'arc',
+      arcDegrees: Math.max(step.arcDegrees, 96),
+      boxWidth: undefined,
+      maxTargets: Math.max(step.maxTargets, 2),
+    }
+  })
 }
 
 

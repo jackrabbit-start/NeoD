@@ -2576,6 +2576,13 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
   assert.equal(levelTwentyPrism.attackBehavior.steps.length, 4)
   assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.maxTargets, 4)
   assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.range, 84)
+
+  const highStarPrism = deriveEffectiveWeaponStats('prism-cutter', {}, 30, 20)
+  assert.equal(highStarPrism.attackBehavior.kind, 'combo-melee')
+  assert.equal(highStarPrism.attackBehavior.steps.length, 8)
+  assert.equal(highStarPrism.attackBehavior.steps[3]?.hitShape, 'arc')
+  assert.ok((highStarPrism.attackBehavior.steps[3]?.arcDegrees ?? 0) >= 96)
+  assert.ok((highStarPrism.attackBehavior.steps.at(-1)?.maxTargets ?? 0) >= 4)
 })
 
 test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
