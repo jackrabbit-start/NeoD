@@ -478,7 +478,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
   assert.deepEqual(describeAvailableRecipes(needleRecipes), [
-    '니들 팬 [산탄 견제] → 피해 16 · 초당 5발 · 산탄 견제 (벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.)',
+    '니들 팬 [산탄 견제] → 피해 16 · 초당 5발 · 사거리 210 · 산탄 견제 (벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.)',
   ])
 })
 
