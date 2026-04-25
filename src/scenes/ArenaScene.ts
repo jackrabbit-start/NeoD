@@ -54,13 +54,19 @@ import {
   getActionableRecipes,
   seedOwnedWeapons,
 } from '../systems/weaponOwnership.js'
-import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
+import { shouldAdvanceWave } from '../systems/waves.js'
 import { resolveAutoAttackShot } from './arena/autoAttack.js'
 import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
 import {
   applyLootPickup,
   applyRecipeSelectionWorkflow,
 } from './arena/combineInventoryWorkflow.js'
+import {
+  createWaveAdvancePlan,
+  setSpawnLoopPaused,
+  startWaveRuntime,
+  type WaveStatePatch,
+} from './arena/waveRuntime.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
 type PhysicsSprite = Phaser.Physics.Arcade.Sprite
@@ -615,51 +621,34 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private startWave(index: number): void {
-    const wave = getWaveByIndex(index)
-    if (!wave) {
-      return
-    }
-
-    this.currentWaveIndex = index
-    this.activeWaveLabel = wave.label
-    this.remainingSpawns = wave.count
-    this.statusMessage = `${wave.label} started.`
-
-    if (wave.isBossWave) {
-      this.isBossActive = true
-      this.spawnEnemy(wave.enemyId)
-      this.remainingSpawns = 0
-      return
-    }
-
-    this.spawnTimer?.remove(false)
-    this.spawnTimer = this.time.addEvent({
-      delay: wave.spawnIntervalMs,
-      repeat: Math.max(0, wave.count - 1),
-      callback: () => {
-        this.spawnEnemy(wave.enemyId)
-        this.remainingSpawns -= 1
+    startWaveRuntime(index, {
+      applyState: (patch) => this.applyWaveStatePatch(patch),
+      clearSpawnLoop: () => {
+        this.spawnTimer?.remove(false)
+        this.spawnTimer = undefined
       },
+      scheduleSpawnLoop: ({ delayMs, repeat, onTick }) => {
+        this.spawnTimer = this.time.addEvent({
+          delay: delayMs,
+          repeat,
+          callback: onTick,
+        })
+      },
+      spawnEnemy: (enemyId) => this.spawnEnemy(enemyId),
     })
-
-    this.spawnEnemy(wave.enemyId)
-    this.remainingSpawns -= 1
   }
 
   private advanceWave(): void {
-    const clearedWave = getWaveByIndex(this.currentWaveIndex)
-    const nextIndex = this.currentWaveIndex + 1
-    const nextWave = getWaveByIndex(nextIndex)
-
-    if (!nextWave) {
+    const advancePlan = createWaveAdvancePlan(this.currentWaveIndex)
+    if (!advancePlan) {
       return
     }
 
-    if (clearedWave && !clearedWave.isBossWave) {
+    if (advancePlan.shouldIncrementWavesCleared) {
       this.wavesCleared += 1
     }
 
-    this.startWave(nextIndex)
+    this.startWave(advancePlan.nextWaveIndex)
   }
 
   private spawnEnemy(enemyId: EnemyDefinition['id']): void {
@@ -826,9 +815,7 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
 
-    if (this.spawnTimer) {
-      this.spawnTimer.paused = shouldPause
-    }
+    setSpawnLoopPaused(this.spawnTimer, shouldPause)
 
     this.freezeCombat(shouldPause)
   }
@@ -1042,6 +1029,34 @@ export class ArenaScene extends Phaser.Scene {
 
   private updateCodex(): void {
     this.codex.update(getCodexState(this.isCodexOpen))
+  }
+
+  private applyWaveStatePatch({
+    currentWaveIndex,
+    activeWaveLabel,
+    remainingSpawns,
+    statusMessage,
+    isBossActive,
+  }: WaveStatePatch): void {
+    if (currentWaveIndex !== undefined) {
+      this.currentWaveIndex = currentWaveIndex
+    }
+
+    if (activeWaveLabel !== undefined) {
+      this.activeWaveLabel = activeWaveLabel
+    }
+
+    if (remainingSpawns !== undefined) {
+      this.remainingSpawns = remainingSpawns
+    }
+
+    if (statusMessage !== undefined) {
+      this.statusMessage = statusMessage
+    }
+
+    if (isBossActive !== undefined) {
+      this.isBossActive = isBossActive
+    }
   }
 
   private getOwnedItemViews(): HudOwnedItemView[] {
