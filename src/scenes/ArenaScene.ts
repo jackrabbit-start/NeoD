@@ -357,6 +357,7 @@ interface MagnetPickupEntity {
 interface ProjectileEntity {
   sprite: PhysicsImage
   tint: number
+  speed: number
   damage: number
   baseDamage: number
   radius: number
@@ -373,6 +374,11 @@ interface ProjectileEntity {
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
   impactBurstOnHit?: ImpactBurstSpec
+  distanceScaling?: ProjectileSpawnSpec['distanceScaling']
+  execute?: ProjectileSpawnSpec['execute']
+  boomerang?: ProjectileSpawnSpec['boomerang']
+  isReturning: boolean
+  baseMaxHits: number
   visualPowerTier: number
   trailCooldownMs: number
 }
@@ -1299,14 +1305,43 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
-      const rangeStep = resolveProjectileRangeStep(
-        projectile.origin,
-        { x: projectile.sprite.x, y: projectile.sprite.y },
-        projectile.maxTravelDistance,
-      )
-      const didExpireAtRange = rangeStep.expired
-      if (rangeStep.expired) {
-        projectile.sprite.setPosition(rangeStep.point.x, rangeStep.point.y)
+      let didExpireAtRange = false
+      if (projectile.boomerang) {
+        const distanceFromOrigin = Math.hypot(
+          projectile.sprite.x - projectile.origin.x,
+          projectile.sprite.y - projectile.origin.y,
+        )
+        if (!projectile.isReturning && distanceFromOrigin >= projectile.boomerang.outboundDistance) {
+          this.startBoomerangReturn(projectile)
+        }
+        if (projectile.isReturning) {
+          const returnDirection = new Phaser.Math.Vector2(
+            this.player.x - projectile.sprite.x,
+            this.player.y - projectile.sprite.y,
+          ).normalize()
+
+          projectile.direction = { x: returnDirection.x || 0, y: returnDirection.y || 0 }
+          projectile.sprite.setVelocity(
+            projectile.direction.x * projectile.speed * (projectile.boomerang.returnSpeedMultiplier ?? 1),
+            projectile.direction.y * projectile.speed * (projectile.boomerang.returnSpeedMultiplier ?? 1),
+          )
+          projectile.sprite.setRotation(Math.atan2(projectile.direction.y, projectile.direction.x))
+
+          if (Math.hypot(projectile.sprite.x - this.player.x, projectile.sprite.y - this.player.y) <= 18) {
+            this.destroyProjectile(projectile)
+            continue
+          }
+        }
+      } else {
+        const rangeStep = resolveProjectileRangeStep(
+          projectile.origin,
+          { x: projectile.sprite.x, y: projectile.sprite.y },
+          projectile.maxTravelDistance,
+        )
+        didExpireAtRange = rangeStep.expired
+        if (rangeStep.expired) {
+          projectile.sprite.setPosition(rangeStep.point.x, rangeStep.point.y)
+        }
       }
 
       projectile.remainingLifetimeMs -= delta
@@ -1349,9 +1384,10 @@ export class ArenaScene extends Phaser.Scene {
 
           projectile.hitEnemyIds = hitStep.hitEnemyIds
           projectile.remainingHits = hitStep.remainingHits
-          const didDamage = this.damageEnemy(enemy, projectile.damage, {
+          const damageProfile = this.getProjectileDamageProfile(projectile, enemy)
+          const didDamage = this.damageEnemy(enemy, damageProfile.damage, {
             canCrit: true,
-            baseDamage: projectile.baseDamage,
+            baseDamage: damageProfile.baseDamage,
           })
           if (this.isRunEnding || this.isInteractionBlocked()) {
             return
@@ -2218,6 +2254,57 @@ export class ArenaScene extends Phaser.Scene {
       this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
     }
     return true
+  }
+
+  private getExecuteDamageMultiplier(
+    enemy: EnemyEntity,
+    execute?: ProjectileSpawnSpec['execute'] | MeleeSwingSpec['execute'],
+  ): number {
+    if (!execute) {
+      return 1
+    }
+
+    const healthRatio = enemy.currentHealth / Math.max(1, enemy.config.maxHealth)
+    return healthRatio <= execute.thresholdRatio ? execute.damageMultiplier : 1
+  }
+
+  private getProjectileDamageProfile(
+    projectile: ProjectileEntity,
+    enemy: EnemyEntity,
+  ): { damage: number; baseDamage: number } {
+    let multiplier = 1
+
+    if (projectile.distanceScaling) {
+      const traveledDistance = Math.hypot(
+        projectile.sprite.x - projectile.origin.x,
+        projectile.sprite.y - projectile.origin.y,
+      )
+      const progress = Math.max(0, Math.min(1, traveledDistance / Math.max(1, projectile.maxTravelDistance)))
+      multiplier *=
+        projectile.distanceScaling.nearMultiplier +
+        (projectile.distanceScaling.farMultiplier - projectile.distanceScaling.nearMultiplier) * progress
+    }
+
+    multiplier *= this.getExecuteDamageMultiplier(enemy, projectile.execute)
+
+    if (projectile.boomerang && projectile.isReturning) {
+      multiplier *= projectile.boomerang.returnDamageMultiplier ?? 1
+    }
+
+    return {
+      damage: Math.max(1, Math.round(projectile.damage * multiplier)),
+      baseDamage: Math.max(1, Math.round(projectile.baseDamage * multiplier)),
+    }
+  }
+
+  private startBoomerangReturn(projectile: ProjectileEntity): void {
+    if (!projectile.boomerang || projectile.isReturning || !projectile.sprite.active) {
+      return
+    }
+
+    projectile.isReturning = true
+    projectile.hitEnemyIds = new Set<number>()
+    projectile.remainingHits = Math.max(1, projectile.boomerang.returnHits ?? projectile.baseMaxHits)
   }
 
   private grantPlayerXpForEnemy(enemyId: EnemyDefinition['id']): PlayerProgressionResult {
@@ -3926,11 +4013,13 @@ export class ArenaScene extends Phaser.Scene {
     this.projectiles.push({
       sprite: projectile,
       tint: projectileSpec.tint,
+      speed: projectileSpec.speed,
       damage: projectileSpec.damage,
       baseDamage: projectileSpec.damage,
       radius: projectileSpec.radius,
       remainingLifetimeMs: projectileSpec.lifetimeMs,
       remainingHits: projectileSpec.maxHits,
+      baseMaxHits: projectileSpec.maxHits,
       hitEnemyIds: new Set<number>(),
       origin: projectileOrigin,
       direction: projectileSpec.direction,
@@ -3942,6 +4031,10 @@ export class ArenaScene extends Phaser.Scene {
       hazardOnHit: projectileSpec.hazardOnHit,
       hazardOnExpire: projectileSpec.hazardOnExpire,
       impactBurstOnHit: projectileSpec.impactBurstOnHit,
+      distanceScaling: projectileSpec.distanceScaling,
+      execute: projectileSpec.execute,
+      boomerang: projectileSpec.boomerang,
+      isReturning: false,
       visualPowerTier: visualTier,
       trailCooldownMs: 0,
     })
@@ -3987,9 +4080,11 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
-      const didDamage = this.damageEnemy(enemy, swing.damage, {
+      const swingMultiplier = this.getExecuteDamageMultiplier(enemy, swing.execute)
+      const swingDamage = Math.max(1, Math.round(swing.damage * swingMultiplier))
+      const didDamage = this.damageEnemy(enemy, swingDamage, {
         canCrit: true,
-        baseDamage: swing.damage,
+        baseDamage: swingDamage,
       })
       if (this.isRunEnding || this.isInteractionBlocked()) {
         return

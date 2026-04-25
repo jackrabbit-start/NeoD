@@ -1,7 +1,10 @@
 import type {
+  WeaponBoomerangDefinition,
   WeaponBurstFireBehavior,
   WeaponChainBehavior,
+  WeaponDistanceScalingDefinition,
   WeaponDefinition,
+  WeaponExecuteDefinition,
   WeaponImpactAoeBehavior,
   WeaponImpactBurstBehavior,
   WeaponKnockbackDefinition,
@@ -67,6 +70,9 @@ export interface ProjectileSpawnSpec {
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
   impactBurstOnHit?: ImpactBurstSpec
+  distanceScaling?: WeaponDistanceScalingDefinition
+  execute?: WeaponExecuteDefinition
+  boomerang?: WeaponBoomerangDefinition
   visualPowerTier?: number
 }
 
@@ -81,6 +87,7 @@ export interface MeleeSwingSpec {
   visualDurationMs: number
   maxTargets: number
   knockback: WeaponKnockbackDefinition
+  execute?: WeaponExecuteDefinition
   visualPowerTier?: number
 }
 
@@ -138,18 +145,25 @@ export interface ProjectileRangeStep {
 export type WeaponRangeBand = 'close' | 'mid' | 'long'
 export type WeaponOutputGeometry =
   | 'single-shot'
+  | 'distance-shot'
+  | 'return-shot'
   | 'multi-volley'
+  | 'burst-rhythm'
   | 'line-pierce'
   | 'chain-hit'
   | 'wide-cleave'
   | 'narrow-cleave'
   | 'hazard-zone'
+  | 'execute-sweep'
 export type WeaponSpecialEffectProfile =
   | 'none'
   | 'hazard-linger'
   | 'impact-splash'
   | 'high-knockback'
   | 'chain-bounce'
+  | 'distance-ramp'
+  | 'return-pass'
+  | 'execute-finisher'
 
 const BASE_PROJECTILE_RADIUS = 5
 
@@ -227,11 +241,12 @@ const createSprayProjectiles = (
     const offset = (index - centerIndex) * behavior.spreadDegrees
     const spreadDirection = normalize(rotate(direction, offset))
 
-    return createBaseProjectile(weapon, origin, spreadDirection, behavior.projectileLifetimeMs, {
+  return createBaseProjectile(weapon, origin, spreadDirection, behavior.projectileLifetimeMs, {
       damage,
       speed: Math.round(weapon.projectileSpeed * 0.78),
       hazardOnHit: hazard,
       hazardOnExpire: hazard,
+      execute: behavior.execute,
     })
   })
 }
@@ -256,6 +271,7 @@ const createSplitProjectiles = (
       damage,
       speed,
       maxHits: behavior.maxHits ?? 1,
+      execute: behavior.execute,
     })
   })
 }
@@ -280,6 +296,7 @@ const createBurstProjectiles = (
       delayMs: index * behavior.shotIntervalMs,
       damage,
       speed,
+      distanceScaling: behavior.distanceScaling,
     })
   })
 }
@@ -302,6 +319,7 @@ const createVolleyProjectiles = (
       damage: volleyDamage,
       speed,
       maxHits: behavior.maxHits,
+      execute: behavior.execute,
     })
   })
 }
@@ -313,6 +331,9 @@ const createPierceProjectile = (
   behavior: WeaponPierceBehavior,
 ): ProjectileSpawnSpec =>
   createBaseProjectile(weapon, origin, direction, behavior.projectileLifetimeMs, {
+    distanceScaling: behavior.distanceScaling,
+    execute: behavior.execute,
+    boomerang: behavior.boomerang,
     maxHits: behavior.maxHits,
   })
 
@@ -352,6 +373,7 @@ const createImpactProjectile = (
   return createBaseProjectile(weapon, origin, direction, behavior.projectileLifetimeMs, {
     explosionOnHit: explosion,
     explosionOnExpire: explosion,
+    distanceScaling: behavior.distanceScaling,
   })
 }
 
@@ -385,6 +407,7 @@ const createZoneControlProjectile = (
     speed: Math.max(1, Math.round(weapon.projectileSpeed * (behavior.speedMultiplier ?? 1))),
     hazardOnHit: zone,
     hazardOnExpire: zone,
+    boomerang: behavior.boomerang,
   })
 }
 
@@ -403,6 +426,7 @@ const createMeleeSwing = (
   visualDurationMs: behavior.visualDurationMs,
   maxTargets: behavior.maxTargets,
   knockback: weapon.knockback,
+  execute: behavior.execute,
   visualPowerTier: weapon.visualPowerTier,
 })
 
@@ -428,7 +452,13 @@ export function buildAttackPlan(
     case 'single':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: [createBaseProjectile(weapon, origin, direction, weapon.attackBehavior.projectileLifetimeMs)],
+        projectiles: [
+          createBaseProjectile(weapon, origin, direction, weapon.attackBehavior.projectileLifetimeMs, {
+            distanceScaling: weapon.attackBehavior.distanceScaling,
+            execute: weapon.attackBehavior.execute,
+            boomerang: weapon.attackBehavior.boomerang,
+          }),
+        ],
         meleeSwings: [],
       }
     case 'spray-hazard':
@@ -505,6 +535,16 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
     return weapon.identityLabel
   }
 
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
+    return '귀환 사격'
+  }
+  if (
+    (weapon.attackBehavior.kind === 'single' || weapon.attackBehavior.kind === 'pierce') &&
+    weapon.attackBehavior.distanceScaling
+  ) {
+    return '거리 압축'
+  }
+
   switch (weapon.attackBehavior.kind) {
     case 'single':
       return '기본 사격'
@@ -556,6 +596,22 @@ export function getWeaponRangeBand(weapon: WeaponDefinition): WeaponRangeBand {
 }
 
 export function getWeaponOutputGeometry(weapon: WeaponDefinition): WeaponOutputGeometry {
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
+    return 'return-shot'
+  }
+  if (
+    (weapon.attackBehavior.kind === 'single' || weapon.attackBehavior.kind === 'pierce') &&
+    weapon.attackBehavior.distanceScaling
+  ) {
+    return 'distance-shot'
+  }
+  if (weapon.attackBehavior.kind === 'burst-fire') {
+    return 'burst-rhythm'
+  }
+  if (weapon.attackBehavior.kind === 'melee-cleave' && weapon.attackBehavior.execute) {
+    return 'execute-sweep'
+  }
+
   switch (weapon.attackBehavior.kind) {
     case 'single':
     case 'impact-burst':
@@ -565,7 +621,6 @@ export function getWeaponOutputGeometry(weapon: WeaponDefinition): WeaponOutputG
     case 'zone-control':
       return 'hazard-zone'
     case 'split-shot':
-    case 'burst-fire':
     case 'volley':
       return 'multi-volley'
     case 'pierce':
@@ -580,6 +635,29 @@ export function getWeaponOutputGeometry(weapon: WeaponDefinition): WeaponOutputG
 }
 
 export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponSpecialEffectProfile {
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
+    return 'return-pass'
+  }
+  if (
+    (weapon.attackBehavior.kind === 'single' ||
+      weapon.attackBehavior.kind === 'pierce' ||
+      weapon.attackBehavior.kind === 'burst-fire' ||
+      weapon.attackBehavior.kind === 'impact-aoe') &&
+    weapon.attackBehavior.distanceScaling
+  ) {
+    return 'distance-ramp'
+  }
+  if (
+    (weapon.attackBehavior.kind === 'spray-hazard' ||
+      weapon.attackBehavior.kind === 'volley' ||
+      weapon.attackBehavior.kind === 'split-shot' ||
+      weapon.attackBehavior.kind === 'melee-cleave' ||
+      weapon.attackBehavior.kind === 'pierce') &&
+    weapon.attackBehavior.execute
+  ) {
+    return 'execute-finisher'
+  }
+
   switch (weapon.attackBehavior.kind) {
     case 'spray-hazard':
     case 'zone-control':
@@ -606,15 +684,22 @@ export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponS
 export function getWeaponSummary(weapon: WeaponDefinition): string {
   const range = getWeaponAttackRange(weapon)
 
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
+    return `피해 ${weapon.damage} · 귀환 재타격 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+  }
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.distanceScaling) {
+    return `피해 ${weapon.damage} · 멀수록 증폭 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+  }
+
   switch (weapon.attackBehavior.kind) {
     case 'single':
       return `피해 ${weapon.damage} · 단발 견제 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'split-shot':
-      return `갈래당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.projectileCount}갈래 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `${weapon.attackBehavior.execute ? '마무리' : '갈래당'} ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.projectileCount}갈래 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'burst-fire':
-      return `탄당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.shotsPerBurst}점사 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `탄당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.shotsPerBurst}박자 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'spray-hazard':
-      return `피해 ${weapon.damage} · 장판 압박 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.execute ? '빈사 처형' : '장판 압박'} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'volley':
       return `피해 ${weapon.damage} · ${weapon.attackBehavior.projectileCount}연발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'pierce':
@@ -628,34 +713,55 @@ export function getWeaponSummary(weapon: WeaponDefinition): string {
     case 'zone-control':
       return `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'melee-cleave':
-      return `피해 ${weapon.damage} · 전방 ${weapon.attackBehavior.arcDegrees}° · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.execute ? '빈사 수확' : `전방 ${weapon.attackBehavior.arcDegrees}°`} · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponSummary')
   }
 }
 
 export function getWeaponAttackContract(weapon: WeaponDefinition): WeaponAttackContract {
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
+    return {
+      family: 'boomerang-single',
+      geometry: `return:${weapon.attackBehavior.boomerang.outboundDistance}`,
+      cadence: `cooldown:${weapon.fireRateMs}`,
+      followUp: 'return-pass',
+    }
+  }
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.distanceScaling) {
+    return {
+      family: 'distance-single',
+      geometry: `ramp:${weapon.attackBehavior.distanceScaling.nearMultiplier}:${weapon.attackBehavior.distanceScaling.farMultiplier}`,
+      cadence: `cooldown:${weapon.fireRateMs}`,
+      followUp: 'far-pressure',
+    }
+  }
+
   switch (weapon.attackBehavior.kind) {
     case 'split-shot':
       return {
-        family: 'split-shot',
+        family: weapon.attackBehavior.execute ? 'execute-split' : 'split-shot',
         geometry: `${weapon.attackBehavior.projectileCount}-way:${weapon.attackBehavior.spreadDegrees}`,
         cadence: `cooldown:${weapon.fireRateMs}:delay:${weapon.attackBehavior.shotDelayMs ?? 0}`,
-        followUp: (weapon.attackBehavior.shotDelayMs ?? 0) > 0 ? 'delayed-second-pass' : 'none',
+        followUp: weapon.attackBehavior.execute
+          ? 'cleanup-burst'
+          : (weapon.attackBehavior.shotDelayMs ?? 0) > 0
+            ? 'delayed-second-pass'
+            : 'none',
       }
     case 'burst-fire':
       return {
         family: 'burst-fire',
         geometry: `line-burst:${weapon.attackBehavior.shotsPerBurst}:${weapon.attackBehavior.spreadDegrees ?? 0}`,
         cadence: `cooldown:${weapon.fireRateMs}:interval:${weapon.attackBehavior.shotIntervalMs}`,
-        followUp: 'burst-sequence',
+        followUp: weapon.attackBehavior.distanceScaling ? 'tempo-ramp' : 'burst-sequence',
       }
     case 'spray-hazard':
       return {
-        family: 'spray-hazard',
+        family: weapon.attackBehavior.execute ? 'execute-spray' : 'spray-hazard',
         geometry: `spread:${weapon.attackBehavior.projectileCount}:${weapon.attackBehavior.spreadDegrees}:radius:${weapon.attackBehavior.hazardRadius}`,
         cadence: `cooldown:${weapon.fireRateMs}`,
-        followUp: 'puddle-hazard',
+        followUp: weapon.attackBehavior.execute ? 'low-health-melt' : 'puddle-hazard',
       }
     case 'volley':
       return {
@@ -687,24 +793,24 @@ export function getWeaponAttackContract(weapon: WeaponDefinition): WeaponAttackC
       }
     case 'impact-aoe':
       return {
-        family: 'impact-aoe',
+        family: weapon.attackBehavior.distanceScaling ? 'distance-impact' : 'impact-aoe',
         geometry: `single-shell:radius:${weapon.attackBehavior.explosionRadius}`,
         cadence: `cooldown:${weapon.fireRateMs}`,
-        followUp: 'impact-explosion',
+        followUp: weapon.attackBehavior.distanceScaling ? 'far-shell' : 'impact-explosion',
       }
     case 'zone-control':
       return {
-        family: 'zone-control',
+        family: weapon.attackBehavior.boomerang ? 'anchor-zone' : 'zone-control',
         geometry: `single-zone:${weapon.attackBehavior.zoneRadius}:${weapon.attackBehavior.zoneDurationMs}`,
         cadence: `cooldown:${weapon.fireRateMs}`,
-        followUp: 'linger-zone',
+        followUp: weapon.attackBehavior.boomerang ? 'return-anchor' : 'linger-zone',
       }
     case 'melee-cleave':
       return {
-        family: 'melee-cleave',
+        family: weapon.attackBehavior.execute ? 'execute-cleave' : 'melee-cleave',
         geometry: `arc:${weapon.attackBehavior.arcDegrees}:range:${weapon.attackBehavior.range}`,
         cadence: `cooldown:${weapon.fireRateMs}`,
-        followUp: 'none',
+        followUp: weapon.attackBehavior.execute ? 'finisher-window' : 'none',
       }
     case 'single':
       return {
