@@ -85,8 +85,10 @@ export class ResultScene extends Phaser.Scene {
       )
       .setOrigin(0.5)
 
+    const restartButtonWidth = Math.min(244, Math.max(180, width - 96))
+    const restartButtonHeight = 48
     const restartButton = this.add
-      .rectangle(width / 2, restartButtonY, Math.min(244, Math.max(180, width - 96)), 48, 0x1f3a5f, 0.96)
+      .rectangle(width / 2, restartButtonY, restartButtonWidth, restartButtonHeight, 0x1f3a5f, 0.96)
       .setStrokeStyle(2, Number.parseInt(presentation.accentColor.slice(1), 16), 0.95)
       .setInteractive({ useHandCursor: true })
       .setName('restart-run-button')
@@ -99,6 +101,29 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
+    let isRestarting = false
+    const restartRun = (): void => {
+      if (isRestarting) {
+        return
+      }
+
+      isRestarting = true
+      restartButton.disableInteractive()
+      restartButtonLabel.setText('시작 중...')
+      this.input.off(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)
+      this.scene.start('arena')
+    }
+    const isInsideRestartButton = (pointer: Phaser.Input.Pointer): boolean =>
+      pointer.x >= restartButton.x - restartButtonWidth / 2 &&
+      pointer.x <= restartButton.x + restartButtonWidth / 2 &&
+      pointer.y >= restartButton.y - restartButtonHeight / 2 &&
+      pointer.y <= restartButton.y + restartButtonHeight / 2
+    const handleScenePointerDown = (pointer: Phaser.Input.Pointer): void => {
+      if (isInsideRestartButton(pointer)) {
+        restartRun()
+      }
+    }
+
     restartButton.on(Phaser.Input.Events.POINTER_OVER, () => {
       restartButton.setFillStyle(0x2d5f8f, 1)
     })
@@ -107,11 +132,11 @@ export class ResultScene extends Phaser.Scene {
     })
     restartButton.on(Phaser.Input.Events.POINTER_DOWN, () => {
       restartButton.setFillStyle(0x16314f, 1)
+      restartRun()
     })
-    restartButton.on(Phaser.Input.Events.POINTER_UP, () => {
-      restartButton.disableInteractive()
-      restartButtonLabel.setText('시작 중...')
-      this.scene.start('arena')
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.off(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)
     })
   }
 }

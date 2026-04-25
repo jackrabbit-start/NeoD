@@ -1130,8 +1130,20 @@ test('result scene restart is button-driven instead of R-key driven', () => {
     'ResultScene should expose a named restart button for the result screen',
   )
   assert.ok(
-    resultSceneSource.includes(`Phaser.Input.Events.POINTER_UP`),
-    'ResultScene restart should be activated by pointer/click input',
+    resultSceneSource.includes(`const restartRun = (): void => {`),
+    'ResultScene restart should use a shared restart handler for button input',
+  )
+  assert.ok(
+    resultSceneSource.includes(`restartButton.on(Phaser.Input.Events.POINTER_DOWN`),
+    'ResultScene restart should fire on button pointer down rather than waiting for a fragile pointer-up path',
+  )
+  assert.ok(
+    resultSceneSource.includes(`this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)`),
+    'ResultScene should include a scene-level pointer fallback so button clicks restart even if game-object hit testing misses',
+  )
+  assert.ok(
+    resultSceneSource.includes(`this.scene.start('arena')`),
+    'ResultScene restart handler should start the arena scene',
   )
   assert.ok(
     resultSceneSource.includes(`const restartButtonY = Math.max(48, height - 48)`),
