@@ -100,6 +100,7 @@ import {
   createRunResultHudState,
   createRunResultPresentation,
 } from '../.tmp-test/src/systems/runResult.js'
+import { HudController } from '../.tmp-test/src/ui/Hud.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -1000,6 +1001,113 @@ test('codex controller preserves scroll across repeated open renders', () => {
   assert.equal(element.hidden, false)
   assert.match(element.innerHTML, /아이템/)
   assert.equal(element.assignments, 3)
+})
+
+test('hud controller skips summary DOM rewrites for identical frame-loop updates', () => {
+  class FakeClassList {
+    toggle() {}
+  }
+
+  class FakeElement {
+    children = []
+    classList = new FakeClassList()
+    dataset = {}
+    disabled = false
+    style = {}
+    textContent = ''
+    assignments = 0
+    #innerHTML = ''
+    #regions = new Map()
+
+    constructor(tagName = 'div') {
+      this.tagName = tagName.toUpperCase()
+    }
+
+    get innerHTML() {
+      return this.#innerHTML
+    }
+
+    set innerHTML(value) {
+      this.assignments += 1
+      this.#innerHTML = value
+
+      if (value.includes('data-region="items"')) {
+        this.#regions.set('button[data-action="inventory-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="items"]', new FakeElement('div'))
+        this.#regions.set('[data-region="item-detail"]', new FakeElement('div'))
+        this.#regions.set('[data-region="recipes"]', new FakeElement('div'))
+        this.#regions.set('[data-region="weapons"]', new FakeElement('div'))
+      }
+    }
+
+    addEventListener() {}
+
+    removeEventListener() {}
+
+    append(...nodes) {
+      this.children.push(...nodes)
+    }
+
+    replaceChildren(...nodes) {
+      this.children = nodes
+    }
+
+    querySelector(selector) {
+      return this.#regions.get(selector) ?? null
+    }
+
+    querySelectorAll() {
+      return []
+    }
+  }
+
+  const previousDocument = globalThis.document
+  globalThis.document = {
+    createElement: (tagName) => new FakeElement(tagName),
+  }
+
+  try {
+    const root = new FakeElement('section')
+    const controller = new HudController(root)
+    const state = {
+      title: 'NeoD 프로토타입',
+      subtitle: '1 웨이브',
+      stats: ['체력: 10/10', '무기: 기본'],
+      inventory: ['젤 파편 × 1'],
+      recipes: ['조합 대기'],
+      objective: '웨이브를 버티세요.',
+      tip: 'WASD 이동 · J 대시',
+      status: '전투 중입니다. 계속 움직이세요.',
+      inventoryButtonLabel: '인벤토리 열기',
+      inventoryButtonDisabled: false,
+      modal: {
+        isOpen: false,
+        items: [],
+        recipes: [],
+        weapons: [],
+      },
+    }
+
+    controller.update(state)
+    const summaryElement = root.children[0]
+    assert.equal(summaryElement.assignments, 1)
+    assert.match(summaryElement.innerHTML, /hud-summary__status-line/)
+
+    controller.update({ ...state, modal: { ...state.modal } })
+
+    assert.equal(summaryElement.assignments, 1)
+    assert.deepEqual(controller.getRenderMetrics(), {
+      summaryAssignments: 1,
+      summarySkips: 1,
+      modalClosedSkips: 1,
+    })
+  } finally {
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
 })
 
 test('elite drop table returns a tuning capsule', () => {

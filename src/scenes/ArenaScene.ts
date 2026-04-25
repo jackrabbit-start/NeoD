@@ -208,6 +208,8 @@ interface HazardZoneEntity {
   tickCountdownMs: number
 }
 
+const MINI_MAP_SYNC_INTERVAL_MS = 100
+
 export class ArenaScene extends Phaser.Scene {
   private hud!: HudController
 
@@ -224,6 +226,8 @@ export class ArenaScene extends Phaser.Scene {
   private mapVisuals: Phaser.GameObjects.GameObject[] = []
 
   private miniMap?: MiniMapDisplay
+
+  private nextMiniMapSyncAt = 0
 
   private readonly mapLayout: MapLayout = createMapLayout()
 
@@ -356,7 +360,7 @@ export class ArenaScene extends Phaser.Scene {
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
 
     this.startWave(0)
-    this.syncMiniMap()
+    this.syncMiniMap(this.time.now, true)
     this.updateHud()
     this.updateCodex()
   }
@@ -388,7 +392,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.cleanupDestroyedEntities()
-    this.syncMiniMap()
+    this.syncMiniMap(time)
 
     if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
       this.advanceWave()
@@ -459,10 +463,15 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private syncMiniMap(): void {
+  private syncMiniMap(time = this.time.now, force = false): void {
     if (!this.miniMap || !this.player?.active) {
       return
     }
+
+    if (!force && time < this.nextMiniMapSyncAt) {
+      return
+    }
+    this.nextMiniMapSyncAt = time + MINI_MAP_SYNC_INTERVAL_MS
 
     const { graphics, bounds } = this.miniMap
     const { worldBounds } = this.mapLayout
