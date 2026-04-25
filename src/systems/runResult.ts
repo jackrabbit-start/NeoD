@@ -49,8 +49,8 @@ export function createRunResultPresentation(payload: RunResultPayload): RunResul
   return {
     title: isWin ? '런 클리어' : '런 실패',
     subtitle: isWin
-      ? '크라운 슬라임을 쓰러뜨리고 네온 아레나를 장악했습니다.'
-      : '런이 중단되었습니다. 조합 타이밍과 회피 루트를 재정비하세요.',
+      ? '크라운 슬라임을 쓰러뜨리고 토큰 파친코 런 결과가 정리되었습니다.'
+      : '런이 중단되었습니다. 토큰 보상과 무기 별 합성 루트를 다시 점검해 보세요.',
     backgroundColor: isWin ? '#171f3f' : '#2b1220',
     accentColor: isWin ? '#a6ffd0' : '#ff9db8',
     status: isWin ? '크라운 슬라임 격파 · 런 종료' : '전투 불능 · 런 종료',
@@ -60,8 +60,8 @@ export function createRunResultPresentation(payload: RunResultPayload): RunResul
       `최종 무기: ${payload.weaponName}`,
       `돌파 웨이브: ${payload.wavesCleared}`,
     ],
-    inventoryLines: [isWin ? '크라운 슬라임의 잔광이 아레나에 남았습니다.' : '이번 런의 기록을 정리합니다.'],
-    recipeLines: ['조합 루트를 확인하고 다음 진입을 준비하세요.'],
+    inventoryLines: [isWin ? '보스는 추가 토큰을 주지 않고 클리어를 확정합니다.' : '미해결 토큰은 런 종료와 함께 정리됩니다.'],
+    recipeLines: ['같은 무기·같은 별 2개 합성으로 다음 별 등급을 노리는 루프입니다.'],
     restartPrompt,
   }
 }
