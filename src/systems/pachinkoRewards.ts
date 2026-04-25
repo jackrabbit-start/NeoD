@@ -39,6 +39,25 @@ export const ENEMY_TOKEN_XP: Record<EnemyId, number> = {
   'slime-boss': 0,
 }
 
+
+export const ENEMY_TOKEN_DROP_BASE_COUNT: Record<EnemyId, number> = {
+  slime: 1,
+  'dash-slime': 1,
+  'spark-slime': 1,
+  'splitter-slime': 1,
+  'orbit-slime': 1,
+  'mender-slime': 1,
+  'needle-wasp': 2,
+  'shard-sentinel': 2,
+  'lantern-moth': 2,
+  'void-orb': 2,
+  'mirror-wisp': 2,
+  'prism-slime': 3,
+  'crusher-slime': 3,
+  'siege-toad': 4,
+  'slime-boss': 0,
+}
+
 export const STAR_ODDS_BY_LEVEL: Record<number, readonly [number, number, number, number, number]> = {
   1: [70, 25, 5, 0, 0],
   2: [55, 32, 11, 2, 0],
@@ -322,17 +341,16 @@ export function getEnemyPachinkoTokenDropCount(enemyId: EnemyId, elapsedMs: numb
     return 0
   }
 
+  const baseCount = Math.max(1, ENEMY_TOKEN_DROP_BASE_COUNT[enemyId] ?? 1)
   const safeElapsedMs = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs)) : 0
-  if (safeElapsedMs < DOUBLE_TOKEN_DROP_START_MS) {
-    return 1
-  }
-  if (safeElapsedMs >= 18 * 60_000) {
-    return 4
-  }
-  if (safeElapsedMs >= 16 * 60_000) {
-    return 3
-  }
-  return 2
+  const timeBonus = safeElapsedMs >= 18 * 60_000
+    ? 3
+    : safeElapsedMs >= 16 * 60_000
+      ? 2
+      : safeElapsedMs >= DOUBLE_TOKEN_DROP_START_MS
+        ? 1
+        : 0
+  return Math.min(8, baseCount + timeBonus)
 }
 
 export function resolveEnemyPachinkoTokenXpMultiplier(

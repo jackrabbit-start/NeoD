@@ -160,6 +160,7 @@ import {
   DOUBLE_TOKEN_DROP_START_MS,
   PACHINKO_STAR_20_TARGET_TOKEN_XP,
   RARE_TOKEN_XP_MULTIPLIER,
+  ENEMY_TOKEN_DROP_BASE_COUNT,
   MAX_ACTIVE_PACHINKO_TOKENS,
   PACHINKO_SLOT_COUNT,
   PACHINKO_LEVEL_THRESHOLDS,
@@ -502,12 +503,18 @@ test('player level raises pachinko star range before live table rolls stars', ()
 })
 
 test('enemy token drops scale by time while rare tokens can appear before the late double-drop mark', () => {
+  assert.equal(ENEMY_TOKEN_DROP_BASE_COUNT.slime, 1)
+  assert.equal(ENEMY_TOKEN_DROP_BASE_COUNT['needle-wasp'], 2)
+  assert.equal(ENEMY_TOKEN_DROP_BASE_COUNT['prism-slime'], 3)
+  assert.equal(ENEMY_TOKEN_DROP_BASE_COUNT['siege-toad'], 4)
   assert.equal(getEnemyPachinkoTokenDropCount('slime', DOUBLE_TOKEN_DROP_START_MS - 1), 1)
+  assert.equal(getEnemyPachinkoTokenDropCount('needle-wasp', DOUBLE_TOKEN_DROP_START_MS - 1), 2)
+  assert.equal(getEnemyPachinkoTokenDropCount('prism-slime', DOUBLE_TOKEN_DROP_START_MS - 1), 3)
+  assert.equal(getEnemyPachinkoTokenDropCount('siege-toad', DOUBLE_TOKEN_DROP_START_MS - 1), 4)
   assert.equal(getEnemyPachinkoTokenDropCount('slime', DOUBLE_TOKEN_DROP_START_MS), 2)
-  assert.equal(getEnemyPachinkoTokenDropCount('slime', 15 * 60_000), 2)
-  assert.equal(getEnemyPachinkoTokenDropCount('slime', 16 * 60_000), 3)
-  assert.equal(getEnemyPachinkoTokenDropCount('slime', 18 * 60_000), 4)
-  assert.equal(getEnemyPachinkoTokenDropCount('slime', 20 * 60_000), 4)
+  assert.equal(getEnemyPachinkoTokenDropCount('needle-wasp', 16 * 60_000), 4)
+  assert.equal(getEnemyPachinkoTokenDropCount('prism-slime', 18 * 60_000), 6)
+  assert.equal(getEnemyPachinkoTokenDropCount('siege-toad', 20 * 60_000), 7)
   assert.equal(getEnemyPachinkoTokenDropCount('slime-boss', DOUBLE_TOKEN_DROP_START_MS), 0)
   assert.equal(resolveEnemyPachinkoTokenXpMultiplier(() => 0), RARE_TOKEN_XP_MULTIPLIER)
   assert.equal(resolveEnemyPachinkoTokenXpMultiplier(() => 0.99), 1)
