@@ -18,8 +18,8 @@ export const WAVE_DEFINITIONS: WaveDefinition[] = [
   {
     id: 'wave-3',
     label: 'Wave 3',
-    enemyId: 'slime',
-    count: 10,
+    enemyId: 'spark-slime',
+    count: 9,
     spawnIntervalMs: 560,
   },
   {

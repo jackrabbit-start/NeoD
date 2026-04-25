@@ -1,6 +1,6 @@
 import { RECIPE_DEFINITIONS } from '../data/recipes.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
-import type { AvailableRecipe, InventoryState, WeaponId } from '../domain/types.js'
+import type { AvailableRecipe, InventoryState, RecipeId, WeaponId } from '../domain/types.js'
 import { consumeItems, hasRequiredItems } from './inventory.js'
 
 export function getAvailableRecipes(
@@ -16,7 +16,7 @@ export function getAvailableRecipes(
 
 export function resolveCombine(
   inventory: InventoryState,
-  recipeId: string,
+  recipeId: RecipeId,
 ): { nextInventory: InventoryState; weaponId: WeaponId } | null {
   const recipe = RECIPE_DEFINITIONS.find((candidate) => candidate.id === recipeId)
 

@@ -65,6 +65,24 @@ button {
   pointer-events: none;
 }
 
+.codex-panel {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  width: min(420px, calc(100% - 28px));
+  max-height: calc(100% - 28px);
+  padding: 14px;
+  overflow-y: auto;
+  border: 1px solid rgba(156, 181, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(5, 8, 22, 0.78);
+  backdrop-filter: blur(10px);
+  color: #ecf2ff;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .hud-summary {
   position: absolute;
   top: 14px;
@@ -84,7 +102,10 @@ button {
 .hud-summary h1,
 .hud-summary h2,
 .hud-summary h3,
-.hud-summary p {
+.hud-summary p,
+.codex-panel h2,
+.codex-panel h3,
+.codex-panel p {
   margin: 0;
 }
 
@@ -92,7 +113,8 @@ button {
   font-size: 16px;
 }
 
-.hud-summary h2 {
+.hud-summary h2,
+.codex-section > h3 {
   margin-top: 10px;
   margin-bottom: 4px;
   color: #9bb5ff;
@@ -286,6 +308,83 @@ button {
   color: #b9c7ff;
 }
 
+.codex-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.codex-header {
+  display: grid;
+  gap: 8px;
+}
+
+.codex-header h2 {
+  font-size: 18px;
+}
+
+.codex-hint {
+  color: #a6ffd0;
+  font-size: 12px;
+}
+
+.codex-section {
+  display: grid;
+  gap: 8px;
+}
+
+.codex-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.codex-entry {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(156, 181, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(14, 22, 43, 0.72);
+}
+
+.codex-entry h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.codex-inline-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.codex-meta {
+  color: #b9c7ff;
+  font-size: 12px;
+}
+
+.codex-label {
+  color: #9bb5ff;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.codex-arrow {
+  color: #8fb2ff;
+}
+
+.codex-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--swatch);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
 @media (max-width: 900px) {
   .game-header {
     flex-direction: column;
@@ -304,5 +403,12 @@ button {
 
   .hud-summary {
     max-width: min(320px, calc(100% - 28px));
+  }
+
+  .codex-panel {
+    width: calc(100% - 24px);
+    max-height: calc(100% - 24px);
+    top: 12px;
+    right: 12px;
   }
 }

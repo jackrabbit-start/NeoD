@@ -1,4 +1,4 @@
-import type { AvailableRecipe, InventoryState, WeaponId } from '../domain/types.js'
+import type { AvailableRecipe, InventoryState, RecipeId, WeaponId } from '../domain/types.js'
 import { getAvailableRecipes, resolveCombine } from './combine.js'
 
 export const STARTER_WEAPON_ID: WeaponId = 'starter-blaster'
@@ -41,7 +41,7 @@ export function getActionableRecipes(
 
 export function applyRecipeSelection(
   state: WeaponLoadoutState,
-  recipeId: string,
+  recipeId: RecipeId,
 ): AppliedRecipeSelection | null {
   const selectedRecipe = getActionableRecipes(
     state.inventory,
