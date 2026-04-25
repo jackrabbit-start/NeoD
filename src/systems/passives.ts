@@ -269,6 +269,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'runner-instinct',
     name: '런각 본능',
     description: '캐릭터 이동 속도가 올라 카이팅 여지가 커집니다.',
+    kind: 'general',
     weight: { base: 1.08, levelScale: 0.014, repeatPenalty: 0.35 },
     roll(level, random) {
       const [min, max] = createLevelScaledPercentRange(0.03, 0.07, level, 0.003, 0.12)
@@ -296,6 +297,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'vacuum-pocket',
     name: '진공 포켓',
     description: '가까워진 보상을 더 빨리 빨아들이고 획득 판정도 넉넉해집니다.',
+    kind: 'general',
     preferredFamilies: ['spray', 'zone', 'melee'],
     weight: { base: 0.9, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.46 },
     roll(level, random) {
@@ -358,6 +360,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'jackpot-fever',
     name: '잭팟 열기',
     description: '적이 주는 파친코 토큰 XP가 더 크게 불어납니다.',
+    kind: 'general',
     preferredFamilies: ['starter', 'zone', 'rapid'],
     weight: { base: 0.9, levelScale: 0.03, repeatPenalty: 0.44, familyBonus: 0.48 },
     roll(level, random) {
@@ -429,7 +432,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'guard-breaker',
     name: '가드 브레이커',
     description: '강한 적일수록 더 세게 찍어눌러 보스전에 힘을 실어 줍니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['heavy', 'melee', 'precision'],
     weight: { base: 0.78, levelScale: 0.03, repeatPenalty: 0.5, familyBonus: 0.58 },
     roll(level, random) {
@@ -442,7 +445,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'crowd-reaper',
     name: '군중 수확',
     description: '일반 적 무리를 정리하는 화력이 한층 안정적으로 올라갑니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['spray', 'chain', 'zone'],
     weight: { base: 1.0, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.54 },
     roll(level, random) {
@@ -468,7 +471,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'finisher-instinct',
     name: '마무리 본능',
     description: '결정타를 노리는 감각으로 치확과 화력을 함께 보강합니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['precision', 'rapid', 'heavy'],
     weight: { base: 0.78, levelScale: 0.018, repeatPenalty: 0.5, familyBonus: 0.52 },
     roll(level, random) {
