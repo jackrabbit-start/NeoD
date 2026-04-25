@@ -2068,6 +2068,8 @@ test('combat effects are split out for chain lightning, projectile trails, and h
   assert.ok(arenaSceneSource.includes('createHazardZoneEffect('))
   assert.ok(combatEffectsSource.includes('drawJaggedLine'))
   assert.ok(combatEffectsSource.includes('spawnHazardTickEffect'))
+  assert.ok(combatEffectsSource.includes('scene.add.graphics({ x, y })'))
+  assert.ok(combatEffectsSource.includes('scene.add.graphics({ x: point.x, y: point.y })'))
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {

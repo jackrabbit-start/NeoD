@@ -58,16 +58,20 @@ export function spawnChainLightningEffect(
   const burst = scene.add.circle(midpoint.x, midpoint.y, 8 + visualTier * 3, 0xffffff, 0.55).setDepth(1.19)
 
   scene.tweens.add({
-    targets: [graphics, burst],
+    targets: graphics,
     alpha: 0,
-    scaleX: 1.06 + visualTier * 0.02,
-    scaleY: 1.06 + visualTier * 0.02,
-    duration: 180 + visualTier * 28,
+    duration: 160 + visualTier * 24,
     ease: 'Quad.Out',
-    onComplete: () => {
-      graphics.destroy()
-      burst.destroy()
-    },
+    onComplete: () => graphics.destroy(),
+  })
+  scene.tweens.add({
+    targets: burst,
+    alpha: 0,
+    scaleX: 1.24,
+    scaleY: 1.24,
+    duration: 170 + visualTier * 24,
+    ease: 'Quad.Out',
+    onComplete: () => burst.destroy(),
   })
 }
 
@@ -78,14 +82,14 @@ export function spawnProjectileTrailEffect(
   visualPowerTier?: number,
 ): void {
   const visualTier = getCombatEffectPowerTier(visualPowerTier)
-  const spark = scene.add.graphics().setDepth(0.86)
-  const radius = 5 + visualTier * 1.6
+  const spark = scene.add.graphics({ x: point.x, y: point.y }).setDepth(0.86)
+  const radius = 4 + visualTier * 1.2
 
-  spark.lineStyle(2 + visualTier * 0.35, tint, 0.5)
-  spark.strokeCircle(point.x, point.y, radius)
-  spark.lineStyle(1, 0xffffff, 0.66)
-  spark.lineBetween(point.x - radius * 0.8, point.y, point.x + radius * 0.8, point.y)
-  spark.lineBetween(point.x, point.y - radius * 0.8, point.x, point.y + radius * 0.8)
+  spark.lineStyle(1.5 + visualTier * 0.25, tint, 0.42)
+  spark.strokeCircle(0, 0, radius)
+  spark.lineStyle(1, 0xffffff, 0.46)
+  spark.lineBetween(-radius * 0.7, 0, radius * 0.7, 0)
+  spark.lineBetween(0, -radius * 0.7, 0, radius * 0.7)
 
   scene.tweens.add({
     targets: spark,
@@ -106,16 +110,16 @@ export function createHazardZoneEffect(
 ): HazardZoneEffect {
   const visualTier = getCombatEffectPowerTier(hazard.visualPowerTier)
   const core = scene.add.circle(x, y, hazard.radius, hazard.tint, 0.24 + visualTier * 0.025).setDepth(0.4)
-  const ring = scene.add.graphics().setDepth(0.43)
-  const pulse = scene.add.graphics().setDepth(0.44)
+  const ring = scene.add.graphics({ x, y }).setDepth(0.43)
+  const pulse = scene.add.graphics({ x, y }).setDepth(0.44)
 
-  ring.lineStyle(2 + visualTier, hazard.tint, 0.78)
-  ring.strokeCircle(x, y, hazard.radius)
-  ring.lineStyle(1, 0xffffff, 0.28)
-  ring.strokeCircle(x, y, Math.max(4, hazard.radius * 0.72))
+  ring.lineStyle(2 + visualTier, hazard.tint, 0.68)
+  ring.strokeCircle(0, 0, hazard.radius)
+  ring.lineStyle(1, 0xffffff, 0.2)
+  ring.strokeCircle(0, 0, Math.max(4, hazard.radius * 0.72))
 
-  pulse.lineStyle(4 + visualTier, hazard.tint, 0.22)
-  pulse.strokeCircle(x, y, hazard.radius * 0.72)
+  pulse.lineStyle(3 + visualTier, hazard.tint, 0.18)
+  pulse.strokeCircle(0, 0, hazard.radius * 0.72)
   scene.tweens.add({
     targets: pulse,
     alpha: 0.08,
@@ -144,13 +148,13 @@ export function destroyHazardZoneEffect(effect: HazardZoneEffect): void {
 
 export function spawnHazardTickEffect(scene: Phaser.Scene, hazard: HazardSpawnSpec, point: Point): void {
   const visualTier = getCombatEffectPowerTier(hazard.visualPowerTier)
-  const tick = scene.add.graphics().setDepth(0.72)
-  const radius = 8 + visualTier * 2
+  const tick = scene.add.graphics({ x: point.x, y: point.y }).setDepth(0.72)
+  const radius = 6 + visualTier * 1.4
 
-  tick.lineStyle(2 + visualTier * 0.4, hazard.tint, 0.62)
-  tick.strokeCircle(point.x, point.y, radius)
-  tick.fillStyle(0xffffff, 0.2)
-  tick.fillCircle(point.x, point.y, Math.max(2, radius * 0.28))
+  tick.lineStyle(1.5 + visualTier * 0.3, hazard.tint, 0.48)
+  tick.strokeCircle(0, 0, radius)
+  tick.fillStyle(0xffffff, 0.14)
+  tick.fillCircle(0, 0, Math.max(2, radius * 0.24))
 
   scene.tweens.add({
     targets: tick,
