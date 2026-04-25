@@ -1,5 +1,13 @@
-<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M4.1 2.2C5.3 1.1 7.4 1.1 8.6 2.2L11.8 5.4C12.9 6.6 12.9 8.7 11.8 9.9L8.6 13.1C7.4 14.2 5.3 14.2 4.1 13.1L0.9 9.9C-0.2 8.7 -0.2 6.6 0.9 5.4L4.1 2.2Z" fill="#FFD86A"/>
-  <path d="M4.1 5.2L7 2.3L9.9 5.2L7 8.1L4.1 5.2Z" fill="#FFF7CF"/>
-  <path d="M4.1 8.8L7 5.9L9.9 8.8L7 11.7L4.1 8.8Z" fill="#FFF0A6"/>
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spark knot">
+  <defs>
+    <filter id="spark-knot-glow" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.8" flood-color="#FFD866" flood-opacity="0.9"/>
+    </filter>
+    <linearGradient id="spark-core" x1="4" y1="3" x2="18" y2="19" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF7CF"/><stop offset="0.48" stop-color="#FFD866"/><stop offset="1" stop-color="#F28A15"/></linearGradient>
+  </defs>
+  <circle cx="11" cy="11" r="10" fill="#33230A" fill-opacity="0.72" stroke="#FFD866" stroke-width="1.2" filter="url(#spark-knot-glow)"/>
+  <path d="M7.2 2.8h7.6L19.2 7.2v7.6l-4.4 4.4H7.2l-4.4-4.4V7.2l4.4-4.4Z" fill="url(#spark-core)" stroke="#FFF7CF" stroke-width="1.4" stroke-linejoin="round"/>
+  <path d="M7 8.2 11 4.2l4 4-4 4-4-4Z" fill="#FFF7CF"/>
+  <path d="M7 13.8 11 9.8l4 4-4 4-4-4Z" fill="#FFE893"/>
+  <path d="M11 6.5v9" stroke="#9A5A00" stroke-opacity="0.55" stroke-width="0.9" stroke-linecap="round"/>
 </svg>

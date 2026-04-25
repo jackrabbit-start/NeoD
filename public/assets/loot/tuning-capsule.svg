@@ -1,12 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" role="img" aria-label="Tuning capsule">
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tuning capsule">
   <defs>
-    <linearGradient id="capsule" x1="2" y1="2" x2="12" y2="12" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffd6fb"/>
-      <stop offset="0.48" stop-color="#ff9df3"/>
-      <stop offset="1" stop-color="#8fe4ff"/>
-    </linearGradient>
+    <filter id="tuning-capsule-glow" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.8" flood-color="#FF9DF3" flood-opacity="0.9"/>
+    </filter>
+    <linearGradient id="capsule-core" x1="6" y1="6" x2="16" y2="16" gradientUnits="userSpaceOnUse"><stop stop-color="#FFD6FB"/><stop offset="0.48" stop-color="#FF9DF3"/><stop offset="1" stop-color="#8FE4FF"/></linearGradient>
   </defs>
-  <circle cx="7" cy="7" r="6" fill="#1a1837" stroke="#f7c9ff" stroke-width="1.2"/>
-  <path d="M4.2 8.9 8.9 4.2a1.35 1.35 0 0 1 1.9 1.9L6.1 10.8a1.35 1.35 0 0 1-1.9-1.9Z" fill="url(#capsule)"/>
-  <path d="m6.3 6.8.9.9" stroke="#ffffff" stroke-width=".8" stroke-linecap="round"/>
+  <circle cx="11" cy="11" r="10" fill="#2B163D" fill-opacity="0.72" stroke="#FF9DF3" stroke-width="1.2" filter="url(#tuning-capsule-glow)"/>
+  <circle cx="11" cy="11" r="8" fill="#1A1837" stroke="#FFD6FB" stroke-width="1.5"/>
+  <path d="M6.5 13.6 13.6 6.5a2 2 0 0 1 2.9 2.9l-7.1 7.1a2 2 0 0 1-2.9-2.9Z" fill="url(#capsule-core)" stroke="#FFFFFF" stroke-opacity="0.7" stroke-width="0.7"/>
+  <path d="m9.4 9.8 2.8 2.8" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round"/>
+  <path d="M5.5 6.2 7 4.7M15 17.3l1.5-1.5" stroke="#8FE4FF" stroke-width="1" stroke-linecap="round"/>
 </svg>
