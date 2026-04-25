@@ -80,6 +80,12 @@ export function createRunResultHudState(payload: RunResultPayload): HudState {
     status: presentation.status,
     inventoryButtonLabel: '런 종료됨',
     inventoryButtonDisabled: true,
+    stageButtonLabel: '스테이지 선택',
+    stageButtonDisabled: true,
+    stageSelection: {
+      isOpen: false,
+      stages: [],
+    },
     modal: {
       isOpen: false,
       items: [],

@@ -278,6 +278,19 @@ export interface HudModalState {
   weapons: HudOwnedWeaponView[]
 }
 
+export interface HudStageView {
+  index: number
+  label: string
+  description: string
+  isCurrent: boolean
+  isBoss: boolean
+}
+
+export interface HudStageSelectionState {
+  isOpen: boolean
+  stages: HudStageView[]
+}
+
 export interface HudState {
   title: string
   subtitle: string
@@ -289,6 +302,9 @@ export interface HudState {
   status: string
   inventoryButtonLabel: string
   inventoryButtonDisabled: boolean
+  stageButtonLabel: string
+  stageButtonDisabled: boolean
+  stageSelection: HudStageSelectionState
   pachinko?: PachinkoHudState
   modal: HudModalState
 }

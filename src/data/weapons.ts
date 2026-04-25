@@ -252,7 +252,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     description: '가벼운 키틴 바늘을 넓게 흩뿌려 접근하는 적을 견제하는 산탄 무기입니다.',
     identityLabel: '산탄 견제',
     identityHint: '짧은 부채꼴 바늘 다발과 작은 잔류 지대로 가까운 적 무리를 밀어냅니다.',
-    range: 360,
+    range: 210,
     damage: 16,
     fireRateMs: 210,
     projectileSpeed: 610,

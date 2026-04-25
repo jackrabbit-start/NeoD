@@ -223,6 +223,7 @@ test('needle fan reuses spray-hazard behavior for a bounded reward branch', () =
   assert.equal(getWeaponIdentityLabel(needleFan), '산탄 견제')
   assert.equal(plan.projectiles.length, 4)
   assert.equal(plan.cooldownMs, needleFan.fireRateMs)
+  assert.equal(plan.projectiles[0]?.maxTravelDistance, getWeaponAttackRange(needleFan))
   assert.ok((plan.projectiles[0]?.direction.y ?? 0) < 0)
   assert.ok((plan.projectiles.at(-1)?.direction.y ?? 0) > 0)
   assert.equal(plan.projectiles[0]?.hazardOnHit?.radius, 20)

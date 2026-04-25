@@ -65,6 +65,7 @@ import {
   type MiniMapBounds,
 } from '../systems/minimap.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
+import { resolvePlayerMovementStep, type MovementVector } from '../systems/playerMovement.js'
 import {
   canStartPlayerDash,
   createReadyPlayerDashState,
@@ -118,7 +119,8 @@ import {
   parseWeaponStackKey,
   sortWeaponStacks,
 } from '../systems/weaponOwnership.js'
-import { getDefeatedEnemyRunOutcome, shouldAdvanceWave } from '../systems/waves.js'
+import { getSkippedRegularWaveCount, getStageSelectionViews } from '../systems/stageSelection.js'
+import { getDefeatedEnemyRunOutcome, getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
 import { resolveAutoAttackShot } from './arena/autoAttack.js'
 import {
   createWaveAdvancePlan,
@@ -229,6 +231,10 @@ interface HazardZoneEntity {
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
 
+interface ArenaSceneStartData {
+  startWaveIndex?: number
+}
+
 export class ArenaScene extends Phaser.Scene {
   private hud!: HudController
 
@@ -277,6 +283,8 @@ export class ArenaScene extends Phaser.Scene {
   private isInventoryOpen = false
 
   private isCodexOpen = false
+
+  private isStageSelectOpen = false
 
   private isRunEnding = false
 
@@ -328,8 +336,9 @@ export class ArenaScene extends Phaser.Scene {
     super('arena')
   }
 
-  create(): void {
+  create(data: ArenaSceneStartData = {}): void {
     this.resetRunState()
+    const startWaveIndex = this.resolveStartWaveIndex(data.startWaveIndex)
 
     this.hud = this.game.registry.get('hud') as HudController
     this.codex = this.game.registry.get('codex') as CodexController
@@ -339,6 +348,9 @@ export class ArenaScene extends Phaser.Scene {
       onWeaponEquip: (weaponKey) => this.handleWeaponEquip(weaponKey as WeaponStackKey),
       onWeaponTune: (weaponId) => this.handleWeaponTune(weaponId),
       onWeaponFuse: (weaponKey) => this.handleWeaponFuse(weaponKey),
+      onStageSelectionToggle: () => this.toggleStageSelection(),
+      onStageSelectionClose: () => this.closeStageSelection(),
+      onStageSelect: (stageIndex) => this.handleStageSelection(stageIndex),
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
@@ -386,7 +398,8 @@ export class ArenaScene extends Phaser.Scene {
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
 
-    this.startWave(0)
+    this.wavesCleared = getSkippedRegularWaveCount(startWaveIndex)
+    this.startWave(startWaveIndex)
     this.syncMiniMap(this.time.now, true)
     this.updateHud()
     this.updateCodex()
@@ -399,7 +412,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.handleInventoryToggle()
     this.handleCodexToggle()
-    this.handlePlayerMovement(time)
+    this.handlePlayerMovement(time, delta)
     this.handleFiring(time)
     this.updateEnemies(delta)
     if (this.isRunEnding) {
@@ -435,7 +448,15 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private isInteractionBlocked(): boolean {
-    return this.isInventoryOpen || this.isCodexOpen
+    return this.isInventoryOpen || this.isCodexOpen || this.isStageSelectOpen
+  }
+
+  private resolveStartWaveIndex(startWaveIndex?: number): number {
+    if (startWaveIndex === undefined || !Number.isInteger(startWaveIndex)) {
+      return 0
+    }
+
+    return getWaveByIndex(startWaveIndex) ? startWaveIndex : 0
   }
 
   private createMapVisuals(): void {
@@ -555,7 +576,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleCodexToggle(): void {
-    if (!Phaser.Input.Keyboard.JustDown(this.codexKey) || this.isInventoryOpen) {
+    if (!Phaser.Input.Keyboard.JustDown(this.codexKey) || this.isInventoryOpen || this.isStageSelectOpen) {
       return
     }
 
@@ -568,49 +589,57 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handlePlayerMovement(time: number): void {
+  private handlePlayerMovement(time: number, delta: number): void {
     if (this.isInteractionBlocked()) {
       this.player.setVelocity(0, 0)
       this.setPlayerAnimation(false)
+      this.syncPlayerMotionPose({ x: 0, y: 0 }, false)
       return
     }
 
-    const inputVelocity = new Phaser.Math.Vector2(
-      Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
-      Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
+    const rawInput = {
+      x: Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
+      y: Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
+    }
+    const currentVelocity = this.getPlayerBodyVelocity()
+    const movementStep = resolvePlayerMovementStep(
+      rawInput,
+      currentVelocity,
+      this.playerSpeed,
+      delta,
     )
 
-    const isMoving = inputVelocity.lengthSq() > 0
-    if (isMoving) {
-      inputVelocity.normalize()
-      this.lastPlayerMoveDirection.set(inputVelocity.x, inputVelocity.y)
+    if (movementStep.isInputActive) {
+      this.lastPlayerMoveDirection.set(movementStep.normalizedInput.x, movementStep.normalizedInput.y)
     }
 
     if (
       Phaser.Input.Keyboard.JustDown(this.dashKey) &&
       canStartPlayerDash(time, this.playerDashState, false)
     ) {
-      const dashDirection = resolvePlayerDashDirection(inputVelocity, this.lastPlayerMoveDirection)
+      const dashDirection = resolvePlayerDashDirection(
+        movementStep.normalizedInput,
+        this.lastPlayerMoveDirection,
+      )
       this.playerDashDirection.set(dashDirection.x, dashDirection.y)
       this.playerDashState = startPlayerDash(time)
       this.statusMessage = 'J 대시! 짧은 무적 시간으로 보스 예고 공격을 피하세요.'
     }
 
     if (isPlayerDashActive(time, this.playerDashState)) {
-      this.player.setVelocity(
-        this.playerDashDirection.x * PLAYER_DASH_SPEED,
-        this.playerDashDirection.y * PLAYER_DASH_SPEED,
-      )
+      const dashVelocity = {
+        x: this.playerDashDirection.x * PLAYER_DASH_SPEED,
+        y: this.playerDashDirection.y * PLAYER_DASH_SPEED,
+      }
+      this.player.setVelocity(dashVelocity.x, dashVelocity.y)
       this.setPlayerAnimation(true)
+      this.syncPlayerMotionPose(dashVelocity, true)
       return
     }
 
-    if (isMoving) {
-      inputVelocity.scale(this.playerSpeed)
-    }
-
-    this.player.setVelocity(inputVelocity.x, inputVelocity.y)
-    this.setPlayerAnimation(isMoving)
+    this.player.setVelocity(movementStep.velocity.x, movementStep.velocity.y)
+    this.setPlayerAnimation(movementStep.isMoving)
+    this.syncPlayerMotionPose(movementStep.velocity, movementStep.isMoving)
   }
 
   private handleFiring(time: number): void {
@@ -1394,7 +1423,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    if (this.isCodexOpen) {
+    if (this.isCodexOpen || this.isStageSelectOpen) {
       return
     }
 
@@ -1417,6 +1446,47 @@ export class ArenaScene extends Phaser.Scene {
     this.applyInteractionPause(false)
     this.statusMessage = '인벤토리가 닫혔습니다. 전투가 재개됩니다.'
     this.updateHud()
+  }
+
+  private toggleStageSelection(): void {
+    if (this.isStageSelectOpen) {
+      this.closeStageSelection()
+      return
+    }
+
+    this.openStageSelection()
+  }
+
+  private openStageSelection(): void {
+    if (this.isInventoryOpen || this.isCodexOpen || this.isRunEnding) {
+      return
+    }
+
+    this.isStageSelectOpen = true
+    this.applyInteractionPause(true)
+    this.statusMessage = '스테이지 선택이 열렸습니다. 시작할 웨이브를 고르면 런이 새로 시작됩니다.'
+    this.updateHud()
+  }
+
+  private closeStageSelection(): void {
+    if (!this.isStageSelectOpen) {
+      return
+    }
+
+    this.isStageSelectOpen = false
+    this.applyInteractionPause(false)
+    this.statusMessage = '스테이지 선택을 닫았습니다. 전투가 재개됩니다.'
+    this.updateHud()
+  }
+
+  private handleStageSelection(stageIndex: number): void {
+    if (!this.isStageSelectOpen || this.isRunEnding || !getWaveByIndex(stageIndex)) {
+      return
+    }
+
+    this.isStageSelectOpen = false
+    this.applyInteractionPause(false)
+    this.scene.restart({ startWaveIndex: stageIndex })
   }
 
   private applyInteractionPause(shouldPause: boolean): void {
@@ -1518,6 +1588,34 @@ export class ArenaScene extends Phaser.Scene {
         enemy.sprite.setVelocity(0, 0)
       }
     }
+  }
+
+  private getPlayerBodyVelocity(): MovementVector {
+    const body = this.player.body as Phaser.Physics.Arcade.Body | null
+    if (!body) {
+      return { x: 0, y: 0 }
+    }
+
+    return { x: body.velocity.x, y: body.velocity.y }
+  }
+
+  private syncPlayerMotionPose(velocity: MovementVector, isMoving: boolean): void {
+    if (isMoving && Math.abs(velocity.x) > 1) {
+      this.player.setFlipX(velocity.x < 0)
+    }
+
+    const speedRatio = Math.min(Math.hypot(velocity.x, velocity.y) / Math.max(this.playerSpeed, 1), 1)
+    const targetAngle = isMoving
+      ? Phaser.Math.Clamp(velocity.x / Math.max(this.playerSpeed, 1), -1, 1) * 5
+      : 0
+    const targetScaleX = isMoving ? 1 + speedRatio * 0.04 : 1
+    const targetScaleY = isMoving ? 1 - speedRatio * 0.03 : 1
+
+    this.player.setAngle(Phaser.Math.Linear(this.player.angle, targetAngle, 0.24))
+    this.player.setScale(
+      Phaser.Math.Linear(this.player.scaleX, targetScaleX, 0.18),
+      Phaser.Math.Linear(this.player.scaleY, targetScaleY, 0.18),
+    )
   }
 
   private setPlayerAnimation(isMoving: boolean): void {
@@ -1672,6 +1770,7 @@ export class ArenaScene extends Phaser.Scene {
     const initialState = createInitialArenaRunState()
     this.isInventoryOpen = initialState.isInventoryOpen
     this.isCodexOpen = initialState.isCodexOpen
+    this.isStageSelectOpen = false
     this.isRunEnding = initialState.isRunEnding
     this.playerHealth = initialState.playerHealth
     this.playerMaxHealth = initialState.playerMaxHealth
@@ -1770,6 +1869,7 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnTimer = undefined
     this.isInventoryOpen = false
     this.isCodexOpen = false
+    this.isStageSelectOpen = false
     this.codex.update(getCodexState(false))
     this.physics.world.pause()
     this.freezeCombat(true)
@@ -1806,10 +1906,16 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isBossActive
         ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
         : '웨이브를 돌파하며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
-      tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 토큰은 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스',
+      tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 토큰은 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스 · 스테이지 선택 버튼',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
-      inventoryButtonDisabled: this.isCodexOpen,
+      inventoryButtonDisabled: this.isCodexOpen || this.isStageSelectOpen,
+      stageButtonLabel: this.isStageSelectOpen ? '선택 닫기' : '스테이지 선택',
+      stageButtonDisabled: this.isInventoryOpen || this.isCodexOpen || this.isRunEnding,
+      stageSelection: {
+        isOpen: this.isStageSelectOpen,
+        stages: getStageSelectionViews(this.currentWaveIndex),
+      },
       pachinko: {
         level: getPachinkoRewardLevel(this.pachinkoTokenXp),
         totalTokenXp: this.pachinkoTokenXp,

@@ -1,0 +1,38 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bunBodyA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(15.4 15.1) rotate(82) scale(12.8 11.6)">
+      <stop stop-color="#FFF7B8"/>
+      <stop offset="0.45" stop-color="#7CFBDE"/>
+      <stop offset="1" stop-color="#2A78FF"/>
+    </radialGradient>
+    <linearGradient id="earA" x1="12" y1="1.5" x2="19" y2="12" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF6FD"/>
+      <stop offset="1" stop-color="#FF6DD8"/>
+    </linearGradient>
+    <linearGradient id="scarfA" x1="5" y1="18" x2="20" y2="25" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE86B"/>
+      <stop offset="1" stop-color="#FF4E9E"/>
+    </linearGradient>
+    <linearGradient id="visorA" x1="10" y1="12" x2="23" y2="16" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#A8FFFF"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="16" cy="27.2" rx="9.4" ry="2.5" fill="#020713" fill-opacity="0.35"/>
+  <path d="M11.4 10.2C9.3 6.6 8.9 2.9 10.5 1.9C12.3 0.8 15 3.8 16.3 8.3L14.3 11.7L11.4 10.2Z" fill="#081425"/>
+  <path d="M12.2 9.7C10.6 6.9 10.4 4 11.2 3.5C12.2 2.9 14.5 5.2 15.4 8.7L14 10.8L12.2 9.7Z" fill="url(#earA)"/>
+  <path d="M19.8 10.2C22 6.8 22.4 3.1 20.8 2C19 0.9 16.2 3.8 14.9 8.4L16.9 11.8L19.8 10.2Z" fill="#081425"/>
+  <path d="M19 9.7C20.6 6.9 20.8 4 20 3.5C19 2.9 16.7 5.2 15.8 8.7L17.2 10.8L19 9.7Z" fill="url(#earA)"/>
+  <path d="M6.2 19.3L2.5 18.2L5.2 21L1.7 22.6C5.5 24.1 8.9 23.9 12.4 21.8L11.3 18.2L6.2 19.3Z" fill="url(#scarfA)"/>
+  <path d="M16 6.7C22.2 6.7 26.4 11.3 26.4 17.4C26.4 23 22.1 26.2 16 26.2C9.9 26.2 5.6 23 5.6 17.4C5.6 11.3 9.8 6.7 16 6.7Z" fill="#06111F"/>
+  <path d="M16 7.9C21.5 7.9 25 12 25 17.3C25 22.2 21.3 25 16 25C10.7 25 7 22.2 7 17.3C7 12 10.5 7.9 16 7.9Z" fill="url(#bunBodyA)"/>
+  <path d="M8.6 15.1C10.8 12.9 20.6 12.9 23.4 15.1L22.1 18.8C18.4 20 13.7 20 9.9 18.8L8.6 15.1Z" fill="#0A1930"/>
+  <path d="M10.1 13.6H21.4L23.7 15.6L21.4 17.7H10.2L8.3 15.7L10.1 13.6Z" fill="url(#visorA)"/>
+  <circle cx="13.1" cy="15.5" r="1" fill="#12365C"/>
+  <circle cx="19.4" cy="15.5" r="1" fill="#12365C"/>
+  <path d="M15.1 18.5L16 19.4L16.9 18.5" stroke="#06314C" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21.9 7.7L25.4 4.8L25.6 8.8L29.4 10L25.8 11.5L25.5 15.5L22.9 12.5L19 13.4L21 10L19 6.6L21.9 7.7Z" fill="#FFE86B"/>
+  <circle cx="25.2" cy="10.1" r="1.4" fill="#FFFFFF"/>
+  <path d="M10.5 22.1L8.6 25.4H12.7L14 23.7L10.5 22.1Z" fill="#FDFDFF"/>
+  <path d="M21.5 22.1L23.4 25.4H19.3L18 23.7L21.5 22.1Z" fill="#FDFDFF"/>
+</svg>
