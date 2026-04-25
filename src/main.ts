@@ -3,8 +3,11 @@ import { createGameConfig } from './game/config.js'
 import './style.css'
 import { CodexController } from './ui/Codex.js'
 import { HudController } from './ui/Hud.js'
+import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE } from './ui/controlCopy.js'
 
 const app = document.querySelector<HTMLDivElement>('#app')
+
+const headerControlMarkup = GAME_HEADER_CONTROL_HINTS.map((hint) => `<span>${hint}</span>`).join('')
 
 if (!app) {
   throw new Error('#app 루트 요소가 필요합니다.')
@@ -14,7 +17,12 @@ app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
       <div class="game-header__brand">
-        <strong>NeoD</strong>
+        <div class="game-header__title-row">
+          <strong>${GAME_TITLE}</strong>
+          <div class="game-header__controls" aria-label="조작 방법">
+            ${headerControlMarkup}
+          </div>
+        </div>
         <span>슬라임 아레나 · 토큰 파친코 + 별 합성 생존 런</span>
       </div>
       <div class="game-header__rails" aria-hidden="true">
@@ -46,13 +54,13 @@ const hud = new HudController(hudElement)
 const codex = new CodexController(codexElement)
 
 hud.update({
-  title: 'NeoD',
+  title: GAME_TITLE,
   subtitle: '슬라임 아레나 진입 준비…',
   stats: ['게임 런타임 시작 중'],
   inventory: ['파친코 보상 레벨 준비 중'],
   recipes: ['같은 무기·같은 별 3개 자동 합성 대기 중'],
   objective: '토큰을 파친코에 넣어 무기 별 등급을 합성하고 크라운 슬라임에게 도전하세요.',
-  tip: 'WASD 이동 · J 대시 · 자동 사격 · 토큰 파친코 · 무기 3개 자동 합성 · I 인벤토리 · Q 코덱스',
+  tip: GAMEPLAY_CONTROL_TIP,
   status: '아레나 연결 중',
   inventoryButtonLabel: '인벤토리 열기',
   inventoryButtonDisabled: false,
@@ -66,6 +74,7 @@ hud.update({
     level: 1,
     totalTokenXp: 0,
     droppedTokens: 0,
+    activeTokens: 0,
     queuedTokens: 0,
     isTokenInFlight: false,
     latestReward: null,

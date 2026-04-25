@@ -127,13 +127,20 @@ import {
   createRunResultPresentation,
 } from '../.tmp-test/src/systems/runResult.js'
 import {
+  MAX_ACTIVE_PACHINKO_TOKENS,
+  PACHINKO_SLOT_COUNT,
   PACHINKO_LEVEL_THRESHOLDS,
+  PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
   STAR_ODDS_BY_LEVEL,
   applyEnemyPachinkoTokenProgress,
+  buildPachinkoSlotRewards,
+  canLaunchPachinkoToken,
   getPachinkoRewardLevel,
   getTokenXpForEnemy,
   resolvePachinkoLandingReward,
   resolvePachinkoReward,
+  resolvePachinkoSlotIndex,
+  resolvePachinkoSlotReward,
   resolveStarForLevel,
   resolveWeaponReward,
   shouldEnemyGrantPachinkoToken,
@@ -149,6 +156,7 @@ import {
   getPlayerXpForEnemy,
 } from '../.tmp-test/src/systems/playerProgression.js'
 import { HudController } from '../.tmp-test/src/ui/Hud.js'
+import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE } from '../.tmp-test/src/ui/controlCopy.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -465,7 +473,9 @@ test('player progression starts per run and levels from enemy defeat xp', () => 
   assert.equal(getPlayerLevelForXp(4), 1)
   assert.equal(getPlayerLevelForXp(5), 2)
   assert.equal(getPlayerLevelForXp(12), 3)
-  assert.equal(getPlayerLevelForXp(999), 5)
+  assert.equal(getPlayerLevelForXp(36), 5)
+  assert.equal(getPlayerLevelForXp(55), 6)
+  assert.equal(getPlayerLevelForXp(999), 17)
 
   const firstDefeat = applyEnemyPlayerXp(initial, 'prism-slime')
   assert.deepEqual(firstDefeat.state, { totalXp: 5, level: 2 })
@@ -486,7 +496,7 @@ test('player progression starts per run and levels from enemy defeat xp', () => 
   assert.equal(bossDefeat.didLevelUp, false)
 })
 
-test('player progression view clamps invalid and max-level xp', () => {
+test('player progression view clamps invalid xp and continues past seeded levels', () => {
   assert.deepEqual(getPlayerProgressionView(-5), {
     totalXp: 0,
     level: 1,
@@ -503,10 +513,21 @@ test('player progression view clamps invalid and max-level xp', () => {
     level: 5,
     currentLevelXp: 36,
     xpIntoLevel: 4,
-    xpToNextLevel: 0,
-    nextLevelAt: null,
-    progressRatio: 1,
-    isMaxLevel: true,
+    xpToNextLevel: 19,
+    nextLevelAt: 55,
+    progressRatio: 4 / 19,
+    isMaxLevel: false,
+  })
+
+  assert.deepEqual(getPlayerProgressionView(999), {
+    totalXp: 999,
+    level: 17,
+    currentLevelXp: 880,
+    xpIntoLevel: 119,
+    xpToNextLevel: 157,
+    nextLevelAt: 1037,
+    progressRatio: 119 / 157,
+    isMaxLevel: false,
   })
 
   assert.deepEqual(applyPlayerXp({ totalXp: 4, level: 1 }, 8).state, {
@@ -515,6 +536,108 @@ test('player progression view clamps invalid and max-level xp', () => {
   })
 })
 
+test('pachinko slot table makes displayed bottom rewards exact', () => {
+  const levelOneSlots = buildPachinkoSlotRewards(0)
+  assert.equal(levelOneSlots.length, PACHINKO_SLOT_COUNT)
+  assert.deepEqual(levelOneSlots.map((slot) => slot.weaponId), [
+    'starter-blaster',
+    'acid-sprayer',
+    'frost-lance',
+    'storm-cannon',
+    'arc-loom',
+    'spark-carbine',
+    'mist-vortex',
+    'slime-glaive',
+    'prism-cutter',
+    'needle-fan',
+  ])
+  assert.deepEqual(levelOneSlots[0], {
+    slotIndex: 0,
+    slotCount: 10,
+    ratioStart: 0,
+    ratioEnd: 0.1,
+    sampleRatio: 0.09999999999999978,
+    weaponId: 'starter-blaster',
+    star: 1,
+    iconKey: 'weapon-starter-blaster',
+  })
+
+  for (const slot of levelOneSlots) {
+    const landingRatio = slot.ratioStart + 0.001
+    assert.deepEqual(resolvePachinkoSlotReward(0, landingRatio), slot)
+    assert.deepEqual(resolvePachinkoLandingReward(0, landingRatio), {
+      weaponId: slot.weaponId,
+      star: slot.star,
+    })
+  }
+
+  const levelFiveSlots = buildPachinkoSlotRewards(42)
+  assert.equal(levelFiveSlots.at(-1)?.weaponId, 'needle-fan')
+  assert.equal(levelFiveSlots.at(-1)?.star, 5)
+  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999), {
+    weaponId: 'needle-fan',
+    star: 5,
+  })
+})
+
+test('pachinko slot index clamps boundaries and live table timing', () => {
+  assert.equal(resolvePachinkoSlotIndex(-1), 0)
+  assert.equal(resolvePachinkoSlotIndex(0), 0)
+  assert.equal(resolvePachinkoSlotIndex(0.1), 1)
+  assert.equal(resolvePachinkoSlotIndex(0.999), 9)
+  assert.equal(resolvePachinkoSlotIndex(1), 9)
+
+  const launchedAtLevelOne = resolvePachinkoSlotReward(0, 0.95)
+  const resolvedAfterLevelUp = resolvePachinkoSlotReward(42, 0.95)
+  assert.deepEqual(launchedAtLevelOne, {
+    slotIndex: 9,
+    slotCount: 10,
+    ratioStart: 0.9,
+    ratioEnd: 1,
+    sampleRatio: 0.999,
+    weaponId: 'needle-fan',
+    star: 3,
+    iconKey: 'weapon-needle-fan',
+  })
+  assert.deepEqual(resolvedAfterLevelUp, {
+    ...launchedAtLevelOne,
+    star: 5,
+  })
+})
+
+test('pachinko launch capacity respects active cap, queue, and cadence', () => {
+  assert.equal(MAX_ACTIVE_PACHINKO_TOKENS, 15)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 14,
+    queuedTokenCount: 1,
+    now: 1000,
+    lastLaunchAt: 0,
+  }), true)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 15,
+    queuedTokenCount: 10,
+    now: 1000,
+    lastLaunchAt: 0,
+  }), false)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 3,
+    queuedTokenCount: 0,
+    now: 1000,
+    lastLaunchAt: 0,
+  }), false)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 3,
+    queuedTokenCount: 4,
+    now: 1000,
+    lastLaunchAt: 1000 - PACHINKO_TOKEN_LAUNCH_INTERVAL_MS + 1,
+  }), false)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 3,
+    queuedTokenCount: 4,
+    now: 1000,
+    lastLaunchAt: 1000 - PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
+  }), true)
+})
 test('weapon star stacks auto-fuse three matching weapons into the next grade', () => {
   let stacks = seedWeaponStacks()
   stacks = addWeaponStack(stacks, 'starter-blaster', 1, 1)
@@ -889,7 +1012,9 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   const finale = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
 
   assert.equal(firstPhase.minuteIndex, 0)
+  assert.equal(firstPhase.healthMultiplier, 1.15)
   assert.equal(secondMinute.minuteIndex, 1)
+  assert.equal(secondMinute.stageIndex, 1)
   assert.equal(finale.isFinale, true)
   assert.equal(finale.oneTimeSpawns?.includes('slime-boss'), true)
   assert.equal(isFinaleActive(FINAL_STAGE_START_MS), true)
@@ -1157,21 +1282,29 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
+test('game title and title control hints stay aligned with playable keyboard shortcuts', () => {
+  assert.equal(GAME_TITLE, '김동성의 살아남기')
+  assert.deepEqual([...GAME_HEADER_CONTROL_HINTS], ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'])
+  assert.match(GAMEPLAY_CONTROL_TIP, /I 인벤토리/)
+  assert.match(GAMEPLAY_CONTROL_TIP, /Q 코덱스/)
+})
+
 test('stage selection views expose readable time-stage choices and current marker', () => {
   const stages = getStageSelectionViews(15 * 60_000)
 
-  assert.equal(stages.length, 6)
-  assert.equal(stages[3]?.isCurrent, true)
-  assert.match(stages[3]?.description ?? '', /침날개 벌레/)
-  assert.equal(stages.at(-1)?.isBoss, true)
-  assert.match(stages.at(-1)?.description ?? '', /보스 결전/)
-  assert.equal(stages.at(-1)?.startElapsedMs, FINAL_STAGE_START_MS)
+  assert.equal(stages.length, 30)
+  assert.equal(stages[15]?.isCurrent, true)
+  assert.match(stages[15]?.description ?? '', /체력 ×/)
+  const bossStage = stages.find((stage) => stage.isBoss)
+  assert.ok(bossStage)
+  assert.match(bossStage.description, /보스 결전/)
+  assert.equal(bossStage.startElapsedMs, FINAL_STAGE_START_MS)
 })
 
 test('stage selection maps choices to time offsets instead of wave clears', () => {
   assert.equal(getStageSelectionStartElapsedMs(0), 0)
-  assert.equal(getStageSelectionStartElapsedMs(2), 10 * 60_000)
-  assert.equal(getStageSelectionStartElapsedMs(5), FINAL_STAGE_START_MS)
+  assert.equal(getStageSelectionStartElapsedMs(2), 2 * 60_000)
+  assert.equal(getStageSelectionStartElapsedMs(25), FINAL_STAGE_START_MS)
   assert.equal(getStageSelectionStartElapsedMs(99), null)
 })
 

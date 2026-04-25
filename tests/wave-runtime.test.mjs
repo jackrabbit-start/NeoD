@@ -19,7 +19,7 @@ test('run progression runtime starts with immediate recurring pressure', () => {
 
   assert.equal(step.state.elapsedMs, 0)
   assert.equal(step.activePhase.id, 'minute-01')
-  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime'])
+  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime', 'slime', 'slime'])
   assert.equal(step.timedOut, false)
 })
 
@@ -63,6 +63,7 @@ test('run progression table covers all 30 one-minute phases with escalating pres
   assert.equal(RUN_PROGRESS_PHASES[0]?.startMs, 0)
   assert.equal(RUN_PROGRESS_PHASES.at(-1)?.startMs, 29 * 60_000)
   assert.ok((RUN_PROGRESS_PHASES.at(-1)?.softEnemyCap ?? 0) > (RUN_PROGRESS_PHASES[0]?.softEnemyCap ?? 0))
+  assert.ok((RUN_PROGRESS_PHASES.at(-1)?.healthMultiplier ?? 0) > (RUN_PROGRESS_PHASES[0]?.healthMultiplier ?? 0))
 })
 
 test('spawn loop pause helper toggles timer-like handles without crashing on missing loops', () => {
