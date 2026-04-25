@@ -25,12 +25,14 @@ export interface HazardSpawnSpec {
   tickEveryMs: number
   damage: number
   tint: number
+  visualPowerTier?: number
 }
 
 export interface ChainSpec {
   maxChains: number
   range: number
   falloff: number
+  visualPowerTier?: number
 }
 
 export interface ProjectileSpawnSpec {
@@ -139,6 +141,7 @@ const createHazardSpec = (
   tickEveryMs: behavior.hazardTickMs,
   damage: behavior.hazardDamage,
   tint: weapon.projectileTint,
+  visualPowerTier: weapon.visualPowerTier,
 })
 
 const createBaseProjectile = (
@@ -201,6 +204,7 @@ const createChainProjectile = (
       maxChains: behavior.maxChains,
       range: behavior.chainRange,
       falloff: behavior.chainFalloff,
+      visualPowerTier: weapon.visualPowerTier,
     },
   })
 

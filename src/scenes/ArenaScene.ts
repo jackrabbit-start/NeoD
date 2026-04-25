@@ -147,6 +147,16 @@ import {
 } from '../systems/weaponBehaviors.js'
 import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import {
+  createHazardZoneEffect,
+  destroyHazardZoneEffect,
+  spawnChainLightningEffect,
+  spawnHazardTickEffect,
+  spawnMeleeSwingEffect,
+  spawnProjectileTrailEffect,
+  updateHazardZoneEffect,
+  type HazardZoneEffect,
+} from './arena/combatEffects.js'
+import {
   resolveEquippedWeaponPresentation,
   resolveEquippedWeaponTextureRefresh,
   resolveWeaponPresentationFacing,
@@ -316,6 +326,8 @@ interface ProjectileEntity {
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
+  visualPowerTier: number
+  trailCooldownMs: number
 }
 
 interface EnemyProjectileEntity extends EnemyProjectileState {
@@ -324,6 +336,7 @@ interface EnemyProjectileEntity extends EnemyProjectileState {
 
 interface HazardZoneEntity {
   visual: Phaser.GameObjects.Arc
+  effect: HazardZoneEffect
   x: number
   y: number
   radius: number
@@ -333,6 +346,8 @@ interface HazardZoneEntity {
   totalLifetimeMs: number
   tickEveryMs: number
   tickCountdownMs: number
+  tint: number
+  visualPowerTier?: number
 }
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
@@ -426,6 +441,8 @@ export class ArenaScene extends Phaser.Scene {
   private passiveState: PassiveState = {}
 
   private pendingPassiveChoices: PassiveCardDefinition[] = []
+
+  private isInteractionPauseApplied = false
 
   private playerDashState: PlayerDashState = createReadyPlayerDashState()
 
@@ -1232,7 +1249,7 @@ export class ArenaScene extends Phaser.Scene {
             canCrit: true,
             baseDamage: projectile.baseDamage,
           })
-          if (this.isRunEnding) {
+          if (this.isRunEnding || this.isInteractionBlocked()) {
             return
           }
 
@@ -1253,6 +1270,17 @@ export class ArenaScene extends Phaser.Scene {
             break
           }
         }
+      }
+
+      projectile.trailCooldownMs = Math.max(0, projectile.trailCooldownMs - delta)
+      if ((projectile.chain || projectile.visualPowerTier > 0) && projectile.sprite.active && projectile.trailCooldownMs <= 0) {
+        spawnProjectileTrailEffect(
+          this,
+          { x: projectile.sprite.x, y: projectile.sprite.y },
+          projectile.tint,
+          projectile.visualPowerTier,
+        )
+        projectile.trailCooldownMs = projectile.chain ? 70 : 110
       }
 
       if (didExpireAtRange && projectile.sprite.active) {
@@ -1489,7 +1517,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private destroyHealthPickup(pickup: HealthPickupEntity): void {
-    pickup.auraTween.stop()
+    pickup.auraTween?.stop()
 
     if (pickup.aura.active) {
       pickup.aura.destroy()
@@ -1587,7 +1615,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private destroyPachinkoTokenPickup(pickup: PachinkoTokenPickupEntity): void {
-    pickup.auraTween.stop()
+    pickup.auraTween?.stop()
 
     if (pickup.aura.active) {
       pickup.aura.destroy()
@@ -1717,21 +1745,26 @@ export class ArenaScene extends Phaser.Scene {
             canCrit: true,
             baseDamage: hazard.baseDamage,
           })
-          if (this.isRunEnding) {
+          spawnHazardTickEffect(this, {
+            radius: hazard.radius,
+            durationMs: hazard.totalLifetimeMs,
+            tickEveryMs: hazard.tickEveryMs,
+            damage: hazard.damage,
+            tint: hazard.tint,
+            visualPowerTier: hazard.visualPowerTier,
+          }, { x: enemy.sprite.x, y: enemy.sprite.y })
+          if (this.isRunEnding || this.isInteractionBlocked()) {
             return
           }
         }
       }
 
       if (hazardStep.expired) {
-        hazard.visual.destroy()
+        destroyHazardZoneEffect(hazard.effect)
         continue
       }
 
-      hazard.visual.setFillStyle(
-        hazard.visual.fillColor,
-        Math.max(0.12, 0.3 * (hazard.remainingLifetimeMs / hazard.totalLifetimeMs)),
-      )
+      updateHazardZoneEffect(hazard.effect, hazard.remainingLifetimeMs / hazard.totalLifetimeMs)
     }
   }
 
@@ -2114,6 +2147,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private openPassiveSelection(level: number): void {
+    if (this.isPassiveSelectionOpen) {
+      return
+    }
+
     this.pendingPassiveChoices = getPassiveCardChoices(level, this.passiveState)
     this.isPassiveSelectionOpen = true
     this.applyInteractionPause(true)
@@ -2141,18 +2178,24 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private applyInteractionPause(shouldPause: boolean): void {
+    if (this.isInteractionPauseApplied === shouldPause) {
+      return
+    }
+
+    this.isInteractionPauseApplied = shouldPause
+
     if (shouldPause) {
       this.player.setVelocity(0, 0)
       this.physics.world.pause()
-      this.player.anims.pause()
+      this.player.anims?.pause()
       for (const enemy of this.enemies) {
-        enemy.sprite.anims.pause()
+        enemy.sprite.anims?.pause()
       }
     } else {
       this.physics.world.resume()
-      this.player.anims.resume()
+      this.player.anims?.resume()
       for (const enemy of this.enemies) {
-        enemy.sprite.anims.resume()
+        enemy.sprite.anims?.resume()
       }
     }
 
@@ -2165,6 +2208,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private setHealthPickupPulsePaused(shouldPause: boolean): void {
     for (const pickup of this.healthPickups) {
+      if (!pickup.auraTween) {
+        continue
+      }
+
       if (shouldPause) {
         pickup.auraTween.pause()
         continue
@@ -2176,6 +2223,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private setPachinkoTokenPulsePaused(shouldPause: boolean): void {
     for (const pickup of this.pachinkoTokenPickups) {
+      if (!pickup.auraTween) {
+        continue
+      }
+
       if (shouldPause) {
         pickup.auraTween.pause()
         continue
@@ -2576,6 +2627,7 @@ export class ArenaScene extends Phaser.Scene {
     this.passiveState = initialState.passiveState
     this.pendingPassiveChoices = []
     this.isPassiveSelectionOpen = false
+    this.isInteractionPauseApplied = false
     this.playerSpeed = applyPassivePlayerSpeed(initialState.playerSpeed, this.passiveState)
     this.playerDashState = createReadyPlayerDashState()
     this.playerDashDirection.set(1, 0)
@@ -2650,7 +2702,7 @@ export class ArenaScene extends Phaser.Scene {
 
     for (const hazard of this.hazardZones) {
       if (hazard.visual.active) {
-        hazard.visual.destroy()
+        destroyHazardZoneEffect(hazard.effect)
       }
     }
 
@@ -3345,6 +3397,8 @@ export class ArenaScene extends Phaser.Scene {
       chain: projectileSpec.chain,
       hazardOnHit: projectileSpec.hazardOnHit,
       hazardOnExpire: projectileSpec.hazardOnExpire,
+      visualPowerTier: visualTier,
+      trailCooldownMs: 0,
     })
   }
 
@@ -3378,6 +3432,10 @@ export class ArenaScene extends Phaser.Scene {
         canCrit: true,
         baseDamage: swing.damage,
       })
+      if (this.isRunEnding || this.isInteractionBlocked()) {
+        return
+      }
+
       if (didDamage && enemy.sprite.active) {
         this.applyMeleeSwingKnockback(enemy, swing)
       }
@@ -3385,29 +3443,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnMeleeSwingVisual(swing: MeleeSwingSpec): void {
-    const graphics = this.add.graphics({ x: this.player.x, y: this.player.y })
-    const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
-    const visualTier = Math.max(0, swing.visualPowerTier ?? 0)
-
-    graphics.fillStyle(swing.tint, Math.min(0.44, 0.28 + visualTier * 0.04))
-    graphics.lineStyle(3 + visualTier, swing.tint, Math.min(0.9, 0.65 + visualTier * 0.05))
-    graphics.beginPath()
-    graphics.moveTo(0, 0)
-    graphics.slice(0, 0, swing.range, -halfArcRadians, halfArcRadians, false)
-    graphics.closePath()
-    graphics.fillPath()
-    graphics.strokePath()
-    graphics.setRotation(Math.atan2(swing.direction.y, swing.direction.x))
-    graphics.setDepth(0.7)
-
-    this.tweens.add({
-      targets: graphics,
-      alpha: 0,
-      scaleX: 1.08 + visualTier * 0.03,
-      scaleY: 1.08 + visualTier * 0.03,
-      duration: swing.visualDurationMs,
-      onComplete: () => graphics.destroy(),
-    })
+    spawnMeleeSwingEffect(this, { x: this.player.x, y: this.player.y }, swing)
   }
 
   private applyDirectProjectileKnockback(enemy: EnemyEntity, projectile: ProjectileEntity): void {
@@ -3455,10 +3491,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnHazardZone(x: number, y: number, hazard: HazardSpawnSpec): void {
-    const visual = this.add.circle(x, y, hazard.radius, hazard.tint, 0.3).setDepth(0.4)
+    const effect = createHazardZoneEffect(this, x, y, hazard)
 
     this.hazardZones.push({
-      visual,
+      visual: effect.core,
+      effect,
       x,
       y,
       radius: hazard.radius,
@@ -3468,6 +3505,8 @@ export class ArenaScene extends Phaser.Scene {
       totalLifetimeMs: hazard.durationMs,
       tickEveryMs: hazard.tickEveryMs,
       tickCountdownMs: hazard.tickEveryMs,
+      tint: hazard.tint,
+      visualPowerTier: hazard.visualPowerTier,
     })
   }
 
@@ -3499,12 +3538,20 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
+      spawnChainLightningEffect(
+        this,
+        { x: primaryEnemy.sprite.x, y: primaryEnemy.sprite.y },
+        { x: target.sprite.x, y: target.sprite.y },
+        chain,
+        target.config.tint,
+        chainIndex,
+      )
       const chainBaseDamage = getChainDamage(baseDamage, chainIndex + 1, chain.falloff)
       this.damageEnemy(target, chainBaseDamage, {
         canCrit: true,
         baseDamage: chainBaseDamage,
       })
-      if (this.isRunEnding) {
+      if (this.isRunEnding || this.isInteractionBlocked()) {
         return
       }
     }

@@ -35,7 +35,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -66,8 +66,8 @@ jobs:
           echo "package.json engines.node: ${package_node_version}"
           echo "Vercel project settings nodeVersion: ${project_node_version}"
 
-          if [ "${package_node_version}" != "22.x" ]; then
-            echo "Expected package.json engines.node to pin Vercel builds to 22.x."
+          if [ "${package_node_version}" != "24.x" ]; then
+            echo "Expected package.json engines.node to pin Vercel builds to 24.x."
             exit 1
           fi
 
