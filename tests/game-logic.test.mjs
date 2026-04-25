@@ -141,11 +141,16 @@ import {
   PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
   STAR_ODDS_BY_LEVEL,
   applyEnemyPachinkoTokenProgress,
+  applyPachinkoSlotModifier,
+  buildPachinkoSlotModifiers,
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
   getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
   getPachinkoStarRangeForPlayerLevel,
+  getPachinkoWeaponFamily,
+  getPachinkoWeaponFamilyLabel,
+  getPachinkoWeaponSynergySummary,
   getTokenXpForEnemy,
   resolvePachinkoLandingReward,
   resolvePachinkoReward,
@@ -608,6 +613,46 @@ test('pachinko slot table makes displayed bottom rewards exact', () => {
   assert.deepEqual(resolvePachinkoLandingReward(42, 0.999, 0, 17), {
     weaponId: levelFiveLandingSlot.weaponId,
     star: levelFiveLandingSlot.star,
+  })
+})
+
+test('pachinko weapon-family synergy marks mostly-upside bonus slots', () => {
+  assert.equal(getPachinkoWeaponFamily('slime-glaive'), 'melee')
+  assert.equal(getPachinkoWeaponFamilyLabel('melee'), '근접')
+  assert.equal(getPachinkoWeaponSynergySummary('slime-glaive'), '근접 계열: 젓가락워킹 글레이브 보너스 슬롯 등장')
+
+  const modifiers = buildPachinkoSlotModifiers('slime-glaive', 3)
+  assert.equal(modifiers.get(7), 'family')
+  assert.equal(modifiers.get(3), 'bonus')
+  assert.equal(modifiers.get(5), 'jackpot')
+
+  const synergizedSlots = buildPachinkoSlotRewards(14, PACHINKO_SLOT_COUNT, 0, 1, 'slime-glaive')
+  assert.equal(synergizedSlots[7].modifier?.kind, 'family')
+  assert.equal(synergizedSlots[7].weaponId, 'slime-glaive')
+  assert.equal(synergizedSlots[3].modifier?.kind, 'bonus')
+  assert.equal(synergizedSlots[5].modifier?.kind, 'jackpot')
+  assert.equal(synergizedSlots[5].weaponId, 'slime-glaive')
+})
+
+test('pachinko slot modifiers never punish the base reward', () => {
+  const baseReward = { weaponId: 'acid-sprayer', star: 4 }
+  assert.deepEqual(applyPachinkoSlotModifier(baseReward, 'family', 'spark-carbine'), {
+    weaponId: 'spark-carbine',
+    star: 4,
+  })
+  assert.deepEqual(applyPachinkoSlotModifier(baseReward, 'bonus', 'spark-carbine'), {
+    weaponId: 'acid-sprayer',
+    star: 5,
+  })
+  assert.deepEqual(applyPachinkoSlotModifier(baseReward, 'jackpot', 'spark-carbine'), {
+    weaponId: 'spark-carbine',
+    star: 5,
+  })
+
+  const familyLanding = resolvePachinkoLandingReward(14, 0.75, 0, 1, 'slime-glaive')
+  assert.deepEqual(familyLanding, {
+    weaponId: 'slime-glaive',
+    star: 2,
   })
 })
 
