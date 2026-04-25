@@ -81,6 +81,7 @@ import {
   type PlayerProgressionResult,
   type PlayerProgressionState,
 } from '../systems/playerProgression.js'
+import { getPlayerLevelCombatStats } from '../systems/playerScaling.js'
 import { resolvePlayerMovementStep, type MovementVector } from '../systems/playerMovement.js'
 import {
   canStartPlayerDash,
@@ -1858,8 +1859,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private grantPlayerXpForEnemy(enemyId: EnemyDefinition['id']): PlayerProgressionResult {
+    const previousMaxHealth = this.playerMaxHealth
     const result = applyEnemyPlayerXp(this.playerProgression, enemyId)
     this.playerProgression = result.state
+    this.syncPlayerLevelStats(previousMaxHealth)
     this.syncPlayerHealthBar()
 
     if (result.didLevelUp) {
@@ -1867,6 +1870,18 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     return result
+  }
+
+  private syncPlayerLevelStats(previousMaxHealth = this.playerMaxHealth): void {
+    const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
+    this.playerMaxHealth = playerStats.maxHealth
+
+    const gainedMaxHealth = Math.max(0, this.playerMaxHealth - previousMaxHealth)
+    if (gainedMaxHealth > 0) {
+      this.playerHealth = Math.min(this.playerMaxHealth, this.playerHealth + gainedMaxHealth)
+    } else {
+      this.playerHealth = Math.min(this.playerHealth, this.playerMaxHealth)
+    }
   }
 
   private showPlayerLevelUpFeedback(level: number): void {
@@ -2095,6 +2110,7 @@ export class ArenaScene extends Phaser.Scene {
       activeStack?.weaponId ?? getWeaponIdFromStackKey(this.activeWeaponKey),
       {},
       activeStack?.star ?? 1,
+      this.playerProgression.level,
     )
   }
 
@@ -2424,6 +2440,7 @@ export class ArenaScene extends Phaser.Scene {
     this.playerHealth = initialState.playerHealth
     this.playerMaxHealth = initialState.playerMaxHealth
     this.playerProgression = initialState.playerProgression
+    this.syncPlayerLevelStats()
     this.playerSpeed = initialState.playerSpeed
     this.playerDashState = createReadyPlayerDashState()
     this.playerDashDirection.set(1, 0)
@@ -2562,19 +2579,20 @@ export class ArenaScene extends Phaser.Scene {
     const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
     const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
     const activeStar = activeStack?.star ?? 1
-    const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar)
+    const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar, this.playerProgression.level)
     const playerProgression = getPlayerProgressionView(this.playerProgression.totalXp)
     const currentPhase = getRunPhaseByElapsedMs(this.runElapsedMs)
     const enemyChanceLines = getRunEnemySpawnChanceRows(currentPhase).map(
       (row) => `${row.enemyName} ${row.percentLabel}`,
     )
+    const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
 
     this.hud.update({
       title: GAME_TITLE,
       subtitle: this.activeRunLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
-        `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel}`,
+        `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel} · 공격력 ×${playerStats.damageMultiplier.toFixed(2)}`,
         `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
         `현재 시간: ${formatRunTime(this.runElapsedMs)}`,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
@@ -2635,7 +2653,7 @@ export class ArenaScene extends Phaser.Scene {
   private getOwnedWeaponViews(): HudOwnedWeaponView[] {
     return sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).map((stack) => {
       const ownedWeapon = WEAPON_DEFINITIONS[stack.weaponId]
-      const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
+      const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star, this.playerProgression.level)
       const stackKey = getStackKey(stack)
       return {
         id: stack.weaponId,

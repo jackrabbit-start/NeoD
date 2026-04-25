@@ -74,6 +74,12 @@ import {
   deriveEffectiveWeaponStats,
   resolveTuningSelection,
 } from '../.tmp-test/src/systems/tuning.js'
+import {
+  BASE_PLAYER_MAX_HEALTH,
+  PLAYER_DAMAGE_MULTIPLIER_PER_LEVEL,
+  PLAYER_HEALTH_PER_LEVEL,
+  getPlayerLevelCombatStats,
+} from '../.tmp-test/src/systems/playerScaling.js'
 import { getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.js'
 import {
   STARTER_WEAPON_STACK_KEY,
@@ -1883,6 +1889,58 @@ test('effective weapon stats scale by star grade for combat-visible fusion payof
   assert.equal(tunedThreeStar.fireRateMs, 182)
   assert.equal(glaiveThreeStar.attackBehavior.kind, 'melee-cleave')
   assert.equal(glaiveThreeStar.attackBehavior.range, WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.range + 12)
+})
+
+test('player level combat stats raise health and weapon damage globally', () => {
+  assert.equal(BASE_PLAYER_MAX_HEALTH, 100)
+  assert.equal(PLAYER_HEALTH_PER_LEVEL, 8)
+  assert.equal(PLAYER_DAMAGE_MULTIPLIER_PER_LEVEL, 0.05)
+
+  assert.deepEqual(getPlayerLevelCombatStats(1), {
+    level: 1,
+    maxHealth: 100,
+    damageMultiplier: 1,
+    weaponRangeMultiplier: 1,
+    weaponSpecialTier: 0,
+  })
+
+  assert.deepEqual(getPlayerLevelCombatStats(10), {
+    level: 10,
+    maxHealth: 172,
+    damageMultiplier: 1.45,
+    weaponRangeMultiplier: 1.16,
+    weaponSpecialTier: 1,
+  })
+
+  const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
+  assert.equal(levelTenBlaster.damage, 15)
+  assert.equal(levelTenBlaster.range, 487)
+  assert.equal(levelTenBlaster.playerDamageMultiplier, 1.45)
+  assert.equal(levelTenBlaster.weaponSpecialTier, 1)
+})
+
+test('weapon milestone upgrades expand behavior every five and ten player levels', () => {
+  const levelFiveGlaive = deriveEffectiveWeaponStats('slime-glaive', {}, 1, 5)
+  assert.equal(levelFiveGlaive.attackBehavior.kind, 'melee-cleave')
+  assert.equal(levelFiveGlaive.attackBehavior.range, 102)
+
+  const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
+  assert.equal(levelTenBlaster.attackBehavior.kind, 'pierce')
+  assert.equal(levelTenBlaster.attackBehavior.maxHits, 2)
+
+  const levelTwentyFrost = deriveEffectiveWeaponStats('frost-lance', {}, 1, 20)
+  assert.equal(levelTwentyFrost.attackBehavior.kind, 'pierce')
+  assert.equal(levelTwentyFrost.attackBehavior.maxHits, 5)
+
+  const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
+  assert.equal(levelTwentyArc.attackBehavior.kind, 'chain')
+  assert.equal(levelTwentyArc.attackBehavior.maxChains, 4)
+  assert.equal(levelTwentyArc.attackBehavior.chainRange, 172)
+
+  const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
+  assert.equal(levelTwentyMist.attackBehavior.kind, 'spray-hazard')
+  assert.equal(levelTwentyMist.attackBehavior.projectileCount, 7)
+  assert.equal(levelTwentyMist.attackBehavior.hazardRadius, 48)
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {
