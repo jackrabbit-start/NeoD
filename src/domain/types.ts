@@ -87,6 +87,24 @@ export interface WeaponChainBehavior {
   chainFalloff: number
 }
 
+export interface WeaponVolleyBehavior {
+  kind: 'volley'
+  projectileCount: number
+  spreadDegrees: number
+  projectileLifetimeMs: number
+  damageMultiplier: number
+  speedMultiplier: number
+  maxHits: number
+}
+
+export interface WeaponImpactBurstBehavior {
+  kind: 'impact-burst'
+  projectileLifetimeMs: number
+  splashRadius: number
+  splashDamageMultiplier: number
+  splashKnockbackMultiplier: number
+}
+
 export interface WeaponMeleeCleaveBehavior {
   kind: 'melee-cleave'
   range: number
@@ -100,6 +118,8 @@ export type WeaponAttackBehavior =
   | WeaponSprayHazardBehavior
   | WeaponPierceBehavior
   | WeaponChainBehavior
+  | WeaponVolleyBehavior
+  | WeaponImpactBurstBehavior
   | WeaponMeleeCleaveBehavior
 
 export interface WeaponDefinition {
@@ -321,6 +341,8 @@ export interface HudOwnedWeaponView {
   stackKey?: WeaponStackKey
   name: string
   description: string
+  identityLabel: string
+  summary: string
   star?: WeaponStar
   count?: number
   damage: number

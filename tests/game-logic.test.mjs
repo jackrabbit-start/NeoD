@@ -908,7 +908,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(acidRecipes), [
-    '난리자베스 분사기 [난리 분사] → 피해 20 · 초당 4발 · 사거리 130 · 난리 분사 (안정적인 젤을 난리 난 초록 리액션 분사로 바꿉니다.)',
+    '난리자베스 분사기 [난리 분사] → 피해 19 · 장판 압박 · 사거리 145 · 난리 분사 (젤 안정성을 포기하고 산성 난사와 진한 발밑 장판으로 바꿉니다.)',
   ])
 
   const sparkRecipes = getActionableRecipes(
@@ -927,10 +927,10 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(sparkRecipes), [
-    '오버드라이브 카빈 [오버드라이브 속사] → 피해 15 · 초당 7발 · 사거리 560 · 오버드라이브 속사 (안정적인 젤 코어로 전하를 붙잡아 쇼츠 박자의 속사 무기로 만듭니다.)',
+    '오버드라이브 카빈 [오버드라이브 속사] → 피해 10 · 3연발 · 사거리 520 · 오버드라이브 속사 (전하를 짧은 간격의 3연발로 쪼개 한 방향 압박을 빠르게 누적합니다.)',
   ])
   assert.deepEqual(describeAvailableRecipes(mistRecipes), [
-    '멘탈나감 소용돌이 [멘탈 안개] → 피해 14 · 초당 4발 · 사거리 190 · 멘탈 안개 (서리 입자와 안개 구슬을 멘탈 나간 듯한 회전 제어 지대로 만듭니다.)',
+    '멘탈나감 소용돌이 [멘탈 안개] → 피해 12 · 장판 압박 · 사거리 220 · 멘탈 안개 (서리와 안개를 오래 남는 소용돌이 구역으로 바꿔 전장 흐름을 지연시킵니다.)',
   ])
 
   const needleRecipes = getActionableRecipes(
@@ -941,7 +941,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
   assert.deepEqual(describeAvailableRecipes(needleRecipes), [
-    '간바레 응원부채 [간바레 산탄] → 피해 16 · 초당 5발 · 사거리 210 · 간바레 산탄 (벌레 사수의 날카로운 키틴을 간바레 구호 같은 산탄 부채로 다듬습니다.)',
+    '간바레 응원부채 [간바레 산탄] → 피해 11 · 6연발 · 사거리 240 · 간바레 산탄 (키틴 바늘을 한순간 넓게 펴서 장판 없이 즉시 밀어내는 부채 산탄으로 다듬습니다.)',
   ])
 })
 
@@ -1946,13 +1946,13 @@ test('effective weapon stats scale by star grade for combat-visible fusion payof
   const tunedThreeStar = deriveEffectiveWeaponStats('acid-sprayer', { 'acid-sprayer': 'quick-loader' }, 3)
   const glaiveThreeStar = deriveEffectiveWeaponStats('slime-glaive', {}, 3)
 
-  assert.equal(fiveStar.damage, 34)
-  assert.equal(fiveStar.fireRateMs, 175)
+  assert.equal(fiveStar.damage, 33)
+  assert.equal(fiveStar.fireRateMs, 179)
   assert.equal(fiveStar.projectileSpeed, 660)
   assert.ok(fiveStar.damage > oneStar.damage)
   assert.ok(fiveStar.fireRateMs < oneStar.fireRateMs)
   assert.ok(fiveStar.projectileSpeed > oneStar.projectileSpeed)
-  assert.equal(tunedThreeStar.fireRateMs, 182)
+  assert.equal(tunedThreeStar.fireRateMs, 187)
   assert.equal(glaiveThreeStar.attackBehavior.kind, 'melee-cleave')
   assert.equal(glaiveThreeStar.attackBehavior.range, WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.range + 12)
 })
@@ -1991,7 +1991,7 @@ test('player level combat stats raise health and weapon damage globally', () => 
 test('weapon milestone upgrades expand behavior every five and ten player levels', () => {
   const levelFiveGlaive = deriveEffectiveWeaponStats('slime-glaive', {}, 1, 5)
   assert.equal(levelFiveGlaive.attackBehavior.kind, 'melee-cleave')
-  assert.equal(levelFiveGlaive.attackBehavior.range, 102)
+  assert.equal(levelFiveGlaive.attackBehavior.range, 114)
 
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
   assert.equal(levelTenBlaster.attackBehavior.kind, 'pierce')
@@ -1999,17 +1999,17 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
 
   const levelTwentyFrost = deriveEffectiveWeaponStats('frost-lance', {}, 1, 20)
   assert.equal(levelTwentyFrost.attackBehavior.kind, 'pierce')
-  assert.equal(levelTwentyFrost.attackBehavior.maxHits, 5)
+  assert.equal(levelTwentyFrost.attackBehavior.maxHits, 6)
 
   const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
   assert.equal(levelTwentyArc.attackBehavior.kind, 'chain')
   assert.equal(levelTwentyArc.attackBehavior.maxChains, 4)
-  assert.equal(levelTwentyArc.attackBehavior.chainRange, 172)
+  assert.equal(levelTwentyArc.attackBehavior.chainRange, 185)
 
   const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
   assert.equal(levelTwentyMist.attackBehavior.kind, 'spray-hazard')
-  assert.equal(levelTwentyMist.attackBehavior.projectileCount, 7)
-  assert.equal(levelTwentyMist.attackBehavior.hazardRadius, 48)
+  assert.equal(levelTwentyMist.attackBehavior.projectileCount, 5)
+  assert.equal(levelTwentyMist.attackBehavior.hazardRadius, 61)
 })
 
 test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
@@ -2028,6 +2028,8 @@ test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
   assert.ok(arenaSceneSource.includes('graphics.lineStyle(3 + visualTier'))
   assert.ok(hudSource.includes('weapon.levelUpgradeLabel'))
   assert.ok(hudSource.includes('weapon.levelUpgradeDescription'))
+  assert.ok(hudSource.includes('weapon.identityLabel'))
+  assert.ok(hudSource.includes('weapon.summary'))
 })
 
 test('arena damage feedback shows normal hits as numbers and critical hits with emphasis', () => {

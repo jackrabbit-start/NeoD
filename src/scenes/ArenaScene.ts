@@ -138,6 +138,7 @@ import {
   collectTargetsInRadius,
   getChainDamage,
   getWeaponAttackRange,
+  getWeaponIdentityLabel,
   getWeaponSummary,
   isAttackPlanActionable,
   isPointWithinRadius,
@@ -145,7 +146,14 @@ import {
   resolveProjectileRangeStep,
   selectChainTargets,
 } from '../systems/weaponBehaviors.js'
-import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
+import type {
+  ChainSpec,
+  HazardSpawnSpec,
+  ImpactBurstSpec,
+  MeleeSwingSpec,
+  Point,
+  ProjectileSpawnSpec,
+} from '../systems/weaponBehaviors.js'
 import {
   resolveEquippedWeaponPresentation,
   resolveEquippedWeaponTextureRefresh,
@@ -316,6 +324,7 @@ interface ProjectileEntity {
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
+  impactBurstOnHit?: ImpactBurstSpec
 }
 
 interface EnemyProjectileEntity extends EnemyProjectileState {
@@ -1258,6 +1267,10 @@ export class ArenaScene extends Phaser.Scene {
 
           if (projectile.chain) {
             this.applyChainDamage(enemy, projectile.chain, projectile.damage)
+          }
+
+          if (projectile.impactBurstOnHit) {
+            this.applyImpactBurstDamage(enemy, projectile.impactBurstOnHit, projectile)
           }
 
           if (projectile.hazardOnHit) {
@@ -2878,6 +2891,8 @@ export class ArenaScene extends Phaser.Scene {
         stackKey,
         name: ownedWeapon.name,
         description: ownedWeapon.description,
+        identityLabel: getWeaponIdentityLabel(effectiveWeapon),
+        summary: getWeaponSummary(effectiveWeapon),
         star: stack.star,
         count: stack.count,
         damage: effectiveWeapon.damage,
@@ -2896,7 +2911,10 @@ export class ArenaScene extends Phaser.Scene {
     const weaponId = this.getActiveWeaponId()
     const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
     const activeStar = activeStack?.star ?? 1
-    const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar, this.playerProgression.level)
+    const weapon = applyPassiveWeaponEffects(
+      deriveEffectiveWeaponStats(weaponId, {}, activeStar, this.playerProgression.level),
+      this.passiveState,
+    )
     const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
     const attackRange = getWeaponAttackRange(weapon)
 
@@ -3403,6 +3421,7 @@ export class ArenaScene extends Phaser.Scene {
       chain: projectileSpec.chain,
       hazardOnHit: projectileSpec.hazardOnHit,
       hazardOnExpire: projectileSpec.hazardOnExpire,
+      impactBurstOnHit: projectileSpec.impactBurstOnHit,
     })
   }
 
@@ -3502,6 +3521,88 @@ export class ArenaScene extends Phaser.Scene {
     })
 
     enemy.knockback = result.state
+  }
+
+  private applyScaledProjectileKnockback(
+    enemy: EnemyEntity,
+    direction: Point,
+    knockbackMultiplier: number,
+    baseKnockback: ProjectileEntity['knockback'],
+  ): void {
+    const result = resolveKnockbackHit({
+      source: 'direct-projectile',
+      direction,
+      weapon: {
+        force: Math.max(1, Math.round(baseKnockback.force * knockbackMultiplier)),
+        durationMs: Math.max(40, Math.round(baseKnockback.durationMs * Math.max(0.5, knockbackMultiplier))),
+      },
+      enemy: enemy.config.knockback,
+      activeState: enemy.knockback,
+      targetIsTelegraphing: Boolean(enemy.telegraph),
+      hitTimeMs: this.time.now,
+    })
+
+    enemy.knockback = result.state
+  }
+
+  private applyImpactBurstDamage(
+    primaryEnemy: EnemyEntity,
+    impactBurst: ImpactBurstSpec,
+    projectile: ProjectileEntity,
+  ): void {
+    this.spawnImpactBurstVisual(primaryEnemy.sprite.x, primaryEnemy.sprite.y, impactBurst)
+
+    const nearbyTargetIds = new Set(
+      collectTargetsInRadius(
+        { x: primaryEnemy.sprite.x, y: primaryEnemy.sprite.y },
+        impactBurst.radius,
+        this.enemies
+          .filter((enemy) => enemy.sprite.active && enemy.runtimeId !== primaryEnemy.runtimeId)
+          .map((enemy) => ({
+            id: enemy.runtimeId,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            radius: enemy.config.size / 2,
+          })),
+      ),
+    )
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active || !nearbyTargetIds.has(enemy.runtimeId)) {
+        continue
+      }
+
+      const didDamage = this.damageEnemy(enemy, impactBurst.damage, {
+        ignoreRecentHit: true,
+        baseDamage: impactBurst.baseDamage,
+      })
+      if (this.isRunEnding || this.isInteractionBlocked()) {
+        return
+      }
+
+      if (didDamage && enemy.sprite.active) {
+        this.applyScaledProjectileKnockback(
+          enemy,
+          projectile.direction,
+          impactBurst.knockbackMultiplier,
+          projectile.knockback,
+        )
+      }
+    }
+  }
+
+  private spawnImpactBurstVisual(x: number, y: number, impactBurst: ImpactBurstSpec): void {
+    const burst = this.add.circle(x, y, Math.max(18, impactBurst.radius * 0.45), impactBurst.tint, 0.28)
+    burst.setDepth(0.65)
+
+    this.tweens.add({
+      targets: burst,
+      alpha: 0,
+      scaleX: 1.8,
+      scaleY: 1.8,
+      duration: 120,
+      onComplete: () => burst.destroy(),
+    })
   }
 
   private destroyProjectile(projectile: ProjectileEntity, hazard?: HazardSpawnSpec): void {

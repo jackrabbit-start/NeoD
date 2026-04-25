@@ -1,10 +1,12 @@
 import type {
   WeaponChainBehavior,
   WeaponDefinition,
+  WeaponImpactBurstBehavior,
   WeaponKnockbackDefinition,
   WeaponMeleeCleaveBehavior,
   WeaponPierceBehavior,
   WeaponSprayHazardBehavior,
+  WeaponVolleyBehavior,
 } from '../domain/types.js'
 
 export interface Point {
@@ -33,6 +35,14 @@ export interface ChainSpec {
   falloff: number
 }
 
+export interface ImpactBurstSpec {
+  radius: number
+  damage: number
+  baseDamage: number
+  tint: number
+  knockbackMultiplier: number
+}
+
 export interface ProjectileSpawnSpec {
   direction: Point
   speed: number
@@ -46,6 +56,7 @@ export interface ProjectileSpawnSpec {
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
+  impactBurstOnHit?: ImpactBurstSpec
   visualPowerTier?: number
 }
 
@@ -105,7 +116,27 @@ export interface ProjectileRangeStep {
   expired: boolean
 }
 
+export type WeaponRangeBand = 'close' | 'mid' | 'long'
+export type WeaponOutputGeometry =
+  | 'single-shot'
+  | 'multi-volley'
+  | 'line-pierce'
+  | 'chain-hit'
+  | 'wide-cleave'
+  | 'narrow-cleave'
+  | 'hazard-zone'
+export type WeaponSpecialEffectProfile =
+  | 'none'
+  | 'hazard-linger'
+  | 'impact-splash'
+  | 'high-knockback'
+  | 'chain-bounce'
+
 const BASE_PROJECTILE_RADIUS = 5
+
+function assertNever(value: never, message: string): never {
+  throw new Error(`${message}: ${JSON.stringify(value)}`)
+}
 
 const normalize = (vector: Point): Point => {
   const length = Math.hypot(vector.x, vector.y)
@@ -182,6 +213,27 @@ const createSprayProjectiles = (
   })
 }
 
+const createVolleyProjectiles = (
+  weapon: WeaponDefinition,
+  direction: Point,
+  behavior: WeaponVolleyBehavior,
+): ProjectileSpawnSpec[] => {
+  const centerIndex = (behavior.projectileCount - 1) / 2
+  const volleyDamage = Math.max(1, Math.round(weapon.damage * behavior.damageMultiplier))
+  const speed = Math.round(weapon.projectileSpeed * behavior.speedMultiplier)
+
+  return Array.from({ length: behavior.projectileCount }, (_, index) => {
+    const offset = (index - centerIndex) * behavior.spreadDegrees
+    const spreadDirection = normalize(rotate(direction, offset))
+
+    return createBaseProjectile(weapon, spreadDirection, behavior.projectileLifetimeMs, {
+      damage: volleyDamage,
+      speed,
+      maxHits: behavior.maxHits,
+    })
+  })
+}
+
 const createPierceProjectile = (
   weapon: WeaponDefinition,
   direction: Point,
@@ -203,6 +255,24 @@ const createChainProjectile = (
       falloff: behavior.chainFalloff,
     },
   })
+
+const createImpactBurstProjectile = (
+  weapon: WeaponDefinition,
+  direction: Point,
+  behavior: WeaponImpactBurstBehavior,
+): ProjectileSpawnSpec => {
+  const splashDamage = Math.max(1, Math.round(weapon.damage * behavior.splashDamageMultiplier))
+
+  return createBaseProjectile(weapon, direction, behavior.projectileLifetimeMs, {
+    impactBurstOnHit: {
+      radius: behavior.splashRadius,
+      damage: splashDamage,
+      baseDamage: splashDamage,
+      tint: weapon.projectileTint,
+      knockbackMultiplier: behavior.splashKnockbackMultiplier,
+    },
+  })
+}
 
 const createMeleeSwing = (
   weapon: WeaponDefinition,
@@ -239,10 +309,22 @@ export function buildAttackPlan(
   }
 
   switch (weapon.attackBehavior.kind) {
+    case 'single':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: [createBaseProjectile(weapon, direction, weapon.attackBehavior.projectileLifetimeMs)],
+        meleeSwings: [],
+      }
     case 'spray-hazard':
       return {
         cooldownMs: weapon.fireRateMs,
         projectiles: createSprayProjectiles(weapon, direction, weapon.attackBehavior),
+        meleeSwings: [],
+      }
+    case 'volley':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: createVolleyProjectiles(weapon, direction, weapon.attackBehavior),
         meleeSwings: [],
       }
     case 'pierce':
@@ -257,19 +339,20 @@ export function buildAttackPlan(
         projectiles: [createChainProjectile(weapon, direction, weapon.attackBehavior)],
         meleeSwings: [],
       }
+    case 'impact-burst':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: [createImpactBurstProjectile(weapon, direction, weapon.attackBehavior)],
+        meleeSwings: [],
+      }
     case 'melee-cleave':
       return {
         cooldownMs: weapon.fireRateMs,
         projectiles: [],
         meleeSwings: [createMeleeSwing(weapon, direction, weapon.attackBehavior)],
       }
-    case 'single':
     default:
-      return {
-        cooldownMs: weapon.fireRateMs,
-        projectiles: [createBaseProjectile(weapon, direction, weapon.attackBehavior.projectileLifetimeMs)],
-        meleeSwings: [],
-      }
+      return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in buildAttackPlan')
   }
 }
 
@@ -283,17 +366,22 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
   }
 
   switch (weapon.attackBehavior.kind) {
+    case 'single':
+      return '기본 사격'
     case 'spray-hazard':
       return '산성 분사'
+    case 'volley':
+      return '연속 발사'
     case 'pierce':
       return '관통 사격'
     case 'chain':
       return '연쇄 번개'
+    case 'impact-burst':
+      return '충격 폭발'
     case 'melee-cleave':
       return '전방 참격'
-    case 'single':
     default:
-      return '기본 사격'
+      return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponIdentityLabel')
   }
 }
 
@@ -309,14 +397,78 @@ export function getWeaponAttackRange(weapon: WeaponDefinition): number {
   throw new Error(`Ranged weapon ${weapon.id} is missing an explicit range`)
 }
 
+export function getWeaponRangeBand(weapon: WeaponDefinition): WeaponRangeBand {
+  const range = getWeaponAttackRange(weapon)
+  if (range <= 180) {
+    return 'close'
+  }
+  if (range <= 360) {
+    return 'mid'
+  }
+  return 'long'
+}
+
+export function getWeaponOutputGeometry(weapon: WeaponDefinition): WeaponOutputGeometry {
+  switch (weapon.attackBehavior.kind) {
+    case 'single':
+    case 'impact-burst':
+      return 'single-shot'
+    case 'spray-hazard':
+      return 'hazard-zone'
+    case 'volley':
+      return 'multi-volley'
+    case 'pierce':
+      return 'line-pierce'
+    case 'chain':
+      return 'chain-hit'
+    case 'melee-cleave':
+      return weapon.attackBehavior.arcDegrees >= 90 ? 'wide-cleave' : 'narrow-cleave'
+    default:
+      return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponOutputGeometry')
+  }
+}
+
+export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponSpecialEffectProfile {
+  switch (weapon.attackBehavior.kind) {
+    case 'spray-hazard':
+      return 'hazard-linger'
+    case 'chain':
+      return 'chain-bounce'
+    case 'impact-burst':
+      return 'impact-splash'
+    case 'melee-cleave':
+      return weapon.knockback.force >= 110 ? 'high-knockback' : 'none'
+    case 'volley':
+      return weapon.knockback.force >= 80 ? 'high-knockback' : 'none'
+    case 'single':
+    case 'pierce':
+      return weapon.knockback.force >= 120 ? 'high-knockback' : 'none'
+    default:
+      return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponSpecialEffectProfile')
+  }
+}
+
 export function getWeaponSummary(weapon: WeaponDefinition): string {
   const range = getWeaponAttackRange(weapon)
 
-  if (weapon.attackBehavior.kind === 'melee-cleave') {
-    return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}회 · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
+  switch (weapon.attackBehavior.kind) {
+    case 'single':
+      return `피해 ${weapon.damage} · 단발 견제 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'spray-hazard':
+      return `피해 ${weapon.damage} · 장판 압박 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'volley':
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.projectileCount}연발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'pierce':
+      return `피해 ${weapon.damage} · 관통 ${weapon.attackBehavior.maxHits}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'chain':
+      return `피해 ${weapon.damage} · 연쇄 ${weapon.attackBehavior.maxChains}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'impact-burst':
+      return `피해 ${weapon.damage} · 착탄 폭발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'melee-cleave':
+      return `피해 ${weapon.damage} · 전방 ${weapon.attackBehavior.arcDegrees}° · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    default:
+      return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponSummary')
   }
-
-  return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
 }
 
 export function getChainDamage(baseDamage: number, chainIndex: number, falloff: number): number {
