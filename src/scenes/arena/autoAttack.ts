@@ -5,6 +5,7 @@ export interface AutoAttackPoint {
 
 export interface AutoAttackCandidate extends AutoAttackPoint {
   isActive?: boolean
+  radius?: number
 }
 
 export interface AutoAttackTarget extends AutoAttackPoint {
@@ -17,17 +18,40 @@ export interface AutoAttackWindow {
   isInteractionBlocked: boolean
   time: number
   nextFireAt: number
+  maxRange?: number
+}
+
+const isCandidateInRange = (
+  origin: AutoAttackPoint,
+  candidate: AutoAttackCandidate,
+  maxRange: number | undefined,
+): boolean => {
+  if (maxRange == null) {
+    return true
+  }
+
+  const radius = Math.max(0, candidate.radius ?? 0)
+  const effectiveRange = Math.max(0, maxRange) + radius
+  const deltaX = candidate.x - origin.x
+  const deltaY = candidate.y - origin.y
+
+  return deltaX * deltaX + deltaY * deltaY <= effectiveRange * effectiveRange
 }
 
 export function resolveNearestAutoAttackTarget(
   origin: AutoAttackPoint,
   candidates: AutoAttackCandidate[],
+  maxRange?: number,
 ): AutoAttackTarget | null {
   let nearestCandidate: AutoAttackCandidate | null = null
   let nearestDistanceSq = Number.POSITIVE_INFINITY
 
   for (const candidate of candidates) {
     if (candidate.isActive === false) {
+      continue
+    }
+
+    if (!isCandidateInRange(origin, candidate, maxRange)) {
       continue
     }
 
@@ -77,5 +101,5 @@ export function resolveAutoAttackShot(
     return null
   }
 
-  return resolveNearestAutoAttackTarget(origin, candidates)
+  return resolveNearestAutoAttackTarget(origin, candidates, window.maxRange)
 }

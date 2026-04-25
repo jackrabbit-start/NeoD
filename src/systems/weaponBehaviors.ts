@@ -40,6 +40,7 @@ export interface ProjectileSpawnSpec {
   tint: number
   radius: number
   lifetimeMs: number
+  maxTravelDistance: number
   maxHits: number
   knockback: WeaponKnockbackDefinition
   chain?: ChainSpec
@@ -96,6 +97,12 @@ export interface ProjectileHitStep {
   destroyed: boolean
 }
 
+export interface ProjectileRangeStep {
+  point: Point
+  distanceFromOrigin: number
+  expired: boolean
+}
+
 const BASE_PROJECTILE_RADIUS = 5
 
 const normalize = (vector: Point): Point => {
@@ -144,6 +151,7 @@ const createBaseProjectile = (
   tint: weapon.projectileTint,
   radius: BASE_PROJECTILE_RADIUS,
   lifetimeMs,
+  maxTravelDistance: getWeaponAttackRange(weapon),
   maxHits: 1,
   knockback: weapon.knockback,
   ...overrides,
@@ -285,12 +293,26 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
   }
 }
 
-export function getWeaponSummary(weapon: WeaponDefinition): string {
+export function getWeaponAttackRange(weapon: WeaponDefinition): number {
   if (weapon.attackBehavior.kind === 'melee-cleave') {
-    return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}회 · 범위 ${weapon.attackBehavior.range} · ${getWeaponIdentityLabel(weapon)}`
+    return weapon.attackBehavior.range
   }
 
-  return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · ${getWeaponIdentityLabel(weapon)}`
+  if (typeof weapon.range === 'number') {
+    return weapon.range
+  }
+
+  throw new Error(`Ranged weapon ${weapon.id} is missing an explicit range`)
+}
+
+export function getWeaponSummary(weapon: WeaponDefinition): string {
+  const range = getWeaponAttackRange(weapon)
+
+  if (weapon.attackBehavior.kind === 'melee-cleave') {
+    return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}회 · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
+  }
+
+  return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
 }
 
 export function getChainDamage(baseDamage: number, chainIndex: number, falloff: number): number {
@@ -322,6 +344,46 @@ export function selectChainTargets(
 
 export function isPointWithinRadius(source: Point, target: Point, radius: number): boolean {
   return Math.hypot(target.x - source.x, target.y - source.y) <= radius
+}
+
+export function resolveProjectileRangeStep(
+  origin: Point,
+  current: Point,
+  maxTravelDistance: number,
+): ProjectileRangeStep {
+  const offset = {
+    x: current.x - origin.x,
+    y: current.y - origin.y,
+  }
+  const distanceFromOrigin = Math.hypot(offset.x, offset.y)
+  const clampedMaxTravelDistance = Math.max(0, maxTravelDistance)
+
+  if (distanceFromOrigin < clampedMaxTravelDistance) {
+    return {
+      point: current,
+      distanceFromOrigin,
+      expired: false,
+    }
+  }
+
+  if (distanceFromOrigin === 0) {
+    return {
+      point: origin,
+      distanceFromOrigin: 0,
+      expired: true,
+    }
+  }
+
+  const travelRatio = clampedMaxTravelDistance / distanceFromOrigin
+
+  return {
+    point: {
+      x: origin.x + offset.x * travelRatio,
+      y: origin.y + offset.y * travelRatio,
+    },
+    distanceFromOrigin: clampedMaxTravelDistance,
+    expired: true,
+  }
 }
 
 export function collectTargetsInRadius(

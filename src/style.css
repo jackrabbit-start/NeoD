@@ -266,7 +266,7 @@ button {
 
 .hud-summary__hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.55fr);
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.55fr) auto;
   gap: 10px;
   align-items: stretch;
 }
@@ -311,7 +311,7 @@ button {
 
 .hud-summary__status {
   display: grid;
-  gap: 4px;
+  gap: 8px;
   padding: 12px 14px;
   border: 1px solid rgba(151, 191, 255, 0.14);
   border-radius: 16px;
@@ -319,6 +319,38 @@ button {
     radial-gradient(circle at 100% 0%, rgba(166, 255, 208, 0.12), rgba(166, 255, 208, 0) 42%),
     linear-gradient(135deg, rgba(143, 228, 255, 0.14), rgba(143, 228, 255, 0) 68%),
     rgba(9, 19, 37, 0.92);
+}
+
+.hud-summary__status-line {
+  display: grid;
+  gap: 3px;
+}
+
+.hud-summary__status-line > span,
+.hud-summary__status-meta span {
+  color: #9bb5ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hud-summary__status-line > strong {
+  color: #f7fbff;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.hud-summary__status-meta {
+  display: grid;
+  gap: 5px;
+}
+
+.hud-summary__status-meta p {
+  display: grid;
+  gap: 2px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
 }
 
 .hud-summary h2 {
@@ -337,11 +369,6 @@ button {
   text-transform: uppercase;
 }
 
-.hud-summary__status p {
-  color: #f7fbff;
-  font-size: 14px;
-}
-
 .hud-summary__grid {
   display: grid;
   gap: 10px;
@@ -358,17 +385,10 @@ button {
     rgba(8, 18, 35, 0.88);
 }
 
-.hud-summary__section--controls {
-  background:
-    linear-gradient(135deg, rgba(166, 255, 208, 0.08), rgba(166, 255, 208, 0) 72%),
-    rgba(8, 18, 35, 0.9);
-}
-
 .hud-summary__section--inventory {
   gap: 10px;
 }
 
-.hud-summary__body,
 .hud-summary__section > p {
   color: #f3f7ff;
 }
@@ -416,10 +436,6 @@ button {
   margin: 0;
 }
 
-.hud-tip {
-  color: var(--ui-accent-lime);
-}
-
 .hud-button {
   border: 1px solid rgba(151, 191, 255, 0.28);
   border-radius: 999px;
@@ -460,6 +476,18 @@ button {
   font-size: 11px;
 }
 
+.hud-button--stage {
+  align-self: center;
+  min-width: 124px;
+  padding-inline: 14px;
+  border-color: rgba(255, 211, 111, 0.42);
+  background:
+    linear-gradient(135deg, rgba(255, 211, 111, 0.16), rgba(143, 228, 255, 0.04) 72%),
+    rgba(16, 27, 52, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
 .hud-modal-layer {
   position: fixed;
   inset: 0;
@@ -494,6 +522,10 @@ button {
     rgba(7, 14, 31, 0.96);
   box-shadow: var(--ui-shadow);
   padding: 20px;
+}
+
+.hud-modal--stage {
+  width: min(620px, calc(100% - 48px));
 }
 
 .hud-modal__header {
@@ -546,6 +578,10 @@ button {
 .hud-modal__list {
   display: grid;
   gap: 8px;
+}
+
+.hud-modal__list--stage {
+  gap: 10px;
 }
 
 .hud-modal__item {
@@ -628,6 +664,10 @@ button {
 .hud-modal__item--weapon {
   align-items: stretch;
   cursor: default;
+}
+
+.hud-modal__item--stage {
+  align-items: center;
 }
 
 .hud-modal__item--weapon.is-equipped .hud-modal__weapon-meta {

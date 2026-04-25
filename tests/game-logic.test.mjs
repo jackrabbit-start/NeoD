@@ -70,6 +70,7 @@ import {
   deriveEffectiveWeaponStats,
   resolveTuningSelection,
 } from '../.tmp-test/src/systems/tuning.js'
+import { getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.js'
 import {
   applyRecipeSelection,
   equipOwnedWeapon,
@@ -97,10 +98,15 @@ import {
   shouldAdvanceWave,
 } from '../.tmp-test/src/systems/waves.js'
 import {
+  getSkippedRegularWaveCount,
+  getStageSelectionViews,
+} from '../.tmp-test/src/systems/stageSelection.js'
+import {
   createRunResultHudState,
   createRunResultPresentation,
   isRunResultRestartKey,
 } from '../.tmp-test/src/systems/runResult.js'
+import { HudController } from '../.tmp-test/src/ui/Hud.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -443,7 +449,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(acidRecipes), [
-    '산성 분사기 [부식 압박] → 피해 20 · 초당 4발 · 부식 압박 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
+    '산성 분사기 [부식 압박] → 피해 20 · 초당 4발 · 사거리 130 · 부식 압박 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
   ])
 
   const sparkRecipes = getActionableRecipes(
@@ -462,10 +468,10 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(sparkRecipes), [
-    '스파크 카빈 [고속 전격] → 피해 15 · 초당 7발 · 고속 전격 (안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.)',
+    '스파크 카빈 [고속 전격] → 피해 15 · 초당 7발 · 사거리 560 · 고속 전격 (안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.)',
   ])
   assert.deepEqual(describeAvailableRecipes(mistRecipes), [
-    '안개 소용돌이 [안개 제어] → 피해 14 · 초당 4발 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
+    '안개 소용돌이 [안개 제어] → 피해 14 · 초당 4발 · 사거리 190 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
   ])
 
   const needleRecipes = getActionableRecipes(
@@ -476,7 +482,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
   assert.deepEqual(describeAvailableRecipes(needleRecipes), [
-    '니들 팬 [산탄 견제] → 피해 16 · 초당 5발 · 산탄 견제 (벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.)',
+    '니들 팬 [산탄 견제] → 피해 16 · 초당 5발 · 사거리 210 · 산탄 견제 (벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.)',
   ])
 })
 
@@ -766,6 +772,51 @@ test('auto-attack shot gating respects interaction pause, cooldown, and target a
   )
 })
 
+test('auto-attack target selection respects active weapon range and target radius', () => {
+  const origin = { x: 0, y: 0 }
+
+  assert.equal(
+    resolveNearestAutoAttackTarget(
+      origin,
+      [
+        { x: 80, y: 0, radius: 5, isActive: true },
+        { x: 50, y: 0, radius: 5, isActive: false },
+      ],
+      40,
+    ),
+    null,
+  )
+
+  assert.deepEqual(
+    resolveNearestAutoAttackTarget(
+      origin,
+      [
+        { x: 80, y: 0, radius: 5, isActive: true },
+        { x: 45, y: 0, radius: 10, isActive: true },
+        { x: 20, y: 0, radius: 5, isActive: false },
+      ],
+      40,
+    ),
+    {
+      x: 45,
+      y: 0,
+      directionX: 1,
+      directionY: 0,
+      distanceSq: 2025,
+    },
+  )
+
+  assert.equal(
+    resolveAutoAttackShot(origin, [{ x: 70, y: 0, radius: 5, isActive: true }], {
+      isInteractionBlocked: false,
+      time: 1000,
+      nextFireAt: 0,
+      maxRange: 40,
+    }),
+    null,
+  )
+})
+
 test('boss trigger stays behind the final regular wave', () => {
   assert.equal(isBossWaveReady(0), false)
   assert.equal(isBossWaveReady(1), false)
@@ -862,6 +913,23 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
+test('stage selection views expose readable wave choices and current marker', () => {
+  const stages = getStageSelectionViews(2)
+
+  assert.equal(stages.length, 5)
+  assert.equal(stages[2]?.isCurrent, true)
+  assert.match(stages[2]?.description ?? '', /침날개 벌레/)
+  assert.equal(stages.at(-1)?.isBoss, true)
+  assert.match(stages.at(-1)?.description ?? '', /보스 결전/)
+})
+
+test('stage selection skipped clear count preserves boss result accounting', () => {
+  assert.equal(getSkippedRegularWaveCount(0), 0)
+  assert.equal(getSkippedRegularWaveCount(2), 2)
+  assert.equal(getSkippedRegularWaveCount(4), 4)
+  assert.equal(getSkippedRegularWaveCount(99), 4)
+})
+
 test('boss win result presentation is explicit and reward-neutral', () => {
   const presentation = createRunResultPresentation({
     outcome: 'win',
@@ -885,6 +953,8 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   assert.ok(presentation.inventoryLines.every((line) => !/해금|unlock/i.test(line)))
   assert.equal(hudState.title, '런 클리어')
   assert.equal(hudState.inventoryButtonDisabled, true)
+  assert.equal(hudState.stageButtonDisabled, true)
+  assert.equal(hudState.stageSelection.isOpen, false)
   assert.equal(hudState.modal.isOpen, false)
 })
 
@@ -1092,6 +1162,123 @@ test('codex controller preserves scroll across repeated open renders', () => {
   assert.equal(element.assignments, 3)
 })
 
+test('hud controller skips summary DOM rewrites for identical frame-loop updates', () => {
+  class FakeClassList {
+    toggle() {}
+  }
+
+  class FakeElement {
+    children = []
+    classList = new FakeClassList()
+    dataset = {}
+    disabled = false
+    style = {}
+    textContent = ''
+    assignments = 0
+    #innerHTML = ''
+    #regions = new Map()
+
+    constructor(tagName = 'div') {
+      this.tagName = tagName.toUpperCase()
+    }
+
+    get innerHTML() {
+      return this.#innerHTML
+    }
+
+    set innerHTML(value) {
+      this.assignments += 1
+      this.#innerHTML = value
+
+      if (value.includes('data-region="items"')) {
+        this.#regions.set('button[data-action="inventory-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="items"]', new FakeElement('div'))
+        this.#regions.set('[data-region="item-detail"]', new FakeElement('div'))
+        this.#regions.set('[data-region="recipes"]', new FakeElement('div'))
+        this.#regions.set('[data-region="weapons"]', new FakeElement('div'))
+      }
+      if (value.includes('data-region="stages"')) {
+        this.#regions.set('button[data-action="stage-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="stages"]', new FakeElement('div'))
+      }
+    }
+
+    addEventListener() {}
+
+    removeEventListener() {}
+
+    append(...nodes) {
+      this.children.push(...nodes)
+    }
+
+    replaceChildren(...nodes) {
+      this.children = nodes
+    }
+
+    querySelector(selector) {
+      return this.#regions.get(selector) ?? null
+    }
+
+    querySelectorAll() {
+      return []
+    }
+  }
+
+  const previousDocument = globalThis.document
+  globalThis.document = {
+    createElement: (tagName) => new FakeElement(tagName),
+  }
+
+  try {
+    const root = new FakeElement('section')
+    const controller = new HudController(root)
+    const state = {
+      title: 'NeoD 프로토타입',
+      subtitle: '1 웨이브',
+      stats: ['체력: 10/10', '무기: 기본'],
+      inventory: ['젤 파편 × 1'],
+      recipes: ['조합 대기'],
+      objective: '웨이브를 버티세요.',
+      tip: 'WASD 이동 · J 대시',
+      status: '전투 중입니다. 계속 움직이세요.',
+      inventoryButtonLabel: '인벤토리 열기',
+      inventoryButtonDisabled: false,
+      stageButtonLabel: '스테이지 선택',
+      stageButtonDisabled: false,
+      stageSelection: {
+        isOpen: false,
+        stages: [],
+      },
+      modal: {
+        isOpen: false,
+        items: [],
+        recipes: [],
+        weapons: [],
+      },
+    }
+
+    controller.update(state)
+    const summaryElement = root.children[0]
+    assert.equal(summaryElement.assignments, 1)
+    assert.match(summaryElement.innerHTML, /hud-summary__status-line/)
+
+    controller.update({ ...state, modal: { ...state.modal } })
+
+    assert.equal(summaryElement.assignments, 1)
+    assert.deepEqual(controller.getRenderMetrics(), {
+      summaryAssignments: 1,
+      summarySkips: 1,
+      modalClosedSkips: 1,
+    })
+  } finally {
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
+})
+
 test('elite drop table returns a tuning capsule', () => {
   assert.equal(
     resolveWeightedDrop(ENEMY_DEFINITIONS['prism-slime'].drops, () => 0),
@@ -1232,6 +1419,7 @@ test('effective melee weapon tuning updates nested behavior immutably', () => {
   assert.equal(quick.fireRateMs, Math.round(baseWeapon.fireRateMs * 0.9))
   assert.equal(stabilized.attackBehavior.kind, 'melee-cleave')
   assert.equal(stabilized.attackBehavior.range, baseBehavior.range + 18)
+  assert.equal(getWeaponAttackRange(stabilized), baseBehavior.range + 18)
   assert.notEqual(stabilized.attackBehavior, baseBehavior)
   assert.deepEqual(WEAPON_DEFINITIONS['slime-glaive'], baseWeapon)
 })

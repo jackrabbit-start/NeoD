@@ -22,14 +22,14 @@ export const getHudWeaponAssetPath = (iconKey: string) => `assets/hud/weapons/${
 export const VECTOR_ASSETS: VectorAssetDefinition[] = [
   {
     key: 'player',
-    path: 'assets/units/player-idle-0.svg',
+    path: 'assets/units/player-bunny-idle-0.svg',
     width: 32,
     height: 32,
     fallback: { radius: 14, color: 0x66d9ef },
   },
   {
     key: 'player-idle-1',
-    path: 'assets/units/player-idle-1.svg',
+    path: 'assets/units/player-bunny-idle-1.svg',
     width: 32,
     height: 32,
     fallback: { radius: 14, color: 0x66d9ef },
