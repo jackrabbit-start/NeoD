@@ -2011,6 +2011,16 @@ test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
   assert.ok(hudSource.includes('weapon.levelUpgradeDescription'))
 })
 
+test('arena damage feedback shows normal hits as numbers and critical hits with emphasis', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+
+  assert.ok(arenaSceneSource.includes('this.showDamageFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage, criticalHit.isCritical)'))
+  assert.ok(arenaSceneSource.includes('label: `${damage}`'))
+  assert.ok(arenaSceneSource.includes('label: `CRIT! ${damage}`'))
+  assert.ok(arenaSceneSource.includes("color: '#f7fbff'"))
+  assert.ok(arenaSceneSource.includes("color: '#ffd866'"))
+})
+
 test('effective melee weapon tuning updates nested behavior immutably', () => {
   const baseWeapon = WEAPON_DEFINITIONS['slime-glaive']
   const baseBehavior = baseWeapon.attackBehavior

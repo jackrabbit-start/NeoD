@@ -1853,6 +1853,7 @@ export class ArenaScene extends Phaser.Scene {
     enemy.lastHitAt = now
     enemy.currentHealth -= criticalHit.damage
     this.syncEnemyHealthBar(enemy)
+    this.showDamageFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage, criticalHit.isCritical)
 
     if (enemy.currentHealth > 0) {
       enemy.sprite.setScale(1.08)
@@ -1861,9 +1862,6 @@ export class ArenaScene extends Phaser.Scene {
         scale: 1,
         duration: 100,
       })
-      if (criticalHit.isCritical) {
-        this.showCriticalHitFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage)
-      }
       return true
     }
 
@@ -1899,9 +1897,6 @@ export class ArenaScene extends Phaser.Scene {
 
     if (!didDropPachinkoToken) {
       this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 드롭을 계속 모으세요.`
-    }
-    if (criticalHit.isCritical) {
-      this.showCriticalHitFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage)
     }
     return true
   }
@@ -1957,22 +1952,43 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
-  private showCriticalHitFeedback(x: number, y: number, damage: number): void {
+  private showDamageFeedback(x: number, y: number, damage: number, isCritical: boolean): void {
+    const visual = isCritical
+      ? {
+          label: `CRIT! ${damage}`,
+          color: '#ffd866',
+          fontSize: '16px',
+          fontStyle: '900',
+          lift: 54,
+          duration: 520,
+          depth: 8,
+        }
+      : {
+          label: `${damage}`,
+          color: '#f7fbff',
+          fontSize: '13px',
+          fontStyle: '800',
+          lift: 42,
+          duration: 420,
+          depth: 7,
+        }
+
     const text = this.add
-      .text(x, y - 22, `CRIT! ${damage}`, {
-        color: '#ffd866',
+      .text(x, y - 22, visual.label, {
+        color: visual.color,
         fontFamily: 'Inter, system-ui, sans-serif',
-        fontSize: '16px',
-        fontStyle: '900',
+        fontSize: visual.fontSize,
+        fontStyle: visual.fontStyle,
       })
       .setOrigin(0.5)
-      .setDepth(8)
+      .setDepth(visual.depth)
+      .setShadow(0, 2, '#020713', isCritical ? 5 : 3)
 
     this.tweens.add({
       targets: text,
-      y: y - 54,
+      y: y - visual.lift,
       alpha: 0,
-      duration: 520,
+      duration: visual.duration,
       ease: 'Quad.Out',
       onComplete: () => text.destroy(),
     })
