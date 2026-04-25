@@ -1462,6 +1462,13 @@ test('enemy names match college engineering life story beats', () => {
   assert.match(ENEMY_DEFINITIONS['needle-wasp'].description, /코드리뷰/)
   assert.match(ENEMY_DEFINITIONS['siege-toad'].description, /캡스톤 마감/)
   assert.ok(Object.values(ENEMY_DEFINITIONS).every((enemy) => !enemy.name.includes('슬라임')))
+
+  const attendanceSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/slime-idle-0.svg'), 'utf8')
+  const capstoneSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/siege-toad-idle-0.svg'), 'utf8')
+  const professorSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/slime-boss-idle-0.svg'), 'utf8')
+  assert.match(attendanceSvg, /<title>출석 체크 알림<\/title>/)
+  assert.match(capstoneSvg, /<title>캡스톤 마감덩어리<\/title>/)
+  assert.match(professorSvg, /<title>최종 발표 교수님<\/title>/)
 })
 
 test('content id catalogs include scoped enemy and reward branches', () => {
