@@ -19,8 +19,8 @@ test('run progression runtime starts with immediate recurring pressure', () => {
 
   assert.equal(step.state.elapsedMs, 0)
   assert.equal(step.activePhase.id, 'minute-01-a')
-  assert.equal(step.spawnedEnemyIds.length, 4)
-  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime', 'slime', 'slime'])
+  assert.equal(step.spawnedEnemyIds.length, 2)
+  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime'])
   assert.equal(step.timedOut, false)
 })
 

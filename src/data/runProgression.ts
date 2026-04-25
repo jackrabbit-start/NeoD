@@ -34,14 +34,16 @@ function scaleEntriesForHackSlash(
 ): RunSpawnEntryDefinition[] {
   const multiplier =
     minuteIndex >= 18
-      ? 3.8
+      ? 4.8
       : minuteIndex >= 15
-        ? 3.25
+        ? 3.8
         : minuteIndex >= 10
-          ? 2.75
+          ? 2.5
           : minuteIndex >= 5
-            ? 2.2
-            : 1.8
+            ? 1.45
+            : minuteIndex >= 2
+              ? 1.05
+              : 0.75
 
   return entries.map((entry) => ({
     ...entry,
@@ -117,7 +119,7 @@ function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
   }
 
   const surgeIndex = (phaseIndex + minuteIndex) % entries.length
-  const surgeAmount = Math.max(5, Math.ceil((minuteIndex + 4) * 1.25))
+  const surgeAmount = Math.max(1, Math.ceil((minuteIndex + 1) * 1.15))
   entries[surgeIndex] = {
     ...entries[surgeIndex],
     count: entries[surgeIndex].count + surgeAmount,
@@ -168,8 +170,8 @@ function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
     durationMs: RUN_PHASE_DURATION_MS,
     entries: entriesForPhase(phaseIndex),
     spawnIntervalMs: Math.max(120, 760 - minuteIndex * 30),
-    burstSize: Math.min(48, 4 + Math.floor(minuteIndex * 1.8)),
-    softEnemyCap: Math.min(300, 32 + minuteIndex * 15),
+    burstSize: Math.min(48, 2 + Math.floor(minuteIndex * 2.05)),
+    softEnemyCap: Math.min(300, 20 + minuteIndex * 16),
     healthMultiplier: Number((1 + minuteIndex * 0.04 + Math.max(0, minuteIndex - 12) * 0.04).toFixed(2)),
     ...(oneTimeSpawns.length > 0 ? { oneTimeSpawns } : {}),
     ...(isFinale ? { isFinale } : {}),

@@ -1333,7 +1333,7 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
     {
       enemyId: 'slime',
       enemyName: '출석 체크 알림',
-      count: 11,
+      count: 5,
       ratio: 1,
       percentLabel: '100%',
     },
@@ -1355,7 +1355,7 @@ test('run progression spawn sequence interleaves weighted enemies early', () => 
   const firstBackPhase = getRunPhaseByElapsedMs(30_000)
   const sequence = flattenRunPhaseEntries(firstBackPhase)
 
-  assert.equal(sequence.length, 17)
+  assert.equal(sequence.length, 8)
   assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
 })
 
