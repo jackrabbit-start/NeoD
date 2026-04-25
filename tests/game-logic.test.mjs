@@ -1690,6 +1690,8 @@ test('start screen gates arena entry behind an explicit button', () => {
   assert.ok(startSceneSource.includes('const startRun = (): void => {'))
   assert.ok(startSceneSource.includes("this.scene.stop('arena')"))
   assert.ok(startSceneSource.includes("this.scene.start('arena', { startElapsedMs: 0 })"))
+  assert.ok(startSceneSource.includes('김동성은 빚과 오해'))
+  assert.ok(startSceneSource.includes('그의 기구한 일생'))
   assert.ok(startSceneSource.includes('this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)'))
   assert.ok(startSceneSource.includes('Phaser.Input.Keyboard.KeyCodes.ENTER'))
 })

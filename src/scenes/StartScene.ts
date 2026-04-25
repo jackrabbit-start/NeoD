@@ -77,7 +77,7 @@ export class StartScene extends Phaser.Scene {
       .setShadow(0, 3, '#020713', 8)
 
     this.add
-      .text(width / 2, Math.max(150, height * 0.38), '시작 전에는 시간이 흐르지 않고 적도 등장하지 않습니다.\n준비되면 새 런을 시작하세요.', {
+      .text(width / 2, Math.max(142, height * 0.34), '시작 전에는 시간이 흐르지 않고 적도 등장하지 않습니다.\n준비되면 새 런을 시작하세요.', {
         fontSize: '22px',
         color: '#d8e2ff',
         align: 'center',
@@ -87,7 +87,17 @@ export class StartScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     this.add
-      .text(width / 2, Math.max(236, height * 0.54), 'WASD 이동 · J 대시 · 자동 사격 · 토큰으로 레벨업', {
+      .text(width / 2, Math.max(228, height * 0.5), '김동성은 빚과 오해, 끝없는 추격 사이에서 매번 새 출발을 꿈꿨습니다.\n도망칠수록 더 깊은 경기장으로 밀려났지만, 이번 런만큼은 자기 이름을 되찾으려 합니다.\n토큰 하나, 무기 하나가 그의 기구한 일생을 다시 쓰는 증거입니다.', {
+        fontSize: '17px',
+        color: '#ffe28a',
+        align: 'center',
+        lineSpacing: 7,
+        wordWrap: { width: textWidth },
+      })
+      .setOrigin(0.5)
+
+    this.add
+      .text(width / 2, Math.max(312, height * 0.62), 'WASD 이동 · J 대시 · 자동 사격 · 토큰으로 레벨업', {
         fontSize: '18px',
         color: '#8fe4ff',
         align: 'center',
