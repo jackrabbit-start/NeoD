@@ -1134,8 +1134,16 @@ test('result scene restart is button-driven instead of R-key driven', () => {
     'ResultScene restart should be activated by pointer/click input',
   )
   assert.ok(
+    resultSceneSource.includes(`const restartButtonY = Math.max(48, height - 48)`),
+    'ResultScene restart button should stay inside the resized canvas instead of using fixed GAME_HEIGHT coordinates',
+  )
+  assert.ok(
     !resultSceneSource.includes(`Phaser.Input.Keyboard.Events.ANY_KEY_DOWN`),
     'ResultScene must not keep the old R-key restart binding',
+  )
+  assert.ok(
+    !resultSceneSource.includes(`GAME_HEIGHT - 72`),
+    'ResultScene restart button must not use the old fixed baseline that can fall outside resized canvases',
   )
 })
 

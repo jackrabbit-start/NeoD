@@ -18,6 +18,7 @@ export class ResultScene extends Phaser.Scene {
     const panelWidth = Math.max(240, width - 96)
     const panelHeight = Math.max(240, height - 96)
     const textWidth = Math.max(160, Math.min(720, width - 96))
+    const restartButtonY = Math.max(48, height - 48)
     const presentation = createRunResultPresentation(payload)
     const hud = this.game.registry.get('hud') as HudController | undefined
     hud?.update(createRunResultHudState(payload))
@@ -75,7 +76,7 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(
         width / 2,
-        height - 96,
+        Math.max(32, restartButtonY - 48),
         presentation.restartPrompt,
         {
           fontSize: '20px',
@@ -85,13 +86,13 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     const restartButton = this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 72, 244, 48, 0x1f3a5f, 0.96)
+      .rectangle(width / 2, restartButtonY, Math.min(244, Math.max(180, width - 96)), 48, 0x1f3a5f, 0.96)
       .setStrokeStyle(2, Number.parseInt(presentation.accentColor.slice(1), 16), 0.95)
       .setInteractive({ useHandCursor: true })
       .setName('restart-run-button')
 
     const restartButtonLabel = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT - 72, '새 런 시작', {
+      .text(width / 2, restartButtonY, '새 런 시작', {
         fontSize: '20px',
         color: '#f8fafc',
         fontStyle: 'bold',
