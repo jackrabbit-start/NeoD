@@ -30,6 +30,7 @@ export interface PassiveCardChoice {
   effects: PassiveEffects
   grade: PassiveCardGrade
   gradeLabel: string
+  iconKey?: string
 }
 
 export interface PassiveStateEntry {
@@ -618,10 +619,16 @@ export function createPassiveCardChoice(
   id: PassiveCardId,
   level: number,
   random: () => number = Math.random,
+  activeWeaponId?: WeaponId,
 ): PassiveCardChoice {
   const template = getPassiveTemplate(id)
   const roll = template.roll(level, random)
   const grade = gradeFromQuality(roll.quality)
+  const activeFamily = activeWeaponId ? getPachinkoWeaponFamily(activeWeaponId) : null
+  const iconKey =
+    activeWeaponId && activeFamily && template.preferredFamilies?.includes(activeFamily)
+      ? `weapon-${activeWeaponId}`
+      : undefined
   return {
     id,
     name: template.name,
@@ -630,6 +637,7 @@ export function createPassiveCardChoice(
     effects: roll.effects,
     grade,
     gradeLabel: getPassiveGradeLabel(grade),
+    iconKey,
   }
 }
 
@@ -698,7 +706,7 @@ export function getPassiveCardChoices(
 
   while (remaining.length > 0 && picks.length < 3) {
     const template = pickWeightedTemplate(remaining, level, state, random, activeWeaponId)
-    picks.push(createPassiveCardChoice(template.id as PassiveCardId, level, random))
+    picks.push(createPassiveCardChoice(template.id as PassiveCardId, level, random, activeWeaponId))
     const index = remaining.findIndex((entry) => entry.id === template.id)
     if (index >= 0) {
       remaining.splice(index, 1)
