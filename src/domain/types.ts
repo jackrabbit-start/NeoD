@@ -2,7 +2,12 @@ import type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
 export type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
-export type EnemyAnimationKey = 'slime-idle' | 'spark-slime-idle' | 'slime-boss-idle'
+export type EnemyAnimationKey =
+  | 'slime-idle'
+  | 'spark-slime-idle'
+  | 'dash-slime-idle'
+  | 'orbit-slime-idle'
+  | 'slime-boss-idle'
 
 export interface ItemDefinition {
   id: LootId
@@ -100,9 +105,18 @@ export interface EnemyOrbitMovementBehavior {
   orbitDirection: -1 | 1
 }
 
+export interface EnemyDashMovementBehavior {
+  kind: 'dash'
+  triggerRange: number
+  chargeSpeed: number
+  chargeDurationMs: number
+  cooldownMs: number
+}
+
 export type EnemyMovementBehavior =
   | EnemyDirectChaseMovementBehavior
   | EnemyOrbitMovementBehavior
+  | EnemyDashMovementBehavior
 
 export interface EnemyContactAttackBehavior {
   kind: 'contact'
@@ -150,11 +164,15 @@ export interface EnemyDefinition {
   drops?: WeightedDropEntry[]
 }
 
+export interface WaveEntryDefinition {
+  enemyId: EnemyId
+  count: number
+}
+
 export interface WaveDefinition {
   id: string
   label: string
-  enemyId: EnemyId
-  count: number
+  entries: WaveEntryDefinition[]
   spawnIntervalMs: number
   isBossWave?: boolean
 }

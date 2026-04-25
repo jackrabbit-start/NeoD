@@ -32,6 +32,13 @@ export const RECIPE_IDS = [
 
 export type RecipeId = (typeof RECIPE_IDS)[number]
 
-export const ENEMY_IDS = ['slime', 'spark-slime', 'prism-slime', 'slime-boss'] as const
+export const ENEMY_IDS = [
+  'slime',
+  'spark-slime',
+  'prism-slime',
+  'dash-slime',
+  'orbit-slime',
+  'slime-boss',
+] as const
 
 export type EnemyId = (typeof ENEMY_IDS)[number]

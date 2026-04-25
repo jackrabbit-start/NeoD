@@ -24,11 +24,13 @@ import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
 import {
   advanceEnemyCooldown,
+  createEnemyRuntimeState,
   createEnemyTelegraph,
   getDistanceBetween,
   isPointInsideCircle,
-  resolveEnemyVelocity,
+  resolveEnemyVelocityStep,
   shouldEnemyStartTelegraph,
+  type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
@@ -61,7 +63,7 @@ import {
   equipOwnedWeapon,
   getActionableRecipes,
 } from '../systems/weaponOwnership.js'
-import { shouldAdvanceWave } from '../systems/waves.js'
+import { getDefeatedEnemyRunOutcome, shouldAdvanceWave } from '../systems/waves.js'
 import { resolveAutoAttackShot } from './arena/autoAttack.js'
 import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
 import {
@@ -100,6 +102,7 @@ interface EnemyEntity {
   runtimeId: number
   sprite: PhysicsSprite
   config: EnemyDefinition
+  runtimeState: EnemyRuntimeState
   currentHealth: number
   healthBar: EnemyHealthBar
   lastHitAt: number
@@ -461,15 +464,18 @@ export class ArenaScene extends Phaser.Scene {
         }
       }
 
-      const velocity = resolveEnemyVelocity(
+      const movementStep = resolveEnemyVelocityStep(
         { x: enemy.sprite.x, y: enemy.sprite.y },
         { x: this.player.x, y: this.player.y },
         enemy.config.speed,
         enemy.config.movementBehavior,
+        enemy.runtimeState,
+        this.time.now,
       )
+      enemy.runtimeState = movementStep.runtimeState
       const knockbackStep = advanceKnockbackState(enemy.knockback, delta)
       enemy.knockback = knockbackStep.state
-      const nextVelocity = combineMovementWithKnockback(velocity, knockbackStep.velocity)
+      const nextVelocity = combineMovementWithKnockback(movementStep.velocity, knockbackStep.velocity)
       enemy.sprite.setVelocity(nextVelocity.x, nextVelocity.y)
       enemy.sprite.play(enemy.config.animationKey, true)
 
@@ -705,6 +711,7 @@ export class ArenaScene extends Phaser.Scene {
       runtimeId: this.nextEnemyRuntimeId,
       sprite,
       config,
+      runtimeState: createEnemyRuntimeState(config.movementBehavior),
       currentHealth: config.maxHealth,
       healthBar: this.createEnemyHealthBar(sprite, config),
       lastHitAt: 0,
@@ -758,7 +765,7 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
 
-    const wasBoss = enemy.config.id === 'slime-boss'
+    const defeatOutcome = getDefeatedEnemyRunOutcome(enemy.config.id)
     if (enemy.telegraph?.visual.active) {
       enemy.telegraph.visual.destroy()
       enemy.telegraph = undefined
@@ -767,7 +774,7 @@ export class ArenaScene extends Phaser.Scene {
     this.destroyEnemyHealthBar(enemy)
     enemy.sprite.destroy()
 
-    if (wasBoss) {
+    if (defeatOutcome === 'win') {
       this.endRun('win')
       return true
     }

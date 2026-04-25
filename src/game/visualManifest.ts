@@ -63,6 +63,34 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     fallback: { radius: 12, color: 0xffdb6e },
   },
   {
+    key: 'dash-slime',
+    path: 'assets/units/dash-slime-idle-0.svg',
+    width: 28,
+    height: 24,
+    fallback: { radius: 12, color: 0xff8f70 },
+  },
+  {
+    key: 'dash-slime-idle-1',
+    path: 'assets/units/dash-slime-idle-1.svg',
+    width: 28,
+    height: 24,
+    fallback: { radius: 12, color: 0xff8f70 },
+  },
+  {
+    key: 'orbit-slime',
+    path: 'assets/units/orbit-slime-idle-0.svg',
+    width: 26,
+    height: 26,
+    fallback: { radius: 12, color: 0x75c7ff },
+  },
+  {
+    key: 'orbit-slime-idle-1',
+    path: 'assets/units/orbit-slime-idle-1.svg',
+    width: 26,
+    height: 26,
+    fallback: { radius: 12, color: 0x75c7ff },
+  },
+  {
     key: 'slime-boss',
     path: 'assets/units/slime-boss-idle-0.svg',
     width: 56,
@@ -216,5 +244,7 @@ export const IDLE_ANIMATIONS: AnimationDefinition[] = [
   { key: 'player-move', frames: ['player', 'player-idle-1'], frameRate: 8 },
   { key: 'slime-idle', frames: ['slime', 'slime-idle-1'], frameRate: 3 },
   { key: 'spark-slime-idle', frames: ['spark-slime', 'spark-slime-idle-1'], frameRate: 4 },
+  { key: 'dash-slime-idle', frames: ['dash-slime', 'dash-slime-idle-1'], frameRate: 7 },
+  { key: 'orbit-slime-idle', frames: ['orbit-slime', 'orbit-slime-idle-1'], frameRate: 5 },
   { key: 'slime-boss-idle', frames: ['slime-boss', 'slime-boss-idle-1'], frameRate: 2 },
 ]

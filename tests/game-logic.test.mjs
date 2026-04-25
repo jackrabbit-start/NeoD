@@ -8,7 +8,7 @@ import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
 import { ITEM_DEFINITIONS } from '../.tmp-test/src/data/items.js'
 import { RECIPE_DEFINITIONS } from '../.tmp-test/src/data/recipes.js'
 import { WEAPON_DEFINITIONS } from '../.tmp-test/src/data/weapons.js'
-import { RECIPE_IDS, WEAPON_IDS } from '../.tmp-test/src/data/contentIds.js'
+import { ENEMY_IDS, LOOT_IDS, RECIPE_IDS, WEAPON_IDS } from '../.tmp-test/src/data/contentIds.js'
 import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/combine.js'
 import { getCodexState } from '../.tmp-test/src/systems/codex.js'
 import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RADIUS, PROJECTILE_HIT_PADDING } from '../.tmp-test/src/game/combatGeometry.js'
@@ -39,7 +39,22 @@ import {
   resolveAutoAttackShot,
   resolveNearestAutoAttackTarget,
 } from '../.tmp-test/src/scenes/arena/autoAttack.js'
-import { getWaveByIndex, isBossWaveReady, shouldAdvanceWave } from '../.tmp-test/src/systems/waves.js'
+import {
+  createEnemyRuntimeState,
+  resolveEnemyVelocity,
+  resolveEnemyVelocityStep,
+} from '../.tmp-test/src/systems/enemyBehaviors.js'
+import {
+  flattenWaveEntries,
+  getBossEnemyId,
+  getDefeatedEnemyRunOutcome,
+  getWaveByIndex,
+  getWaveSpawnCount,
+  getWaveSpawnSequence,
+  isBossEnemyId,
+  isBossWaveReady,
+  shouldAdvanceWave,
+} from '../.tmp-test/src/systems/waves.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -514,13 +529,90 @@ test('boss trigger stays behind the final regular wave', () => {
   assert.equal(isBossWaveReady(4), true)
 })
 
-test('third wave exposes the new slime-family sample enemy', () => {
-  assert.equal(getWaveByIndex(2)?.enemyId, 'spark-slime')
+test('third wave still includes the existing spark slime sample enemy', () => {
+  const thirdWave = getWaveByIndex(2)
+
+  assert.ok(thirdWave)
+  assert.ok(getWaveSpawnSequence(thirdWave).includes('spark-slime'))
+})
+
+test('enemy expansion keeps reward ids stable while adding regular enemy ids', () => {
+  assert.deepEqual(LOOT_IDS, [
+    'gel-shard',
+    'acid-core',
+    'frost-mote',
+    'spark-knot',
+    'mist-bead',
+    'tuning-capsule',
+  ])
+  assert.deepEqual(RECIPE_IDS, [
+    'acid-sprayer-recipe',
+    'frost-lance-recipe',
+    'storm-cannon-recipe',
+    'arc-loom-recipe',
+    'spark-carbine-recipe',
+    'mist-vortex-recipe',
+  ])
+  assert.deepEqual(WEAPON_IDS, [
+    'starter-blaster',
+    'acid-sprayer',
+    'frost-lance',
+    'storm-cannon',
+    'arc-loom',
+    'spark-carbine',
+    'mist-vortex',
+  ])
+  assert.deepEqual(ENEMY_IDS, [
+    'slime',
+    'spark-slime',
+    'prism-slime',
+    'dash-slime',
+    'orbit-slime',
+    'slime-boss',
+  ])
+})
+
+test('mixed regular waves resolve deterministic spawn order while boss stays singular', () => {
+  const secondWave = getWaveByIndex(1)
+  const thirdWave = getWaveByIndex(2)
+  const eliteWave = getWaveByIndex(3)
+  const bossWave = getWaveByIndex(4)
+
+  assert.ok(secondWave)
+  assert.ok(thirdWave)
+  assert.ok(eliteWave)
+  assert.ok(bossWave)
+  assert.deepEqual(
+    getWaveSpawnSequence(secondWave),
+    ['slime', 'slime', 'slime', 'slime', 'slime', 'dash-slime', 'dash-slime', 'dash-slime'],
+  )
+  assert.deepEqual(
+    flattenWaveEntries(thirdWave.entries),
+    [
+      'spark-slime',
+      'spark-slime',
+      'spark-slime',
+      'spark-slime',
+      'orbit-slime',
+      'orbit-slime',
+      'orbit-slime',
+      'dash-slime',
+      'dash-slime',
+    ],
+  )
+  assert.equal(getWaveSpawnCount(thirdWave), 9)
+  assert.deepEqual(getWaveSpawnSequence(eliteWave), ['prism-slime'])
+  assert.deepEqual(bossWave.entries, [{ enemyId: 'slime-boss', count: 1 }])
+  assert.equal(getBossEnemyId(), 'slime-boss')
+  assert.equal(isBossEnemyId('slime-boss'), true)
+  assert.equal(isBossEnemyId('dash-slime'), false)
+  assert.equal(getDefeatedEnemyRunOutcome('slime-boss'), 'win')
+  assert.equal(getDefeatedEnemyRunOutcome('dash-slime'), 'continue')
 })
 
 test('elite wave appears before the boss wave', () => {
-  assert.equal(getWaveByIndex(3)?.enemyId, 'prism-slime')
-  assert.equal(getWaveByIndex(4)?.enemyId, 'slime-boss')
+  assert.deepEqual(getWaveByIndex(3)?.entries, [{ enemyId: 'prism-slime', count: 1 }])
+  assert.deepEqual(getWaveByIndex(4)?.entries, [{ enemyId: 'slime-boss', count: 1 }])
 })
 
 test('codex selectors expose shared items, recipes, and enemies', () => {
@@ -529,7 +621,7 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
   assert.equal(codex.isOpen, true)
   assert.equal(codex.items.length, 6)
   assert.equal(codex.recipes.length, 6)
-  assert.equal(codex.enemies.length, 4)
+  assert.equal(codex.enemies.length, 6)
 
   const arcRecipe = codex.recipes.find((recipe) => recipe.id === 'arc-loom-recipe')
   assert.equal(arcRecipe?.identityLabel, '연쇄 제압')
@@ -568,6 +660,14 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
     prismSlime?.drops.map((drop) => drop.id),
     ['tuning-capsule'],
   )
+
+  const dashSlime = codex.enemies.find((enemy) => enemy.id === 'dash-slime')
+  assert.ok(dashSlime)
+  assert.ok(dashSlime?.stats.some((stat) => stat.includes('고속 돌진')))
+
+  const orbitSlime = codex.enemies.find((enemy) => enemy.id === 'orbit-slime')
+  assert.ok(orbitSlime)
+  assert.ok(orbitSlime?.stats.some((stat) => stat.includes('맴돕니다')))
 })
 
 test('recipe identity metadata stays aligned with known ids and weapon outputs', () => {
@@ -743,9 +843,78 @@ test('enemy visual metadata keeps immutable gameplay geometry while adding art h
       slime: { size: 20, textureKey: 'slime', animationKey: 'slime-idle' },
       'spark-slime': { size: 22, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
       'prism-slime': { size: 30, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
+      'dash-slime': { size: 24, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
+      'orbit-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
       'slime-boss': { size: 44, textureKey: 'slime-boss', animationKey: 'slime-boss-idle' },
     },
   )
+})
+
+
+
+test('dash slime movement locks a burst vector through the charge window', () => {
+  const dashSlime = ENEMY_DEFINITIONS['dash-slime']
+  const firstMove = resolveEnemyVelocityStep(
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    dashSlime.speed,
+    dashSlime.movementBehavior,
+    createEnemyRuntimeState(dashSlime.movementBehavior),
+    1_000,
+  )
+
+  assert.equal(dashSlime.movementBehavior.kind, 'dash')
+  assert.equal(firstMove.mode, 'dash-charge')
+  assert.ok(dashSlime.movementBehavior.chargeSpeed > dashSlime.speed)
+  assert.equal(firstMove.velocity.x, dashSlime.movementBehavior.chargeSpeed)
+  assert.equal(firstMove.velocity.y, 0)
+
+  const lockedMove = resolveEnemyVelocityStep(
+    { x: 20, y: 0 },
+    { x: 20, y: 120 },
+    dashSlime.speed,
+    dashSlime.movementBehavior,
+    firstMove.runtimeState,
+    1_100,
+  )
+
+  assert.equal(lockedMove.mode, 'dash-charge')
+  assert.deepEqual(lockedMove.velocity, firstMove.velocity)
+
+  const recoveryMove = resolveEnemyVelocityStep(
+    { x: 20, y: 0 },
+    { x: 20, y: 120 },
+    dashSlime.speed,
+    dashSlime.movementBehavior,
+    lockedMove.runtimeState,
+    1_500,
+  )
+
+  assert.equal(recoveryMove.mode, 'dash-recover')
+  assert.equal(recoveryMove.velocity.x, 0)
+  assert.equal(recoveryMove.velocity.y, dashSlime.speed)
+})
+
+test('orbit slime movement adds lateral pressure inside its engagement band', () => {
+  const orbitSlime = ENEMY_DEFINITIONS['orbit-slime']
+  const orbitVelocity = resolveEnemyVelocity(
+    { x: 90, y: 0 },
+    { x: 0, y: 0 },
+    orbitSlime.speed,
+    orbitSlime.movementBehavior,
+  )
+
+  assert.equal(orbitSlime.movementBehavior.kind, 'orbit')
+  assert.ok(orbitVelocity.x < 0)
+  assert.notEqual(orbitVelocity.y, 0)
+
+  const chaseVelocity = resolveEnemyVelocity(
+    { x: 90, y: 0 },
+    { x: 0, y: 0 },
+    orbitSlime.speed,
+    { kind: 'direct-chase' },
+  )
+  assert.equal(chaseVelocity.y, 0)
 })
 
 test('item and weapon visual metadata stays aligned with the external asset pass', () => {
