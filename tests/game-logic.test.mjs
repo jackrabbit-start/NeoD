@@ -84,6 +84,7 @@ import {
   createWeaponStackKey,
   equipOwnedWeapon,
   equipWeaponStack,
+  formatWeaponStarLabel,
   fuseWeaponStack,
   getActionableRecipes,
   seedOwnedWeapons,
@@ -666,9 +667,14 @@ test('weapon star stacks auto-fuse three matching weapons into the next grade', 
       > deriveEffectiveWeaponStats(fusedStarter.fusions[0].weaponId, {}, 1).damage,
   )
 
-  const maxStar = addWeaponStack([], 'arc-loom', 5, 3)
-  assert.equal(canFuseWeaponStack(maxStar, createWeaponStackKey('arc-loom', 5)), false)
-  assert.equal(fuseWeaponStack({ weaponStacks: maxStar, activeWeaponKey: createWeaponStackKey('arc-loom', 5) }, createWeaponStackKey('arc-loom', 5)), null)
+  const highStar = addWeaponStack([], 'arc-loom', 5, 3)
+  const arcFiveKey = createWeaponStackKey('arc-loom', 5)
+  const fusedArc = fuseWeaponStack({ weaponStacks: highStar, activeWeaponKey: arcFiveKey }, arcFiveKey)
+  assert.equal(canFuseWeaponStack(highStar, arcFiveKey), true)
+  assert.equal(fusedArc?.activeWeaponKey, createWeaponStackKey('arc-loom', 6))
+  assert.deepEqual(fusedArc?.weaponStacks, [{ weaponId: 'arc-loom', star: 6, count: 1 }])
+  assert.equal(formatWeaponStarLabel(fusedArc?.resultStar), '★×6')
+  assert.equal(formatWeaponStarLabel(12), '★×12')
 })
 
 test('combat and pachinko rectangles split the 960px canvas into play and reward lanes', () => {

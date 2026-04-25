@@ -132,6 +132,7 @@ import { deriveEffectiveWeaponStats } from '../systems/tuning.js'
 import {
   addWeaponStackWithAutoFusion,
   equipWeaponStack,
+  formatWeaponStarLabel,
   getStackKey,
   getWeaponIdFromStackKey,
   parseWeaponStackKey,
@@ -1914,6 +1915,7 @@ export class ArenaScene extends Phaser.Scene {
 
 
 
+
   private freezeCombat(shouldFreeze: boolean): void {
     if (this.enemySpacingCollider) {
       this.enemySpacingCollider.active = !shouldFreeze
@@ -2416,7 +2418,7 @@ export class ArenaScene extends Phaser.Scene {
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel}`,
-        `무기: ${weapon.name} ${'★'.repeat(activeStar)} · ${getWeaponSummary(weapon)}`,
+        `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
@@ -2489,10 +2491,11 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
+
   private getActiveWeaponLabel(): string {
     const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
     const stack = this.weaponStacks.find((candidate) => getStackKey(candidate) === this.activeWeaponKey)
-    return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${'★'.repeat(stack.star)}` : ''}`
+    return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${formatWeaponStarLabel(stack.star)}` : ''}`
   }
 
   private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): void {
@@ -2612,10 +2615,10 @@ export class ArenaScene extends Phaser.Scene {
     )
     this.weaponStacks = fusionResult.weaponStacks
     this.activeWeaponKey = fusionResult.activeWeaponKey
-    const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${'★'.repeat(reward.star)}`
+    const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${formatWeaponStarLabel(reward.star)}`
     const lastFusion = fusionResult.fusions.at(-1)
     const fusionLabel = lastFusion
-      ? ` · 자동 합성: ${WEAPON_DEFINITIONS[lastFusion.weaponId].name} ${'★'.repeat(lastFusion.resultStar)}`
+      ? ` · 자동 합성: ${WEAPON_DEFINITIONS[lastFusion.weaponId].name} ${formatWeaponStarLabel(lastFusion.resultStar)}`
       : ''
     this.latestPachinkoReward = `${rewardLabel}${fusionLabel}`
     this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}${fusionLabel}`
@@ -2837,10 +2840,10 @@ export class ArenaScene extends Phaser.Scene {
         fontSize: '8px',
         fontStyle: '800',
       }).setOrigin(0.5).setDepth(63)
-      const starLabel = this.add.text(centerX, centerY + 18, '★'.repeat(reward.star), {
+      const starLabel = this.add.text(centerX, centerY + 18, formatWeaponStarLabel(reward.star), {
         color: '#ffd866',
         fontFamily: 'Inter, system-ui, sans-serif',
-        fontSize: reward.star >= 4 ? '7px' : '8px',
+        fontSize: '8px',
         fontStyle: '900',
       }).setOrigin(0.5).setDepth(63)
       this.pachinkoSlotVisuals.push({
@@ -2878,8 +2881,8 @@ export class ArenaScene extends Phaser.Scene {
         .setText(`${reward.slotIndex + 1}`)
       visual.starLabel
         .setPosition(centerX, centerY + 18)
-        .setText('★'.repeat(reward.star))
-        .setFontSize(reward.star >= 4 ? 7 : 8)
+        .setText(formatWeaponStarLabel(reward.star))
+        .setFontSize(8)
     }
   }
 

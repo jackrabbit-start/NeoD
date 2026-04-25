@@ -7,6 +7,7 @@ import type {
   WeaponStackKey,
 } from '../domain/types.js'
 import { getHudWeaponAssetPath } from '../game/visualManifest.js'
+import { formatWeaponStarLabel } from '../systems/weaponOwnership.js'
 
 export interface HudControllerHandlers {
   onInventoryToggle: () => void
@@ -359,7 +360,7 @@ export class HudController {
     const textGroup = document.createElement('span')
     textGroup.className = 'hud-modal__content'
     const title = document.createElement('strong')
-    const starText = weapon.star ? `${'★'.repeat(weapon.star)}${'☆'.repeat(Math.max(0, 5 - weapon.star))}` : ''
+    const starText = formatWeaponStarLabel(weapon.star)
     const countText = weapon.count != null ? ` × ${weapon.count}` : ''
     title.textContent = `${weapon.name}${starText ? ` · ${starText}` : ''}${countText}`
     const description = document.createElement('small')
