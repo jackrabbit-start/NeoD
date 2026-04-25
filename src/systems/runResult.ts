@@ -21,6 +21,27 @@ export interface RunResultPresentation {
   restartPrompt: string
 }
 
+export interface RunResultRestartKeyEvent {
+  code?: string
+  key?: string
+  keyCode?: number
+  which?: number
+  altKey?: boolean
+  ctrlKey?: boolean
+  metaKey?: boolean
+}
+
+export function isRunResultRestartKey(event: RunResultRestartKeyEvent): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey) {
+    return false
+  }
+
+  const key = event.key?.toLowerCase()
+  const legacyKeyCode = event.keyCode ?? event.which
+
+  return event.code === 'KeyR' || key === 'r' || legacyKeyCode === 82
+}
+
 export function createRunResultPresentation(payload: RunResultPayload): RunResultPresentation {
   const isWin = payload.outcome === 'win'
   const restartPrompt = 'R 키를 눌러 새 런을 시작하세요'
@@ -28,19 +49,19 @@ export function createRunResultPresentation(payload: RunResultPayload): RunResul
   return {
     title: isWin ? '런 클리어' : '런 실패',
     subtitle: isWin
-      ? '크라운 슬라임을 쓰러뜨렸습니다. 결과 화면이 정상적으로 표시되었습니다.'
-      : '런이 중간에 종료되었습니다. 조합과 회피 루트를 다시 점검해 보세요.',
+      ? '크라운 슬라임을 쓰러뜨리고 네온 아레나를 장악했습니다.'
+      : '런이 중단되었습니다. 조합 타이밍과 회피 루트를 재정비하세요.',
     backgroundColor: isWin ? '#171f3f' : '#2b1220',
     accentColor: isWin ? '#a6ffd0' : '#ff9db8',
-    status: isWin ? '보스 처치 확인 · 런 종료' : '플레이어 전투 불능 · 런 종료',
-    objective: isWin ? '클리어 완료. 결과를 확인한 뒤 재시작할 수 있습니다.' : '다시 도전해 보스 클리어를 노리세요.',
+    status: isWin ? '크라운 슬라임 격파 · 런 종료' : '전투 불능 · 런 종료',
+    objective: isWin ? '클리어 완료. 전리품 기록을 확인하고 다음 런을 준비하세요.' : '장비를 다시 정비해 보스 클리어에 다시 도전하세요.',
     statLines: [
       `결과: ${isWin ? '클리어' : '실패'}`,
       `최종 무기: ${payload.weaponName}`,
       `돌파 웨이브: ${payload.wavesCleared}`,
     ],
-    inventoryLines: [isWin ? '보스 처치 보상 연출은 아직 추가하지 않습니다.' : '새 보상 없이 현재 런을 종료합니다.'],
-    recipeLines: ['새 해금/보상 없이 기존 조합 루프를 유지합니다.'],
+    inventoryLines: [isWin ? '크라운 슬라임의 잔광이 아레나에 남았습니다.' : '이번 런의 기록을 정리합니다.'],
+    recipeLines: ['조합 루트를 확인하고 다음 진입을 준비하세요.'],
     restartPrompt,
   }
 }

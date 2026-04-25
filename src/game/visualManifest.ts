@@ -91,6 +91,20 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     fallback: { radius: 12, color: 0x75c7ff },
   },
   {
+    key: 'needle-wasp',
+    path: 'assets/units/needle-wasp-idle-0.svg',
+    width: 32,
+    height: 28,
+    fallback: { radius: 12, color: 0xffb15c },
+  },
+  {
+    key: 'needle-wasp-idle-1',
+    path: 'assets/units/needle-wasp-idle-1.svg',
+    width: 32,
+    height: 28,
+    fallback: { radius: 12, color: 0xffb15c },
+  },
+  {
     key: 'slime-boss',
     path: 'assets/units/slime-boss-idle-0.svg',
     width: 56,
@@ -154,6 +168,13 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     fallback: { radius: 6, color: 0xc4f1ff },
   },
   {
+    key: 'needle-projectile',
+    path: 'assets/projectiles/needle-projectile.svg',
+    width: 24,
+    height: 8,
+    fallback: { radius: 5, color: 0xffb15c },
+  },
+  {
     key: 'gel-shard',
     path: 'assets/loot/gel-shard.svg',
     width: 22,
@@ -194,6 +215,13 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     width: 22,
     height: 22,
     fallback: { radius: 10, color: 0xff9df3 },
+  },
+  {
+    key: 'chitin-needle',
+    path: 'assets/loot/chitin-needle.svg',
+    width: 22,
+    height: 22,
+    fallback: { radius: 10, color: 0xffb15c },
   },
   {
     key: 'heart-pickup',
@@ -256,6 +284,12 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     width: 96,
     height: 96,
   },
+  {
+    key: 'weapon-needle-fan',
+    path: getHudWeaponAssetPath('weapon-needle-fan'),
+    width: 96,
+    height: 96,
+  },
 ]
 
 export const IDLE_ANIMATIONS: AnimationDefinition[] = [
@@ -265,5 +299,6 @@ export const IDLE_ANIMATIONS: AnimationDefinition[] = [
   { key: 'spark-slime-idle', frames: ['spark-slime', 'spark-slime-idle-1'], frameRate: 4 },
   { key: 'dash-slime-idle', frames: ['dash-slime', 'dash-slime-idle-1'], frameRate: 7 },
   { key: 'orbit-slime-idle', frames: ['orbit-slime', 'orbit-slime-idle-1'], frameRate: 5 },
+  { key: 'needle-wasp-idle', frames: ['needle-wasp', 'needle-wasp-idle-1'], frameRate: 7 },
   { key: 'slime-boss-idle', frames: ['slime-boss', 'slime-boss-idle-1'], frameRate: 2 },
 ]

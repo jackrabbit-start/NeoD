@@ -24,14 +24,22 @@ import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
 import {
   advanceEnemyCooldown,
+  createEnemySpreadBurstProjectiles,
   createEnemyRuntimeState,
   createEnemyTelegraph,
   getDistanceBetween,
   isPointInsideCircle,
   resolveEnemyVelocityStep,
+  shouldEnemyStartSpreadBurst,
   shouldEnemyStartTelegraph,
   type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
+import {
+  advanceEnemyProjectileState,
+  createEnemyProjectileState,
+  type EnemyProjectileSpawnSpec,
+  type EnemyProjectileState,
+} from '../systems/enemyProjectiles.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import {
   getLootAttractionStep,
@@ -153,6 +161,13 @@ interface EnemyTelegraph {
   totalMs: number
 }
 
+interface EnemySpreadBurstCharge {
+  visual: Phaser.GameObjects.Graphics
+  projectiles: EnemyProjectileSpawnSpec[]
+  remainingMs: number
+  totalMs: number
+}
+
 interface EnemyEntity {
   runtimeId: number
   sprite: PhysicsSprite
@@ -164,6 +179,7 @@ interface EnemyEntity {
   attackCooldownMs: number
   knockback?: KnockbackState
   telegraph?: EnemyTelegraph
+  spreadBurst?: EnemySpreadBurstCharge
 }
 
 interface LootEntity {
@@ -194,6 +210,10 @@ interface ProjectileEntity {
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
+}
+
+interface EnemyProjectileEntity extends EnemyProjectileState {
+  sprite: PhysicsImage
 }
 
 interface HazardZoneEntity {
@@ -248,6 +268,8 @@ export class ArenaScene extends Phaser.Scene {
   private nextHeartPickupAt = 0
 
   private projectiles: ProjectileEntity[] = []
+
+  private enemyProjectiles: EnemyProjectileEntity[] = []
 
   private hazardZones: HazardZoneEntity[] = []
 
@@ -346,7 +368,7 @@ export class ArenaScene extends Phaser.Scene {
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
-      throw new Error('NeoD 프로토타입에는 키보드 입력이 필요합니다.')
+      throw new Error('NeoD에는 키보드 입력이 필요합니다.')
     }
 
     this.cursors = keyboard.addKeys({
@@ -380,6 +402,11 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.updateProjectiles(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
+    this.updateEnemyProjectiles(delta)
     if (this.isRunEnding) {
       return
     }
@@ -690,6 +717,33 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
+      if (enemy.spreadBurst) {
+        enemy.knockback = clearKnockbackForTelegraph()
+        enemy.spreadBurst.remainingMs -= delta
+        enemy.spreadBurst.visual.setAlpha(
+          Math.max(0.2, 0.86 * (1 - enemy.spreadBurst.remainingMs / enemy.spreadBurst.totalMs)),
+        )
+
+        if (enemy.spreadBurst.remainingMs <= 0) {
+          for (const projectileSpec of enemy.spreadBurst.projectiles) {
+            this.spawnEnemyProjectile(
+              { x: enemy.sprite.x, y: enemy.sprite.y },
+              projectileSpec,
+            )
+          }
+
+          enemy.spreadBurst.visual.destroy()
+          enemy.spreadBurst = undefined
+          if (enemy.config.attackBehavior.kind === 'spread-burst') {
+            enemy.attackCooldownMs = enemy.config.attackBehavior.cooldownMs
+          }
+        }
+
+        enemy.sprite.setVelocity(0, 0)
+        this.syncEnemyHealthBar(enemy)
+        continue
+      }
+
       const distanceToPlayer = getDistanceBetween(
         { x: enemy.sprite.x, y: enemy.sprite.y },
         { x: this.player.x, y: this.player.y },
@@ -722,6 +776,35 @@ export class ArenaScene extends Phaser.Scene {
             damage: telegraphSpec.damage,
             remainingMs: telegraphSpec.durationMs,
             totalMs: telegraphSpec.durationMs,
+          }
+          enemy.knockback = clearKnockbackForTelegraph()
+          enemy.sprite.setVelocity(0, 0)
+          this.syncEnemyHealthBar(enemy)
+          continue
+        }
+      }
+
+      const attackBehavior = enemy.config.attackBehavior
+      if (
+        attackBehavior.kind === 'spread-burst' &&
+        shouldEnemyStartSpreadBurst(
+          attackBehavior,
+          distanceToPlayer,
+          enemy.attackCooldownMs,
+        )
+      ) {
+        const projectiles = createEnemySpreadBurstProjectiles(
+          { x: enemy.sprite.x, y: enemy.sprite.y },
+          { x: this.player.x, y: this.player.y },
+          attackBehavior,
+        )
+
+        if (projectiles.length > 0) {
+          enemy.spreadBurst = {
+            visual: this.createSpreadBurstWarning(enemy, projectiles),
+            projectiles,
+            remainingMs: attackBehavior.windupMs,
+            totalMs: attackBehavior.windupMs,
           }
           enemy.knockback = clearKnockbackForTelegraph()
           enemy.sprite.setVelocity(0, 0)
@@ -832,7 +915,93 @@ export class ArenaScene extends Phaser.Scene {
         }
       }
     }
+  }
 
+  private createSpreadBurstWarning(
+    enemy: EnemyEntity,
+    projectiles: EnemyProjectileSpawnSpec[],
+  ): Phaser.GameObjects.Graphics {
+    const behavior = enemy.config.attackBehavior
+    const range =
+      behavior.kind === 'spread-burst'
+        ? Math.min(
+            behavior.range,
+            behavior.projectileSpeed * (behavior.projectileLifetimeMs / 1000),
+          )
+        : 140
+    const visual = this.add.graphics().setDepth(0.65)
+    visual.lineStyle(2, enemy.config.tint, 0.82)
+
+    for (const projectile of projectiles) {
+      visual.lineBetween(
+        enemy.sprite.x,
+        enemy.sprite.y,
+        enemy.sprite.x + projectile.direction.x * range,
+        enemy.sprite.y + projectile.direction.y * range,
+      )
+    }
+
+    visual.fillStyle(enemy.config.tint, 0.12)
+    visual.fillCircle(enemy.sprite.x, enemy.sprite.y, enemy.config.size * 0.62)
+    visual.setAlpha(0.28)
+    return visual
+  }
+
+  private updateEnemyProjectiles(delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    for (const projectile of this.enemyProjectiles) {
+      if (!projectile.sprite.active) {
+        continue
+      }
+
+      const step = advanceEnemyProjectileState(
+        projectile,
+        delta,
+        { width: GAME_WIDTH, height: GAME_HEIGHT },
+        { x: this.player.x, y: this.player.y, radius: PLAYER_COLLISION_RADIUS },
+      )
+
+      projectile.x = step.projectile.x
+      projectile.y = step.projectile.y
+      projectile.remainingLifetimeMs = step.projectile.remainingLifetimeMs
+      projectile.sprite.setPosition(projectile.x, projectile.y)
+
+      if (step.hitPlayer) {
+        this.damagePlayer(projectile.damage)
+        this.destroyEnemyProjectile(projectile)
+        if (this.isRunEnding) {
+          return
+        }
+        continue
+      }
+
+      if (step.destroyed) {
+        this.destroyEnemyProjectile(projectile)
+      }
+    }
+  }
+
+  private spawnEnemyProjectile(origin: { x: number; y: number }, spec: EnemyProjectileSpawnSpec): void {
+    const projectileState = createEnemyProjectileState(origin, spec)
+    const projectile = this.physics.add.image(origin.x, origin.y, spec.textureKey)
+    projectile.setTint(spec.tint)
+    projectile.setCircle(spec.radius)
+    projectile.setDepth(4)
+    projectile.setRotation(Math.atan2(spec.direction.y, spec.direction.x))
+
+    this.enemyProjectiles.push({
+      ...projectileState,
+      sprite: projectile,
+    })
+  }
+
+  private destroyEnemyProjectile(projectile: EnemyProjectileEntity): void {
+    if (projectile.sprite.active) {
+      projectile.sprite.destroy()
+    }
   }
 
   private updateLootDrops(delta: number): void {
@@ -1181,6 +1350,7 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.healthPickups = this.healthPickups.filter((pickup) => pickup.sprite.active)
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
+    this.enemyProjectiles = this.enemyProjectiles.filter((projectile) => projectile.sprite.active)
     this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
   }
 
@@ -1240,10 +1410,9 @@ export class ArenaScene extends Phaser.Scene {
       currentHealth: config.maxHealth,
       healthBar: this.createEnemyHealthBar(sprite, config),
       lastHitAt: 0,
-      attackCooldownMs:
-        config.attackBehavior.kind === 'telegraphed-aoe'
-          ? Math.round(config.attackBehavior.cooldownMs * 0.35)
-          : 0,
+      attackCooldownMs: 'cooldownMs' in config.attackBehavior
+        ? Math.round(config.attackBehavior.cooldownMs * 0.35)
+        : 0,
     }
 
     this.nextEnemyRuntimeId += 1
@@ -1288,6 +1457,10 @@ export class ArenaScene extends Phaser.Scene {
     if (enemy.telegraph?.visual.active) {
       enemy.telegraph.visual.destroy()
       enemy.telegraph = undefined
+    }
+    if (enemy.spreadBurst?.visual.active) {
+      enemy.spreadBurst.visual.destroy()
+      enemy.spreadBurst = undefined
     }
     enemy.knockback = undefined
     this.destroyEnemyHealthBar(enemy)
@@ -1684,6 +1857,9 @@ export class ArenaScene extends Phaser.Scene {
       if (enemy.telegraph?.visual.active) {
         enemy.telegraph.visual.destroy()
       }
+      if (enemy.spreadBurst?.visual.active) {
+        enemy.spreadBurst.visual.destroy()
+      }
       this.destroyEnemyHealthBar(enemy)
       if (enemy.sprite.active) {
         enemy.sprite.destroy()
@@ -1699,6 +1875,12 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const projectile of this.projectiles) {
+      if (projectile.sprite.active) {
+        projectile.sprite.destroy()
+      }
+    }
+
+    for (const projectile of this.enemyProjectiles) {
       if (projectile.sprite.active) {
         projectile.sprite.destroy()
       }
@@ -1724,6 +1906,7 @@ export class ArenaScene extends Phaser.Scene {
     this.lootDrops = []
     this.healthPickups = []
     this.projectiles = []
+    this.enemyProjectiles = []
     this.hazardZones = []
     this.mapVisuals = []
   }
@@ -1760,8 +1943,8 @@ export class ArenaScene extends Phaser.Scene {
     const tuningText = weapon.tuningLabel ? ` · ${weapon.tuningLabel}` : ''
 
     this.hud.update({
-      title: 'NeoD 프로토타입',
-      subtitle: this.activeWaveLabel || '아레나 준비 중',
+      title: 'NeoD',
+      subtitle: this.activeWaveLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `무기: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
@@ -1771,8 +1954,8 @@ export class ArenaScene extends Phaser.Scene {
       inventory: describeInventoryEntries(this.inventory),
       recipes: describeAvailableRecipes(actionableRecipes),
       objective: this.isBossActive
-        ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
-        : '웨이브를 버티고 드롭을 모아 인벤토리에서 업그레이드를 조합하세요.',
+        ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
+        : '웨이브를 돌파하며 드롭을 모아 새로운 무기를 완성하세요.',
       tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',

@@ -22,9 +22,10 @@ export const WAVE_DEFINITIONS: WaveDefinition[] = [
     id: 'wave-3',
     label: '3 웨이브',
     entries: [
-      { enemyId: 'spark-slime', count: 12 },
-      { enemyId: 'orbit-slime', count: 9 },
-      { enemyId: 'dash-slime', count: 6 },
+      { enemyId: 'spark-slime', count: 11 },
+      { enemyId: 'orbit-slime', count: 8 },
+      { enemyId: 'needle-wasp', count: 3 },
+      { enemyId: 'dash-slime', count: 5 },
     ],
     spawnIntervalMs: 560,
     burstSize: 4,

@@ -5,6 +5,7 @@ export const LOOT_IDS = [
   'spark-knot',
   'mist-bead',
   'tuning-capsule',
+  'chitin-needle',
 ] as const
 
 export type LootId = (typeof LOOT_IDS)[number]
@@ -19,6 +20,7 @@ export const WEAPON_IDS = [
   'mist-vortex',
   'slime-glaive',
   'prism-cutter',
+  'needle-fan',
 ] as const
 
 export type WeaponId = (typeof WEAPON_IDS)[number]
@@ -32,6 +34,7 @@ export const RECIPE_IDS = [
   'mist-vortex-recipe',
   'slime-glaive-recipe',
   'prism-cutter-recipe',
+  'needle-fan-recipe',
 ] as const
 
 export type RecipeId = (typeof RECIPE_IDS)[number]
@@ -42,6 +45,7 @@ export const ENEMY_IDS = [
   'prism-slime',
   'dash-slime',
   'orbit-slime',
+  'needle-wasp',
   'slime-boss',
 ] as const
 

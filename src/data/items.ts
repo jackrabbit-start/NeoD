@@ -43,4 +43,11 @@ export const ITEM_DEFINITIONS = {
     color: 0xff9df3,
     textureKey: 'tuning-capsule',
   },
+  'chitin-needle': {
+    id: 'chitin-needle',
+    name: '키틴 바늘',
+    description: '벌레 사수의 날개 마디에서 떨어진 가볍고 날카로운 조각입니다.',
+    color: 0xffb15c,
+    textureKey: 'chitin-needle',
+  },
 } as const satisfies Record<LootId, ItemDefinition>

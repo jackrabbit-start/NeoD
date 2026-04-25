@@ -73,4 +73,13 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
     identityHint: '안개 굴절과 산성 날을 압축해 좁고 빠른 전방 베기를 만드는 분기입니다.',
     note: '부식성 코어를 안개 렌즈로 얇게 접어 빠른 근접 절단 무기를 만듭니다.',
   },
+  {
+    id: 'needle-fan-recipe',
+    name: '니들 팬',
+    inputs: ['chitin-needle', 'spark-knot'],
+    outputWeaponId: 'needle-fan',
+    identityLabel: '산탄 견제',
+    identityHint: '키틴 바늘을 전하 추진으로 흩뿌려 얇은 부채꼴 압박을 만드는 분기입니다.',
+    note: '벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.',
+  },
 ]

@@ -13,8 +13,8 @@ NeoD is a browser-first prototype for a safe fictional top-down action game wher
 
 ## Current V1 Direction
 
-- Core loop: move, fight slimes, collect drops, combine items into stronger weapons, clear waves, defeat a boss
-- Scope: one arena, slime-family waves, one boss, placeholder-safe art and naming
+- Core loop: move, fight enemies, collect drops, combine items into stronger weapons, clear waves, defeat a boss
+- Scope: one arena, slime-family waves plus a scoped non-slime insect-spitter enemy, one boss, placeholder-safe art and naming
 - Planning baseline:
   - `docs/wiki/game-requirements.md`
   - `.omx/plans/prd-safe-topdown-combine-action-game-v1.md`
