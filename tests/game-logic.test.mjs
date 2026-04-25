@@ -7,6 +7,14 @@ import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
 import {
+  describeAvailableRecipes,
+  describeInventoryEntries,
+} from '../.tmp-test/src/scenes/arena/combineInventoryPresenter.js'
+import {
+  applyLootPickup,
+  applyRecipeSelectionWorkflow,
+} from '../.tmp-test/src/scenes/arena/combineInventoryWorkflow.js'
+import {
   applyRecipeSelection,
   equipOwnedWeapon,
   getActionableRecipes,
@@ -60,6 +68,72 @@ test('new arc recipe resolves from the new sample drops', () => {
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
+})
+
+test('loot pickup workflow updates inventory and reports the pickup message', () => {
+  const result = applyLootPickup({}, 'gel-shard')
+
+  assert.deepEqual(result, {
+    nextInventory: { 'gel-shard': 1 },
+    statusMessage: 'Collected Gel Shard.',
+  })
+})
+
+test('recipe selection workflow reports the current not-actionable status message', () => {
+  const result = applyRecipeSelectionWorkflow(
+    {
+      inventory: {},
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'acid-sprayer-recipe',
+  )
+
+  assert.deepEqual(result, {
+    kind: 'not-actionable',
+    statusMessage: 'That combine is no longer actionable. Choose another option.',
+  })
+})
+
+test('recipe selection workflow returns the equipped upgrade state on success', () => {
+  const result = applyRecipeSelectionWorkflow(
+    {
+      inventory: {
+        'gel-shard': 1,
+        'acid-core': 1,
+      },
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'acid-sprayer-recipe',
+  )
+
+  assert.deepEqual(result, {
+    kind: 'success',
+    nextInventory: {},
+    ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
+    activeWeaponId: 'acid-sprayer',
+    statusMessage: 'Acid Sprayer crafted and equipped. Resume the run when ready.',
+  })
+})
+
+test('inventory presenter mirrors the arena summary strings', () => {
+  assert.deepEqual(describeInventoryEntries({}), ['No drops collected yet.'])
+  assert.deepEqual(describeInventoryEntries({ 'gel-shard': 2 }), ['Gel Shard × 2'])
+})
+
+test('recipe presenter mirrors the actionable combine summary strings', () => {
+  assert.deepEqual(describeAvailableRecipes([]), ['No actionable combine yet.'])
+
+  const recipes = getActionableRecipes(
+    {
+      'gel-shard': 1,
+      'acid-core': 1,
+    },
+    ['starter-blaster'],
+  )
+
+  assert.deepEqual(describeAvailableRecipes(recipes), [
+    'Acid Sprayer → 20 dmg · 4 shots/s · Acid spray (Turns stable slime matter into corrosive firepower.)',
+  ])
 })
 
 test('actionable recipes exclude outputs that are already owned', () => {
