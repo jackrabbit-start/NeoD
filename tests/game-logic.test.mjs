@@ -99,6 +99,7 @@ import {
 import {
   createRunResultHudState,
   createRunResultPresentation,
+  isRunResultRestartKey,
 } from '../.tmp-test/src/systems/runResult.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
@@ -921,6 +922,15 @@ test('loss result presentation keeps restart guidance distinct from boss clear',
   assert.match(presentation.statLines[0] ?? '', /실패/)
   assert.match(presentation.objective, /다시 도전/)
   assert.match(presentation.restartPrompt, /새 런/)
+})
+
+test('result restart key accepts physical R even when IME changes the produced key', () => {
+  assert.equal(isRunResultRestartKey({ code: 'KeyR', key: 'ㄱ', keyCode: 229 }), true)
+  assert.equal(isRunResultRestartKey({ key: 'r' }), true)
+  assert.equal(isRunResultRestartKey({ keyCode: 82 }), true)
+  assert.equal(isRunResultRestartKey({ which: 82 }), true)
+  assert.equal(isRunResultRestartKey({ code: 'KeyE', key: 'ㄷ', keyCode: 229 }), false)
+  assert.equal(isRunResultRestartKey({ code: 'KeyR', key: 'r', metaKey: true }), false)
 })
 
 test('elite wave appears before the boss wave', () => {

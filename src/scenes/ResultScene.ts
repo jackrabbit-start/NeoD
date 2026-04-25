@@ -3,6 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import {
   createRunResultHudState,
   createRunResultPresentation,
+  isRunResultRestartKey,
   type RunResultPayload,
 } from '../systems/runResult.js'
 import type { HudController } from '../ui/Hud.js'
@@ -79,8 +80,24 @@ export class ResultScene extends Phaser.Scene {
       )
       .setOrigin(0.5)
 
-    this.input.keyboard?.once('keydown-R', () => {
+    const keyboard = this.input.keyboard
+    if (!keyboard) {
+      return
+    }
+
+    const handleRestartKey = (event: KeyboardEvent): void => {
+      if (!isRunResultRestartKey(event)) {
+        return
+      }
+
+      event.preventDefault()
+      keyboard.off(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, handleRestartKey)
       this.scene.start('arena')
+    }
+
+    keyboard.on(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, handleRestartKey)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      keyboard.off(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, handleRestartKey)
     })
   }
 }

@@ -21,6 +21,27 @@ export interface RunResultPresentation {
   restartPrompt: string
 }
 
+export interface RunResultRestartKeyEvent {
+  code?: string
+  key?: string
+  keyCode?: number
+  which?: number
+  altKey?: boolean
+  ctrlKey?: boolean
+  metaKey?: boolean
+}
+
+export function isRunResultRestartKey(event: RunResultRestartKeyEvent): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey) {
+    return false
+  }
+
+  const key = event.key?.toLowerCase()
+  const legacyKeyCode = event.keyCode ?? event.which
+
+  return event.code === 'KeyR' || key === 'r' || legacyKeyCode === 82
+}
+
 export function createRunResultPresentation(payload: RunResultPayload): RunResultPresentation {
   const isWin = payload.outcome === 'win'
   const restartPrompt = 'R 키를 눌러 새 런을 시작하세요'
