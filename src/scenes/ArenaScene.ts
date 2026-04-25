@@ -86,6 +86,7 @@ import {
   getPassiveIncomingDamageMultiplier,
   getPassiveCardChoices,
   getPassivePachinkoActiveWeaponWeightMultiplier,
+  getPassivePachinkoNonActiveWeaponWeightMultiplier,
   getPassiveHeartHealMultiplier,
   getPassiveLootPickupTuning,
   getPassiveSummaryLines,
@@ -505,6 +506,8 @@ export class ArenaScene extends Phaser.Scene {
   private latestPachinkoReward: string | null = null
 
   private pachinkoRewardTableSeed = 0
+
+  private pachinkoDisplayedOddsSeed = -1
 
   private pachinkoPins?: Phaser.Physics.Arcade.StaticGroup
 
@@ -2747,6 +2750,7 @@ export class ArenaScene extends Phaser.Scene {
     this.pachinkoTokenXp = initialState.pachinkoTokenXp
     this.latestPachinkoReward = null
     this.pachinkoRewardTableSeed = 0
+    this.pachinkoDisplayedOddsSeed = -1
   }
 
   private destroyRunEntities(): void {
@@ -2867,6 +2871,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private getPachinkoActiveWeaponWeightMultiplier(): number {
     return getPassivePachinkoActiveWeaponWeightMultiplier(this.passiveState)
+  }
+
+  private getPachinkoNonActiveWeaponWeightMultiplier(): number {
+    return getPassivePachinkoNonActiveWeaponWeightMultiplier(this.passiveState)
   }
 
   private updateHud(): void {
@@ -3105,7 +3113,12 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    this.pachinkoRewardTableSeed = getPachinkoRewardTableSeed(this.time.now)
+    const nextSeed = getPachinkoRewardTableSeed(this.time.now)
+    const didRefreshTable = nextSeed !== this.pachinkoRewardTableSeed
+    this.pachinkoRewardTableSeed = nextSeed
+    if (didRefreshTable) {
+      this.pachinkoDisplayedOddsSeed = nextSeed
+    }
     const rect = this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
 
@@ -3198,6 +3211,7 @@ export class ArenaScene extends Phaser.Scene {
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )
     const fusionResult = addWeaponStackWithAutoFusion(
       { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
@@ -3437,10 +3451,11 @@ export class ArenaScene extends Phaser.Scene {
     const rows = getPachinkoWeaponOddsRows(
       this.pachinkoTokenXp,
       PACHINKO_SLOT_COUNT,
-      this.pachinkoRewardTableSeed,
+      Math.max(0, this.pachinkoDisplayedOddsSeed),
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )
 
     for (let index = 0; index < rows.length; index += 1) {
@@ -3466,10 +3481,11 @@ export class ArenaScene extends Phaser.Scene {
     const rows = getPachinkoWeaponOddsRows(
       this.pachinkoTokenXp,
       PACHINKO_SLOT_COUNT,
-      this.pachinkoRewardTableSeed,
+      Math.max(0, this.pachinkoDisplayedOddsSeed),
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )
 
     for (let index = 0; index < this.pachinkoOddsVisuals.length; index += 1) {
@@ -3493,6 +3509,7 @@ export class ArenaScene extends Phaser.Scene {
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )) {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
@@ -3540,6 +3557,7 @@ export class ArenaScene extends Phaser.Scene {
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )
     for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
       const visual = this.pachinkoSlotVisuals[index]

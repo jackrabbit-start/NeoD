@@ -18,6 +18,7 @@ interface PassiveEffects {
   bossDamageMultiplier?: number
   normalEnemyDamageMultiplier?: number
   pachinkoActiveWeaponWeightMultiplier?: number
+  pachinkoNonActiveWeaponWeightMultiplier?: number
   lootAttractionRadiusMultiplier?: number
   lootCollectRadiusMultiplier?: number
   lootAttractionSpeedMultiplier?: number
@@ -336,6 +337,36 @@ const PASSIVE_CARD_TEMPLATES = [
     },
   },
   {
+    id: 'loaded-reel',
+    name: '로드드 릴',
+    description: '현재 장착 무기 계열이 파친코 배정표에 더 자주 올라옵니다.',
+    preferredFamilies: ['starter', 'rapid', 'precision', 'heavy'],
+    weight: { base: 0.86, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.48 },
+    roll(level, random) {
+      const [min, max] = createLevelScaledPercentRange(0.14, 0.28, level, 0.01, 0.46)
+      const result = rollNumber(random, min, max, 2)
+      return {
+        effects: { pachinkoActiveWeaponWeightMultiplier: 1 + result.value },
+        quality: result.quality,
+      }
+    },
+  },
+  {
+    id: 'wide-catalog',
+    name: '와이드 카탈로그',
+    description: '비활성 무기들도 더 자주 배정되어 보상풀이 넓어집니다.',
+    preferredFamilies: ['chain', 'zone', 'spray'],
+    weight: { base: 0.8, levelScale: 0.018, repeatPenalty: 0.44, familyBonus: 0.42 },
+    roll(level, random) {
+      const [min, max] = createLevelScaledPercentRange(0.1, 0.22, level, 0.008, 0.36)
+      const result = rollNumber(random, min, max, 2)
+      return {
+        effects: { pachinkoNonActiveWeaponWeightMultiplier: 1 + result.value },
+        quality: result.quality,
+      }
+    },
+  },
+  {
     id: 'lane-reading',
     name: '레인 리딩',
     description: '파친코 흐름을 읽듯 장거리 화력과 투사체 제어가 좋아집니다.',
@@ -594,6 +625,7 @@ export interface PassiveTotals {
   bossDamageMultiplier: number
   normalEnemyDamageMultiplier: number
   pachinkoActiveWeaponWeightMultiplier: number
+  pachinkoNonActiveWeaponWeightMultiplier: number
   lootAttractionRadiusMultiplier: number
   lootCollectRadiusMultiplier: number
   lootAttractionSpeedMultiplier: number
@@ -673,6 +705,9 @@ function formatEffectSummary(effects: PassiveEffects): string {
   if (effects.pachinkoActiveWeaponWeightMultiplier !== undefined && effects.pachinkoActiveWeaponWeightMultiplier > 1) {
     lines.push(`활성 무기 확률 +${roundPercent(effects.pachinkoActiveWeaponWeightMultiplier - 1)}%`)
   }
+  if (effects.pachinkoNonActiveWeaponWeightMultiplier !== undefined && effects.pachinkoNonActiveWeaponWeightMultiplier > 1) {
+    lines.push(`다른 무기 확률 +${roundPercent(effects.pachinkoNonActiveWeaponWeightMultiplier - 1)}%`)
+  }
   if (effects.lootAttractionRadiusMultiplier !== undefined && effects.lootAttractionRadiusMultiplier > 1) {
     lines.push(`흡입 범위 +${roundPercent(effects.lootAttractionRadiusMultiplier - 1)}%`)
   }
@@ -707,6 +742,8 @@ function mergeEffects(existing: PassiveEffects = {}, next: PassiveEffects): Pass
     normalEnemyDamageMultiplier: (existing.normalEnemyDamageMultiplier ?? 1) * (next.normalEnemyDamageMultiplier ?? 1),
     pachinkoActiveWeaponWeightMultiplier:
       (existing.pachinkoActiveWeaponWeightMultiplier ?? 1) * (next.pachinkoActiveWeaponWeightMultiplier ?? 1),
+    pachinkoNonActiveWeaponWeightMultiplier:
+      (existing.pachinkoNonActiveWeaponWeightMultiplier ?? 1) * (next.pachinkoNonActiveWeaponWeightMultiplier ?? 1),
     lootAttractionRadiusMultiplier:
       (existing.lootAttractionRadiusMultiplier ?? 1) * (next.lootAttractionRadiusMultiplier ?? 1),
     lootCollectRadiusMultiplier:
@@ -836,6 +873,7 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     bossDamageMultiplier: 1,
     normalEnemyDamageMultiplier: 1,
     pachinkoActiveWeaponWeightMultiplier: 1,
+    pachinkoNonActiveWeaponWeightMultiplier: 1,
     lootAttractionRadiusMultiplier: 1,
     lootCollectRadiusMultiplier: 1,
     lootAttractionSpeedMultiplier: 1,
@@ -863,6 +901,7 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     totals.bossDamageMultiplier *= effects.bossDamageMultiplier ?? 1
     totals.normalEnemyDamageMultiplier *= effects.normalEnemyDamageMultiplier ?? 1
     totals.pachinkoActiveWeaponWeightMultiplier *= effects.pachinkoActiveWeaponWeightMultiplier ?? 1
+    totals.pachinkoNonActiveWeaponWeightMultiplier *= effects.pachinkoNonActiveWeaponWeightMultiplier ?? 1
     totals.lootAttractionRadiusMultiplier *= effects.lootAttractionRadiusMultiplier ?? 1
     totals.lootCollectRadiusMultiplier *= effects.lootCollectRadiusMultiplier ?? 1
     totals.lootAttractionSpeedMultiplier *= effects.lootAttractionSpeedMultiplier ?? 1
@@ -952,6 +991,10 @@ export function getPassiveEnemyDamageMultiplier(isBossEnemy: boolean, state: Pas
 
 export function getPassivePachinkoActiveWeaponWeightMultiplier(state: PassiveState = {}): number {
   return getPassiveTotals(state).pachinkoActiveWeaponWeightMultiplier
+}
+
+export function getPassivePachinkoNonActiveWeaponWeightMultiplier(state: PassiveState = {}): number {
+  return getPassiveTotals(state).pachinkoNonActiveWeaponWeightMultiplier
 }
 
 export function getPassiveLootPickupTuning(state: PassiveState = {}) {

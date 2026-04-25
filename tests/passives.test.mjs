@@ -10,6 +10,8 @@ import {
   getPassiveCardChoices,
   getPassiveEnemyDamageMultiplier,
   getPassiveIncomingDamageMultiplier,
+  getPassivePachinkoActiveWeaponWeightMultiplier,
+  getPassivePachinkoNonActiveWeaponWeightMultiplier,
   getPassiveSummaryLines,
   getPassiveTokenXpMultiplier,
   resolveCriticalHit,
@@ -121,23 +123,31 @@ test('pickup utility cards expose attraction, collect, speed, and heal scaling',
 
 test('new pachinko and enemy cards expose varied utility modifiers', () => {
   const jackpot = createPassiveCardChoice('jackpot-fever', 12, createSequenceRandom([0.9]))
+  const loaded = createPassiveCardChoice('loaded-reel', 12, createSequenceRandom([0.8]))
+  const wide = createPassiveCardChoice('wide-catalog', 12, createSequenceRandom([0.7]))
   const shield = createPassiveCardChoice('panic-shield', 9, createSequenceRandom([0.75]))
   const boss = createPassiveCardChoice('guard-breaker', 15, createSequenceRandom([0.8]))
   const crowd = createPassiveCardChoice('crowd-reaper', 15, createSequenceRandom([0.6]))
 
   let state = {}
   state = addPassiveCard(state, jackpot)
+  state = addPassiveCard(state, loaded)
+  state = addPassiveCard(state, wide)
   state = addPassiveCard(state, shield)
   state = addPassiveCard(state, boss)
   state = addPassiveCard(state, crowd)
 
   assert.ok(getPassiveTokenXpMultiplier(state) > 1)
+  assert.ok(getPassivePachinkoActiveWeaponWeightMultiplier(state) > 1)
+  assert.ok(getPassivePachinkoNonActiveWeaponWeightMultiplier(state) > 1)
   assert.ok(getPassiveIncomingDamageMultiplier(state) < 1)
   assert.ok(getPassiveEnemyDamageMultiplier(true, state) > 1)
   assert.ok(getPassiveEnemyDamageMultiplier(false, state) > 1)
 
   const lines = getPassiveSummaryLines(state)
   assert.ok(lines.some((line) => /토큰 XP/.test(line)))
+  assert.ok(lines.some((line) => /활성 무기 확률/.test(line)))
+  assert.ok(lines.some((line) => /다른 무기 확률/.test(line)))
   assert.ok(lines.some((line) => /받는 피해/.test(line)))
   assert.ok(lines.some((line) => /보스 피해/.test(line)))
   assert.ok(lines.some((line) => /일반 적 피해/.test(line)))
