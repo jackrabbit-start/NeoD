@@ -107,7 +107,7 @@ import {
   isRunResultRestartKey,
 } from '../.tmp-test/src/systems/runResult.js'
 import { HudController } from '../.tmp-test/src/ui/Hud.js'
-import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP } from '../.tmp-test/src/ui/controlCopy.js'
+import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE } from '../.tmp-test/src/ui/controlCopy.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -914,7 +914,8 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
-test('title control hints stay aligned with playable keyboard shortcuts', () => {
+test('game title and title control hints stay aligned with playable keyboard shortcuts', () => {
+  assert.equal(GAME_TITLE, '김동성의 살아남기')
   assert.deepEqual([...GAME_HEADER_CONTROL_HINTS], ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'])
   assert.match(GAMEPLAY_CONTROL_TIP, /I 인벤토리/)
   assert.match(GAMEPLAY_CONTROL_TIP, /Q 코덱스/)

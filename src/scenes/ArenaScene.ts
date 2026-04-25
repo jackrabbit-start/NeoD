@@ -20,7 +20,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { CodexController } from '../ui/Codex.js'
 import type { HudController } from '../ui/Hud.js'
-import { GAMEPLAY_CONTROL_TIP } from '../ui/controlCopy.js'
+import { GAMEPLAY_CONTROL_TIP, GAME_TITLE } from '../ui/controlCopy.js'
 import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
 import {
@@ -2097,7 +2097,7 @@ export class ArenaScene extends Phaser.Scene {
     const tuningText = weapon.tuningLabel ? ` · ${weapon.tuningLabel}` : ''
 
     this.hud.update({
-      title: 'NeoD',
+      title: GAME_TITLE,
       subtitle: this.activeWaveLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,

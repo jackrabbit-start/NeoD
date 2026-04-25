@@ -3,7 +3,7 @@ import { createGameConfig } from './game/config.js'
 import './style.css'
 import { CodexController } from './ui/Codex.js'
 import { HudController } from './ui/Hud.js'
-import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP } from './ui/controlCopy.js'
+import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE } from './ui/controlCopy.js'
 
 const app = document.querySelector<HTMLDivElement>('#app')
 
@@ -18,7 +18,7 @@ app.innerHTML = `
     <header class="game-header">
       <div class="game-header__brand">
         <div class="game-header__title-row">
-          <strong>NeoD</strong>
+          <strong>${GAME_TITLE}</strong>
           <div class="game-header__controls" aria-label="조작 방법">
             ${headerControlMarkup}
           </div>
@@ -54,7 +54,7 @@ const hud = new HudController(hudElement)
 const codex = new CodexController(codexElement)
 
 hud.update({
-  title: 'NeoD',
+  title: GAME_TITLE,
   subtitle: '슬라임 아레나 진입 준비…',
   stats: ['게임 런타임 시작 중'],
   inventory: ['드롭 대기 중'],
