@@ -1167,8 +1167,9 @@ test('hud places enemy spawn odds beside the game title for visibility', () => {
 test('arena hud injects enemy spawn odds into the visible stats list', () => {
   const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
 
-  assert.ok(arenaSceneSource.includes('const enemyChanceSummary = enemyChanceLines.join'))
-  assert.ok(arenaSceneSource.includes('`적 출현 확률: ${enemyChanceSummary}`'))
+  assert.ok(arenaSceneSource.includes('const visibleEnemyChanceLines = enemyChanceLines.slice(0, 5)'))
+  assert.ok(arenaSceneSource.includes('`적 출현 확률 (${currentPhase.minuteIndex + 1}분차)`'))
+  assert.ok(arenaSceneSource.includes('...visibleEnemyChanceLines'))
   assert.ok(arenaSceneSource.includes('enemyOddsLabel'))
   assert.ok(arenaSceneSource.includes('syncEnemyOddsHudText(enemyChanceLines)'))
   assert.ok(arenaSceneSource.includes('적 출현 확률 · ${phase.minuteIndex + 1}분차'))
