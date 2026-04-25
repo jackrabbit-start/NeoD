@@ -49,6 +49,7 @@ These are the default requirements for the repo unless a later workflow explicit
 
 - Primary target: browser-first prototype
 - Default controls for V1: `keyboard + mouse`
+- Default player-facing UI language for V1: Korean
 - Desktop packaging is deferred until the core loop is proven
 
 ### Content Safety
@@ -133,6 +134,8 @@ The game must support this loop:
   - currently held loot/components
   - available or newly unlocked combine outcomes
   - health or failure-state feedback
+- Player-facing labels, combat prompts, status text, and run-result messaging should default to Korean in V1.
+- Internal ids, code symbols, and developer-facing documentation do not need to be localized unless a later prompt explicitly requires it.
 - Feedback can be debug-first in V1, but it must be readable
 
 ## V1 Vertical Slice Bounds

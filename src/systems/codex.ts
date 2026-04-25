@@ -5,14 +5,14 @@ import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import type { AvailableRecipe, CodexState, InventoryState, LootId } from '../domain/types.js'
 
 const formatWeaponSummary = (damage: number, fireRateMs: number) =>
-  `${damage} dmg · ${Math.round(1000 / fireRateMs)} shots/s`
+  `피해 ${damage} · 초당 ${Math.round(1000 / fireRateMs)}발`
 
 export function getCodexState(isOpen: boolean): CodexState {
   return {
     isOpen,
-    title: 'Field Codex',
-    subtitle: 'Shared data view · Q to close',
-    hint: 'Items, recipes, and slime notes all come from the live game definitions.',
+    title: '현장 코덱스',
+    subtitle: '공유 데이터 보기 · Q로 닫기',
+    hint: '아이템, 조합식, 슬라임 정보는 모두 현재 게임 데이터 정의를 그대로 반영합니다.',
     items: Object.values(ITEM_DEFINITIONS),
     recipes: RECIPE_DEFINITIONS.map((recipe) => {
       const weapon = WEAPON_DEFINITIONS[recipe.outputWeaponId]
@@ -42,9 +42,9 @@ export function getCodexState(isOpen: boolean): CodexState {
       description: enemy.description,
       tint: enemy.tint,
       stats: [
-        `HP ${enemy.maxHealth}`,
-        `SPD ${enemy.speed}`,
-        `DMG ${enemy.contactDamage}`,
+        `체력 ${enemy.maxHealth}`,
+        `속도 ${enemy.speed}`,
+        `피해 ${enemy.contactDamage}`,
       ],
       drops: (enemy.drops ?? []).map((drop) => {
         const item = ITEM_DEFINITIONS[drop.itemId]
@@ -62,7 +62,7 @@ export function describeInventoryEntries(inventory: InventoryState): string[] {
   const inventoryEntries = Object.entries(inventory) as [LootId, number][]
 
   if (inventoryEntries.length === 0) {
-    return ['No drops collected yet.']
+    return ['아직 획득한 드롭이 없습니다.']
   }
 
   return inventoryEntries.map(
@@ -72,10 +72,10 @@ export function describeInventoryEntries(inventory: InventoryState): string[] {
 
 export function describeAvailableRecipes(recipes: AvailableRecipe[]): string[] {
   if (recipes.length === 0) {
-    return ['No actionable combine yet.']
+    return ['지금 바로 가능한 조합이 없습니다.']
   }
 
   return recipes.map(
-    ({ recipe, weapon }) => `${recipe.name} → ${weapon.damage} dmg (${recipe.note})`,
+    ({ recipe, weapon }) => `${recipe.name} → 피해 ${weapon.damage} (${recipe.note})`,
   )
 }

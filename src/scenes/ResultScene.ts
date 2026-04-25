@@ -14,10 +14,10 @@ export class ResultScene extends Phaser.Scene {
 
   create(payload: ResultPayload): void {
     const isWin = payload.outcome === 'win'
-    const title = isWin ? 'Run Cleared' : 'Run Failed'
+    const title = isWin ? '런 클리어' : '런 실패'
     const subtitle = isWin
-      ? 'The slime boss collapsed. The prototype loop holds.'
-      : 'The run ended early. Retry and chase a stronger combine.'
+      ? '슬라임 보스를 쓰러뜨렸습니다. 프로토타입 루프가 성립합니다.'
+      : '런이 중간에 종료되었습니다. 다시 도전해 더 강한 조합을 노리세요.'
 
     this.cameras.main.setBackgroundColor(isWin ? '#1d1735' : '#2b1220')
 
@@ -42,7 +42,7 @@ export class ResultScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         292,
-        `Final weapon: ${payload.weaponName}\nWaves cleared: ${payload.wavesCleared}`,
+        `최종 무기: ${payload.weaponName}\n돌파 웨이브: ${payload.wavesCleared}`,
         {
           fontSize: '22px',
           color: '#b9c7ff',
@@ -55,7 +55,7 @@ export class ResultScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         GAME_HEIGHT - 120,
-        'Press R to restart the prototype run',
+        'R 키를 눌러 프로토타입 런을 다시 시작하세요',
         {
           fontSize: '20px',
           color: '#a6ffd0',

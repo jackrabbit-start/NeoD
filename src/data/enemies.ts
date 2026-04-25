@@ -3,8 +3,8 @@ import type { EnemyDefinition } from '../domain/types.js'
 export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> = {
   slime: {
     id: 'slime',
-    name: 'Murk Slime',
-    description: 'A baseline slime that sheds the core materials for early combines.',
+    name: '진흙 슬라임',
+    description: '초반 조합에 필요한 핵심 재료를 떨어뜨리는 기본 슬라임입니다.',
     maxHealth: 26,
     speed: 60,
     contactDamage: 8,
@@ -20,8 +20,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'spark-slime': {
     id: 'spark-slime',
-    name: 'Volt Slime',
-    description: 'A brighter slime strain that carries the materials for the new arc recipe.',
+    name: '볼트 슬라임',
+    description: '새로운 아크 조합 재료를 품고 있는 밝은 변종 슬라임입니다.',
     maxHealth: 34,
     speed: 72,
     contactDamage: 10,
@@ -37,8 +37,8 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'slime-boss': {
     id: 'slime-boss',
-    name: 'Crown Slime',
-    description: 'The oversized slime monarch that ends the run when defeated.',
+    name: '크라운 슬라임',
+    description: '쓰러뜨리면 런이 끝나는 거대한 슬라임 우두머리입니다.',
     maxHealth: 220,
     speed: 44,
     contactDamage: 16,
