@@ -6,7 +6,6 @@ import type {
   WeaponComboMeleeBehavior,
   WeaponDeployTurretBehavior,
   WeaponDistanceScalingDefinition,
-  WeaponAttributeDefinition,
   WeaponDefinition,
   WeaponExecuteDefinition,
   WeaponImpactAoeBehavior,
