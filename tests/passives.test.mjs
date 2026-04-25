@@ -169,6 +169,11 @@ test('duration, ricochet, summon, turret, and lifesteal card stats all feed weap
   const bloodReaver = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['slime-glaive'], state)
   assert.equal(bloodReaver.attackBehavior.kind, 'melee-cleave')
   assert.ok(bloodReaver.attackBehavior.healOnHit > WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.healOnHit)
+
+  const fistState = addPassiveCard({}, createPassiveCardChoice('prism-cutter-special', 12, createSequenceRandom([0.7, 0.6, 0.8]), 'prism-cutter'))
+  const fists = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['prism-cutter'], fistState)
+  assert.equal(fists.attackBehavior.kind, 'combo-melee')
+  assert.ok(fists.attackBehavior.steps[0].range > WEAPON_DEFINITIONS['prism-cutter'].attackBehavior.steps[0].range)
 })
 
 test('critical-hit resolution stays deterministic from rolled passive state', () => {

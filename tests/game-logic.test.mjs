@@ -564,7 +564,7 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
 })
 
 test('player progression starts per run and levels from token pickup xp', () => {
-  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 900, 2200, 4200, 7000])
+  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 700, 1800, 3400, 5600])
   assert.deepEqual(ENEMY_PLAYER_XP, {
     slime: 60,
     'spark-slime': 90,
@@ -591,27 +591,27 @@ test('player progression starts per run and levels from token pickup xp', () => 
   assert.equal(getPlayerXpForEnemy('prism-slime'), 180)
   assert.equal(getPlayerXpForEnemy('slime-boss'), 0)
   assert.equal(getPlayerLevelForXp(0), 1)
-  assert.equal(getPlayerLevelForXp(800), 1)
-  assert.equal(getPlayerLevelForXp(900), 2)
-  assert.equal(getPlayerLevelForXp(2200), 3)
-  assert.equal(getPlayerLevelForXp(7000), 5)
-  assert.equal(getPlayerLevelForXp(10300), 6)
-  assert.equal(getPlayerLevelForXp(99900), 30)
-  assert.equal(getPlayerLevelForXp(240000), 50)
-  assert.equal(getPlayerLevelForXp(340000), 60)
+  assert.equal(getPlayerLevelForXp(699), 1)
+  assert.equal(getPlayerLevelForXp(700), 2)
+  assert.equal(getPlayerLevelForXp(1800), 3)
+  assert.equal(getPlayerLevelForXp(5600), 5)
+  assert.equal(getPlayerLevelForXp(10300), 7)
+  assert.equal(getPlayerLevelForXp(99900), 35)
+  assert.equal(getPlayerLevelForXp(240000), 56)
+  assert.equal(getPlayerLevelForXp(340000), 67)
 
   const firstTokenPickup = applyEnemyPlayerXp(initial, 'prism-slime')
   assert.deepEqual(firstTokenPickup.state, { totalXp: 180, level: 1 })
   assert.equal(firstTokenPickup.grantedXp, 180)
   assert.equal(firstTokenPickup.didLevelUp, false)
   assert.equal(firstTokenPickup.view.xpIntoLevel, 180)
-  assert.equal(firstTokenPickup.view.xpToNextLevel, 900)
+  assert.equal(firstTokenPickup.view.xpToNextLevel, 700)
 
   const nextTokenPickup = applyEnemyPlayerXp(firstTokenPickup.state, 'needle-wasp')
   assert.deepEqual(nextTokenPickup.state, { totalXp: 300, level: 1 })
   assert.equal(nextTokenPickup.didLevelUp, false)
   assert.equal(nextTokenPickup.view.xpIntoLevel, 300)
-  assert.equal(nextTokenPickup.view.progressRatio, 300 / 900)
+  assert.equal(nextTokenPickup.view.progressRatio, 300 / 700)
 
   const bossTokenPickup = applyEnemyPlayerXp(nextTokenPickup.state, 'slime-boss')
   assert.deepEqual(bossTokenPickup.state, nextTokenPickup.state)
@@ -625,8 +625,8 @@ test('player progression view clamps invalid xp and continues past seeded levels
     level: 1,
     currentLevelXp: 0,
     xpIntoLevel: 0,
-    xpToNextLevel: 900,
-    nextLevelAt: 900,
+    xpToNextLevel: 700,
+    nextLevelAt: 700,
     progressRatio: 0,
     isMaxLevel: false,
   })
@@ -634,22 +634,22 @@ test('player progression view clamps invalid xp and continues past seeded levels
   assert.deepEqual(getPlayerProgressionView(10000), {
     totalXp: 10000,
     level: 6,
-    currentLevelXp: 9825,
-    xpIntoLevel: 175,
-    xpToNextLevel: 2855,
-    nextLevelAt: 12680,
-    progressRatio: 175 / 2855,
+    currentLevelXp: 7820,
+    xpIntoLevel: 2180,
+    xpToNextLevel: 2244,
+    nextLevelAt: 10064,
+    progressRatio: 2180 / 2244,
     isMaxLevel: false,
   })
 
   assert.deepEqual(getPlayerProgressionView(99900), {
     totalXp: 99900,
-    level: 30,
-    currentLevelXp: 98125,
-    xpIntoLevel: 1775,
-    xpToNextLevel: 5075,
-    nextLevelAt: 103200,
-    progressRatio: 1775 / 5075,
+    level: 35,
+    currentLevelXp: 98880,
+    xpIntoLevel: 1020,
+    xpToNextLevel: 4680,
+    nextLevelAt: 103560,
+    progressRatio: 1020 / 4680,
     isMaxLevel: false,
   })
 

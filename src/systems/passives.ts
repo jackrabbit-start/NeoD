@@ -852,13 +852,14 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'starter-blaster-special',
     weaponId: 'starter-blaster',
     name: '꾹누름 과열',
-    description: '탄막 기관총이 더 오래 이어지며 연사 리듬과 탄막 수가 함께 올라갑니다.',
+    description: '탄막 기관총이 더 오래 이어지며 연사 리듬, 탄막 수, 유효 사거리가 함께 올라갑니다.',
     kind: 'weapon-specialized',
     maxCount: 10,
     weight: { base: 1.1, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
       const [fireMin, fireMax] = createLevelScaledPercentRange(0.08, 0.14, level, 0.005, 0.24)
       const [countMin, countMax] = [1, getLevelTier(level) >= 2 ? 2 : 1]
+      const range = rollNumber(random, 10 + getLevelTier(level) * 2, 18 + getLevelTier(level) * 3)
       const fire = rollNumber(random, fireMin, fireMax, 2)
       const burst = rollNumber(random, countMin, countMax)
       return {
@@ -866,8 +867,9 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
           fireRateMultiplier: 1 - fire.value,
           projectileLifetimeMultiplier: 1 + Math.max(0.05, fire.value * 0.9),
           projectileCountDelta: burst.value,
+          rangeDelta: range.value,
         },
-        quality: averageQuality(fire.quality, burst.quality),
+        quality: averageQuality(averageQuality(fire.quality, burst.quality), range.quality),
       }
     },
   },
@@ -875,7 +877,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'acid-sprayer-special',
     weaponId: 'acid-sprayer',
     name: '구토 역류',
-    description: '산성 분사기가 더 넓게 퍼지고 오염 지대가 더 오래 남습니다.',
+    description: '산성 분사기가 더 넓고 멀리 퍼지며 오염 지대가 더 오래 남습니다.',
     kind: 'weapon-specialized',
     maxCount: 10,
     weight: { base: 1.1, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -883,13 +885,15 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       const [radiusMin, radiusMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
       const radius = rollNumber(random, radiusMin, radiusMax, 2)
       const extra = rollNumber(random, 1, getLevelTier(level) >= 2 ? 2 : 1)
+      const range = rollNumber(random, 8 + getLevelTier(level) * 2, 16 + getLevelTier(level) * 3)
       return {
         effects: {
           hazardRadiusMultiplier: 1 + radius.value,
           hazardDurationMultiplier: 1 + Math.max(0.08, radius.value * 0.85),
           projectileCountDelta: extra.value,
+          rangeDelta: range.value,
         },
-        quality: averageQuality(radius.quality, extra.quality),
+        quality: averageQuality(averageQuality(radius.quality, extra.quality), range.quality),
       }
     },
   },
@@ -920,7 +924,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'storm-cannon-special',
     weaponId: 'storm-cannon',
     name: '골목 쓸기',
-    description: '산탄포가 한 번에 더 넓게 퍼지고 근접 제압력이 올라갑니다.',
+    description: '산탄포가 한 번에 더 넓고 멀게 퍼지며 근접 제압력이 올라갑니다.',
     kind: 'weapon-specialized',
     maxCount: 10,
     weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -928,12 +932,14 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       const [damageMin, damageMax] = createLevelScaledPercentRange(0.08, 0.13, level, 0.005, 0.2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       const extra = rollNumber(random, 1, getLevelTier(level) >= 2 ? 2 : 1)
+      const range = rollNumber(random, 10 + getLevelTier(level) * 2, 20 + getLevelTier(level) * 3)
       return {
         effects: {
           damageMultiplier: 1 + damage.value,
           projectileCountDelta: extra.value,
+          rangeDelta: range.value,
         },
-        quality: averageQuality(damage.quality, extra.quality),
+        quality: averageQuality(averageQuality(damage.quality, extra.quality), range.quality),
       }
     },
   },
@@ -987,7 +993,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'mist-vortex-special',
     weaponId: 'mist-vortex',
     name: '문장 증폭',
-    description: '컴파일러 함정의 폭발 범위와 유지 시간이 함께 올라갑니다.',
+    description: '컴파일러 함정의 설치 간격과 폭발 범위가 더 넓어지고 유지 시간도 함께 올라갑니다.',
     kind: 'weapon-specialized',
     maxCount: 10,
     weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -996,13 +1002,15 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       const [damageMin, damageMax] = createLevelScaledPercentRange(0.08, 0.14, level, 0.005, 0.22)
       const radius = rollNumber(random, radiusMin, radiusMax, 2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
+      const range = rollNumber(random, 8 + getLevelTier(level) * 2, 16 + getLevelTier(level) * 3)
       return {
         effects: {
           hazardRadiusMultiplier: 1 + radius.value,
           hazardDurationMultiplier: 1 + Math.max(0.08, radius.value * 0.8),
           damageMultiplier: 1 + damage.value,
+          rangeDelta: range.value,
         },
-        quality: averageQuality(radius.quality, damage.quality),
+        quality: averageQuality(averageQuality(radius.quality, damage.quality), range.quality),
       }
     },
   },
@@ -1032,21 +1040,23 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'prism-cutter-special',
     weaponId: 'prism-cutter',
     name: '골목 연장전',
-    description: '주먹 콤보의 마지막 휩쓸기가 더 세지고 연속기 간격이 빨라집니다.',
+    description: '주먹 콤보의 타격 범위가 길어지고 마지막 휩쓸기가 더 세지며 연속기 간격이 빨라집니다.',
     kind: 'weapon-specialized',
     maxCount: 10,
     weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
       const [fireMin, fireMax] = createLevelScaledPercentRange(0.08, 0.14, level, 0.005, 0.22)
       const [damageMin, damageMax] = createLevelScaledPercentRange(0.07, 0.12, level, 0.004, 0.18)
+      const range = rollNumber(random, 10 + getLevelTier(level) * 2, 18 + getLevelTier(level) * 3)
       const fire = rollNumber(random, fireMin, fireMax, 2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       return {
         effects: {
           fireRateMultiplier: 1 - fire.value,
           damageMultiplier: 1 + damage.value,
+          rangeDelta: range.value,
         },
-        quality: averageQuality(fire.quality, damage.quality),
+        quality: averageQuality(averageQuality(fire.quality, damage.quality), range.quality),
       }
     },
   },
