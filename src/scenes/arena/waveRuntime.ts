@@ -1,5 +1,5 @@
 import type { EnemyId } from '../../domain/types.js'
-import { getWaveByIndex } from '../../systems/waves.js'
+import { getWaveByIndex, getWaveSpawnSequence } from '../../systems/waves.js'
 
 export interface WaveStatePatch {
   currentWaveIndex?: number
@@ -40,7 +40,9 @@ export function startWaveRuntime(
     return false
   }
 
-  let remainingSpawns = wave.count
+  const pendingSpawns = getWaveSpawnSequence(wave)
+  const totalSpawns = pendingSpawns.length
+  let remainingSpawns = totalSpawns
   applyState({
     currentWaveIndex: index,
     activeWaveLabel: wave.label,
@@ -50,8 +52,15 @@ export function startWaveRuntime(
   })
 
   const spawnAndDecrement = () => {
-    spawnEnemy(wave.enemyId)
-    remainingSpawns -= 1
+    const enemyId = pendingSpawns.shift()
+    if (!enemyId) {
+      remainingSpawns = 0
+      applyState({ remainingSpawns })
+      return
+    }
+
+    spawnEnemy(enemyId)
+    remainingSpawns = pendingSpawns.length
     applyState({
       remainingSpawns,
     })
@@ -63,12 +72,16 @@ export function startWaveRuntime(
   }
 
   clearSpawnLoop()
+  spawnAndDecrement()
+  if (remainingSpawns <= 0) {
+    return true
+  }
+
   scheduleSpawnLoop({
     delayMs: wave.spawnIntervalMs,
-    repeat: Math.max(0, wave.count - 1),
+    repeat: Math.max(0, totalSpawns - 1),
     onTick: spawnAndDecrement,
   })
-  spawnAndDecrement()
   return true
 }
 

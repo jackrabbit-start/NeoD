@@ -22,6 +22,24 @@ export interface EnemyTelegraphSpec {
   tint: number
 }
 
+export interface EnemyDashRuntimeState {
+  lockedVelocity: Point | null
+  chargeUntilMs: number
+  cooldownUntilMs: number
+}
+
+export interface EnemyRuntimeState {
+  dash?: EnemyDashRuntimeState
+}
+
+export type EnemyMovementMode = 'direct-chase' | 'orbit' | 'dash-charge' | 'dash-recover'
+
+export interface EnemyVelocityStep {
+  velocity: Point
+  runtimeState: EnemyRuntimeState
+  mode: EnemyMovementMode
+}
+
 const normalize = (vector: Point): Point => {
   const length = Math.hypot(vector.x, vector.y)
   if (length === 0) {
@@ -42,6 +60,21 @@ const scale = (vector: Point, multiplier: number): Point => ({
 const add = (left: Point, right: Point): Point => ({
   x: left.x + right.x,
   y: left.y + right.y,
+})
+
+const seekVelocity = (source: Point, target: Point, speed: number): Point =>
+  scale(
+    normalize({
+      x: target.x - source.x,
+      y: target.y - source.y,
+    }),
+    speed,
+  )
+
+const createDashRuntimeState = (): EnemyDashRuntimeState => ({
+  lockedVelocity: null,
+  chargeUntilMs: 0,
+  cooldownUntilMs: 0,
 })
 
 export function getDistanceBetween(source: Point, target: Point): number {
@@ -68,23 +101,106 @@ export function selectAutoFireTarget(
   })[0]
 }
 
+export function createEnemyRuntimeState(
+  movementBehavior: EnemyMovementBehavior,
+): EnemyRuntimeState {
+  if (movementBehavior.kind === 'dash') {
+    return {
+      dash: createDashRuntimeState(),
+    }
+  }
+
+  return {}
+}
+
 export function resolveEnemyVelocity(
   enemyPosition: Point,
   playerPosition: Point,
   speed: number,
   movementBehavior: EnemyMovementBehavior,
 ): Point {
+  return resolveEnemyVelocityStep(
+    enemyPosition,
+    playerPosition,
+    speed,
+    movementBehavior,
+    {},
+    0,
+  ).velocity
+}
+
+export function resolveEnemyVelocityStep(
+  enemyPosition: Point,
+  playerPosition: Point,
+  speed: number,
+  movementBehavior: EnemyMovementBehavior,
+  runtimeState: EnemyRuntimeState = {},
+  nowMs = 0,
+): EnemyVelocityStep {
   const toPlayer = normalize({
     x: playerPosition.x - enemyPosition.x,
     y: playerPosition.y - enemyPosition.y,
   })
 
   if (toPlayer.x === 0 && toPlayer.y === 0) {
-    return { x: 0, y: 0 }
+    return {
+      velocity: { x: 0, y: 0 },
+      runtimeState,
+      mode: movementBehavior.kind === 'orbit' ? 'orbit' : 'direct-chase',
+    }
   }
 
   if (movementBehavior.kind === 'direct-chase') {
-    return scale(toPlayer, speed)
+    return {
+      velocity: scale(toPlayer, speed),
+      runtimeState,
+      mode: 'direct-chase',
+    }
+  }
+
+  if (movementBehavior.kind === 'dash') {
+    const dashState = runtimeState.dash ?? createDashRuntimeState()
+
+    if (dashState.lockedVelocity && nowMs < dashState.chargeUntilMs) {
+      return {
+        velocity: dashState.lockedVelocity,
+        runtimeState: {
+          ...runtimeState,
+          dash: dashState,
+        },
+        mode: 'dash-charge',
+      }
+    }
+
+    const distanceToPlayer = getDistanceBetween(enemyPosition, playerPosition)
+    if (distanceToPlayer <= movementBehavior.triggerRange && nowMs >= dashState.cooldownUntilMs) {
+      const lockedVelocity = seekVelocity(enemyPosition, playerPosition, movementBehavior.chargeSpeed)
+      return {
+        velocity: lockedVelocity,
+        runtimeState: {
+          ...runtimeState,
+          dash: {
+            lockedVelocity,
+            chargeUntilMs: nowMs + movementBehavior.chargeDurationMs,
+            cooldownUntilMs:
+              nowMs + movementBehavior.chargeDurationMs + movementBehavior.cooldownMs,
+          },
+        },
+        mode: 'dash-charge',
+      }
+    }
+
+    return {
+      velocity: scale(toPlayer, speed),
+      runtimeState: {
+        ...runtimeState,
+        dash: {
+          ...dashState,
+          lockedVelocity: null,
+        },
+      },
+      mode: 'dash-recover',
+    }
   }
 
   const distance = getDistanceBetween(enemyPosition, playerPosition)
@@ -100,12 +216,16 @@ export function resolveEnemyVelocity(
     radialWeight = 1
   }
 
-  return scale(
-    normalize(
-      add(scale(toPlayer, radialWeight), tangent),
+  return {
+    velocity: scale(
+      normalize(
+        add(scale(toPlayer, radialWeight), tangent),
+      ),
+      speed,
     ),
-    speed,
-  )
+    runtimeState,
+    mode: 'orbit',
+  }
 }
 
 export function shouldEnemyStartTelegraph(
