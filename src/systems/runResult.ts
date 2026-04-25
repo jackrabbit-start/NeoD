@@ -28,7 +28,7 @@ export interface RunResultPresentation {
 export function createRunResultPresentation(payload: RunResultPayload): RunResultPresentation {
   const isWin = payload.outcome === 'win'
   const isTimeout = payload.endReason === 'timeout'
-  const restartPrompt = '재시작 버튼을 눌러 새 런을 시작하세요'
+  const restartPrompt = '다시 달려라! 버튼을 눌러 시작 화면으로 돌아가세요'
 
   return {
     title: isWin ? '런 클리어' : isTimeout ? '시간 종료' : '런 실패',

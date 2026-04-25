@@ -189,7 +189,7 @@ import {
   getPlayerXpForEnemy,
 } from '../.tmp-test/src/systems/playerProgression.js'
 import { HudController } from '../.tmp-test/src/ui/Hud.js'
-import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE } from '../.tmp-test/src/ui/controlCopy.js'
+import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE, KIM_COMMUNITY_NARRATIONS } from '../.tmp-test/src/ui/controlCopy.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -1544,12 +1544,22 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
-test('game title and title control hints stay aligned with playable keyboard shortcuts', () => {
+test('game title, narration, and control hints stay aligned with playable keyboard shortcuts', () => {
   assert.equal(GAME_TITLE, '달려라 김동성!')
   assert.deepEqual([...GAME_HEADER_CONTROL_HINTS], ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'])
+  assert.ok(KIM_COMMUNITY_NARRATIONS.every((line) => line.includes('김동성') || line.includes('토큰') || line.includes('빚쟁이')))
   assert.match(GAMEPLAY_CONTROL_TIP, /I 인벤토리/)
   assert.match(GAMEPLAY_CONTROL_TIP, /Q 코덱스/)
   assert.match(GAMEPLAY_CONTROL_TIP, /끝까지 버티기/)
+
+  const mainSource = readFileSync(resolve(TEST_DIR, '../src/main.ts'), 'utf8')
+  const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
+  assert.ok(mainSource.includes('headerNarration'))
+  assert.ok(mainSource.includes('game-header__narration'))
+  assert.ok(!mainSource.includes('<strong>${GAME_TITLE}</strong>'))
+  assert.ok(styleSource.includes('.game-header__narration'))
+  assert.ok(styleSource.includes('line-height: 1.45'))
+  assert.ok(styleSource.includes('word-break: keep-all'))
 })
 
 test('stage selection views expose readable time-stage choices and current marker', () => {
@@ -1672,7 +1682,7 @@ test('loss result presentation keeps restart guidance distinct from boss clear',
   assert.equal(presentation.title, '런 실패')
   assert.match(presentation.statLines[0] ?? '', /실패/)
   assert.match(presentation.objective, /다시 도전/)
-  assert.match(presentation.restartPrompt, /새 런/)
+  assert.match(presentation.restartPrompt, /다시 달려라!/)
   assert.equal(timeoutPresentation.title, '시간 종료')
   assert.match(timeoutPresentation.status, /타임아웃/)
 })
@@ -1687,13 +1697,19 @@ test('start screen gates arena entry behind an explicit button', () => {
   assert.ok(bootSceneSource.includes("this.scene.start('start')"))
   assert.ok(!bootSceneSource.includes("this.scene.start('arena')"))
   assert.ok(startSceneSource.includes(".setName('start-run-button')"))
+  assert.ok(startSceneSource.includes("'달려라!'"))
+  assert.ok(startSceneSource.includes('createKimRunnerPortrait'))
+  assert.ok(startSceneSource.includes('setPadding(4, 8, 6, 8)'))
   assert.ok(startSceneSource.includes('const startRun = (): void => {'))
   assert.ok(startSceneSource.includes("this.scene.stop('arena')"))
   assert.ok(startSceneSource.includes("this.scene.start('arena', { startElapsedMs: 0 })"))
   assert.ok(!startSceneSource.includes('시작 전에는 시간이 흐르지 않고 적도 등장하지 않습니다.'))
   assert.ok(startSceneSource.includes('파친코 기계 앞에서 삶을 탕진한 김동성'))
   assert.ok(startSceneSource.includes('무기와 레벨로 바꿔 중독을 끊어낼 연료'))
-  assert.ok(startSceneSource.includes('잭팟이 아닌 자기 발로 탈출'))
+  assert.ok(startSceneSource.includes('무엇이 쫓아오든 30분만 버티면'))
+  assert.ok(startSceneSource.includes('잭팟이 아닌 자기 발로 내일을 되찾게'))
+  assert.ok(!startSceneSource.includes("'새 런 시작'"))
+  assert.ok(!startSceneSource.includes('경기장에 진입'))
   assert.ok(startSceneSource.includes('this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)'))
   assert.ok(startSceneSource.includes('Phaser.Input.Keyboard.KeyCodes.ENTER'))
 })
@@ -1705,6 +1721,7 @@ test('result scene restart is button-driven instead of R-key driven', () => {
     resultSceneSource.includes(`.setName('restart-run-button')`),
     'ResultScene should expose a named restart button for the result screen',
   )
+  assert.ok(resultSceneSource.includes("'다시 달려라!'"))
   assert.ok(
     resultSceneSource.includes(`const restartRun = (): void => {`),
     'ResultScene restart should use a shared restart handler for button input',

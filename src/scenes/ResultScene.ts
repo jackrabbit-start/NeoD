@@ -94,7 +94,7 @@ export class ResultScene extends Phaser.Scene {
       .setName('restart-run-button')
 
     const restartButtonLabel = this.add
-      .text(width / 2, restartButtonY, '새 런 시작', {
+      .text(width / 2, restartButtonY, '다시 달려라!', {
         fontSize: '20px',
         color: '#f8fafc',
         fontStyle: 'bold',
@@ -109,7 +109,7 @@ export class ResultScene extends Phaser.Scene {
 
       isRestarting = true
       restartButton.disableInteractive()
-      restartButtonLabel.setText('시작 중...')
+      restartButtonLabel.setText('달리는 중...')
       this.input.off(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)
       this.scene.stop('arena')
       this.scene.start('start')

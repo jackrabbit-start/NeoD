@@ -3,11 +3,12 @@ import { createGameConfig } from './game/config.js'
 import './style.css'
 import { CodexController } from './ui/Codex.js'
 import { HudController } from './ui/Hud.js'
-import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE } from './ui/controlCopy.js'
+import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE, KIM_COMMUNITY_NARRATIONS } from './ui/controlCopy.js'
 
 const app = document.querySelector<HTMLDivElement>('#app')
 
 const headerControlMarkup = GAME_HEADER_CONTROL_HINTS.map((hint) => `<span>${hint}</span>`).join('')
+const headerNarration = KIM_COMMUNITY_NARRATIONS[new Date().getDate() % KIM_COMMUNITY_NARRATIONS.length]
 
 if (!app) {
   throw new Error('#app 루트 요소가 필요합니다.')
@@ -16,14 +17,13 @@ if (!app) {
 app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
-      <div class="game-header__brand">
-        <div class="game-header__title-row">
-          <strong>${GAME_TITLE}</strong>
-          <div class="game-header__controls" aria-label="조작 방법">
-            ${headerControlMarkup}
-          </div>
+      <div class="game-header__brand game-header__brand--narration">
+        <p class="game-header__narration" aria-label="김동성의 오늘">
+          “${headerNarration}”
+        </p>
+        <div class="game-header__controls" aria-label="조작 방법">
+          ${headerControlMarkup}
         </div>
-        <span>김동성의 추격장에서 30분 동안 버티며 무기를 키우는 생존 액션</span>
       </div>
       <div class="game-header__rails" aria-hidden="true">
         <span></span>

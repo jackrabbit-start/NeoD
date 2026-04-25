@@ -19,13 +19,13 @@ export class StartScene extends Phaser.Scene {
 
     hud?.update({
       title: GAME_TITLE,
-      subtitle: '시작 버튼을 눌러 런을 시작하세요.',
+      subtitle: '달려라! 버튼을 눌러 도주를 시작하세요.',
       currentTimeLabel: '00:00',
       stats: ['대기 중: 아직 적이 등장하지 않습니다.', '시작 후 Stage 1부터 진행됩니다.'],
       passives: ['레벨업 패시브는 런 중 토큰 XP로 해금됩니다.'],
       inventory: ['파친코 토큰과 자석/하트는 런 시작 후 등장합니다.'],
       recipes: ['같은 무기·같은 별 3개 자동 합성 대기 중'],
-      objective: '준비가 끝나면 새 런 시작을 눌러 경기장에 진입하세요.',
+      objective: '준비가 끝나면 달려라!를 눌러 김동성의 도주를 시작하세요.',
       tip: GAMEPLAY_CONTROL_TIP,
       status: '시작 화면 대기 중',
       inventoryButtonLabel: '인벤토리 열기',
@@ -65,35 +65,43 @@ export class StartScene extends Phaser.Scene {
       .rectangle(width / 2, height / 2, Math.max(260, width - 96), Math.max(260, height - 96), 0x081426, 0.86)
       .setStrokeStyle(3, 0x52d7ff, 0.72)
 
-    this.add
-      .text(width / 2, Math.max(78, height * 0.2), GAME_TITLE, {
+    const titleY = Math.max(78, height * 0.2)
+    const titleText = this.add
+      .text(58, 0, GAME_TITLE, {
         fontSize: '42px',
         color: '#f8fafc',
         fontStyle: '900',
-        align: 'center',
-        wordWrap: { width: textWidth },
+        align: 'left',
+        lineSpacing: 8,
+        wordWrap: { width: Math.max(180, textWidth - 80), useAdvancedWrap: true },
       })
-      .setOrigin(0.5)
+      .setOrigin(0, 0.5)
+      .setPadding(4, 8, 6, 8)
       .setShadow(0, 3, '#020713', 8)
+    const titleAvatar = this.createKimRunnerPortrait(24, 0)
+    const titleGroupWidth = 58 + titleText.width
+    this.add.container(width / 2 - titleGroupWidth / 2, titleY, [titleAvatar, titleText])
 
     this.add
-      .text(width / 2, Math.max(228, height * 0.5), '파친코 기계 앞에서 삶을 탕진한 김동성은 마지막 빚 독촉을 피해 이 경기장으로 뛰어들었습니다.\n여기서 굴러 떨어지는 토큰은 또 한 번의 판돈이 아니라, 무기와 레벨로 바꿔 중독을 끊어낼 연료입니다.\n추격자와 슬라임을 뚫고 30분을 달려 나가면, 그는 처음으로 잭팟이 아닌 자기 발로 탈출하게 됩니다.', {
+      .text(width / 2, Math.max(228, height * 0.5), '파친코 기계 앞에서 삶을 탕진한 김동성은 마지막 빚 독촉을 피해 무작정 달리기 시작했습니다.\n굴러 떨어지는 토큰은 더는 판돈이 아니라, 무기와 레벨로 바꿔 중독을 끊어낼 연료입니다.\n무엇이 쫓아오든 30분만 버티면, 그는 처음으로 잭팟이 아닌 자기 발로 내일을 되찾게 됩니다.', {
         fontSize: '17px',
         color: '#ffe28a',
         align: 'center',
-        lineSpacing: 7,
-        wordWrap: { width: textWidth },
+        lineSpacing: 10,
+        wordWrap: { width: textWidth, useAdvancedWrap: true },
       })
       .setOrigin(0.5)
+      .setPadding(6, 8, 8, 8)
 
     this.add
       .text(width / 2, Math.max(312, height * 0.62), 'WASD 이동 · J 대시 · 자동 사격 · 토큰으로 레벨업', {
         fontSize: '18px',
         color: '#8fe4ff',
         align: 'center',
-        wordWrap: { width: textWidth },
+        wordWrap: { width: textWidth, useAdvancedWrap: true },
       })
       .setOrigin(0.5)
+      .setPadding(4, 6, 6, 6)
 
     const startButton = this.add
       .rectangle(width / 2, startButtonY, startButtonWidth, startButtonHeight, 0x1f5f4a, 0.98)
@@ -102,7 +110,7 @@ export class StartScene extends Phaser.Scene {
       .setName('start-run-button')
 
     const startButtonLabel = this.add
-      .text(width / 2, startButtonY, '새 런 시작', {
+      .text(width / 2, startButtonY, '달려라!', {
         fontSize: '22px',
         color: '#f8fafc',
         fontStyle: 'bold',
@@ -117,7 +125,7 @@ export class StartScene extends Phaser.Scene {
 
       isStarting = true
       startButton.disableInteractive()
-      startButtonLabel.setText('시작 중...')
+      startButtonLabel.setText('달리는 중...')
       this.input.off(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)
       this.scene.stop('arena')
       this.scene.start('arena', { startElapsedMs: 0 })
@@ -157,5 +165,21 @@ export class StartScene extends Phaser.Scene {
       enterKey?.off(Phaser.Input.Keyboard.Events.DOWN, handleKeyboardStart)
       spaceKey?.off(Phaser.Input.Keyboard.Events.DOWN, handleKeyboardStart)
     })
+  }
+
+  private createKimRunnerPortrait(x: number, y: number): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y)
+    const glow = this.add.circle(0, 0, 31, 0xffd966, 0.18).setStrokeStyle(2, 0x8fe4ff, 0.42)
+    const body = this.add.rectangle(0, 11, 23, 26, 0x1f5f4a, 0.96).setStrokeStyle(2, 0x79ffb2, 0.9)
+    const head = this.add.circle(0, -15, 13, 0xffd6a0, 1).setStrokeStyle(2, 0xf8fbff, 0.9)
+    const hair = this.add.ellipse(0, -22, 24, 10, 0x141414, 1)
+    const eyeLeft = this.add.circle(-5, -15, 1.7, 0x07111f, 1)
+    const eyeRight = this.add.circle(5, -15, 1.7, 0x07111f, 1)
+    const armLeft = this.add.rectangle(-17, 9, 7, 23, 0x8fe4ff, 0.92).setAngle(-32)
+    const armRight = this.add.rectangle(17, 7, 7, 23, 0xffd966, 0.92).setAngle(32)
+    const legLeft = this.add.rectangle(-8, 30, 7, 22, 0xd8e2ff, 0.92).setAngle(24)
+    const legRight = this.add.rectangle(12, 29, 7, 22, 0xd8e2ff, 0.92).setAngle(-28)
+    container.add([glow, armLeft, armRight, legLeft, legRight, body, head, hair, eyeLeft, eyeRight])
+    return container
   }
 }
