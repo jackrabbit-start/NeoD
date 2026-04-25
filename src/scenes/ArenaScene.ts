@@ -92,6 +92,7 @@ import {
   applyEnemyPachinkoTokenProgress,
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
+  getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
   getTokenXpForEnemy,
   resolvePachinkoSlotIndex,
@@ -425,6 +426,8 @@ export class ArenaScene extends Phaser.Scene {
   private lastPachinkoTokenLaunchAt = 0
 
   private latestPachinkoReward: string | null = null
+
+  private pachinkoRewardTableSeed = 0
 
   private pachinkoPins?: Phaser.Physics.Arcade.StaticGroup
 
@@ -2295,6 +2298,9 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
     this.nextHeartPickupAt = 0
+    this.pachinkoTokenXp = initialState.pachinkoTokenXp
+    this.latestPachinkoReward = null
+    this.pachinkoRewardTableSeed = 0
   }
 
   private destroyRunEntities(): void {
@@ -2522,6 +2528,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
+    this.pachinkoRewardTableSeed = getPachinkoRewardTableSeed(this.time.now)
     const rect = this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
 
@@ -2606,7 +2613,13 @@ export class ArenaScene extends Phaser.Scene {
     const rect = this.syncPachinkoBoard()
     const laneRatio = Phaser.Math.Clamp((token.sprite.x - rect.x) / rect.width, 0, 0.999)
     const slotIndex = resolvePachinkoSlotIndex(laneRatio)
-    const reward = resolvePachinkoSlotReward(this.pachinkoTokenXp, laneRatio)
+    const reward = resolvePachinkoSlotReward(
+      this.pachinkoTokenXp,
+      laneRatio,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )
     const fusionResult = addWeaponStackWithAutoFusion(
       { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
       reward.weaponId,
@@ -2695,7 +2708,7 @@ export class ArenaScene extends Phaser.Scene {
       .setDisplaySize(rect.width - 16, 4)
     this.pachinkoLevelBadge
       ?.setPosition(rect.x + rect.width - 12, rect.y + 14)
-      .setText(`Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`)
+      .setText(`Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)} · LIVE`)
     const queueBadgeX = this.getPachinkoQueueBadgeX(rect)
     this.pachinkoQueueBadge
       ?.setPosition(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET)
@@ -2758,7 +2771,7 @@ export class ArenaScene extends Phaser.Scene {
       fontStyle: '700',
       align: 'left',
     }).setDepth(63)
-    const levelBadge = this.add.text(rect.x + rect.width - 12, rect.y + 14, `Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, {
+    const levelBadge = this.add.text(rect.x + rect.width - 12, rect.y + 14, `Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)} · LIVE`, {
       color: '#101a32',
       backgroundColor: '#ffd866',
       fontFamily: 'Inter, system-ui, sans-serif',
@@ -2825,7 +2838,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private createPachinkoSlotVisuals(rect: RectBounds): void {
-    for (const reward of buildPachinkoSlotRewards(this.pachinkoTokenXp)) {
+    for (const reward of buildPachinkoSlotRewards(
+      this.pachinkoTokenXp,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )) {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
       const frame = this.add.rectangle(centerX, centerY, rect.width / reward.slotCount - 3, PACHINKO_SLOT_VISUAL_HEIGHT - 8, 0x07111f, 0.96)
@@ -2857,7 +2875,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private syncPachinkoSlotVisuals(rect: RectBounds): void {
-    const rewards = buildPachinkoSlotRewards(this.pachinkoTokenXp)
+    const rewards = buildPachinkoSlotRewards(
+      this.pachinkoTokenXp,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )
     for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
       const visual = this.pachinkoSlotVisuals[index]
       const reward = rewards[index]

@@ -131,12 +131,15 @@ import {
   MAX_ACTIVE_PACHINKO_TOKENS,
   PACHINKO_SLOT_COUNT,
   PACHINKO_LEVEL_THRESHOLDS,
+  PACHINKO_REWARD_TABLE_REFRESH_MS,
   PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
   STAR_ODDS_BY_LEVEL,
   applyEnemyPachinkoTokenProgress,
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
+  getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
+  getPachinkoStarRangeForPlayerLevel,
   getTokenXpForEnemy,
   resolvePachinkoLandingReward,
   resolvePachinkoReward,
@@ -411,14 +414,35 @@ test('pachinko reward resolution keeps weapon random and star odds deterministic
   assert.equal(resolveWeaponReward(() => 0.999), 'needle-fan')
   assert.equal(resolveStarForLevel(1, () => 0.69), 1)
   assert.equal(resolveStarForLevel(1, () => 0.70), 1)
-  assert.equal(resolveStarForLevel(1, () => 0.701), 2)
-  assert.equal(resolveStarForLevel(5, () => 0.99), 5)
+  assert.equal(resolveStarForLevel(1, () => 0.74), 2)
+  assert.equal(resolveStarForLevel(5, () => 0.99, { minStar: 1, maxStar: 5 }), 5)
+  assert.equal(resolveStarForLevel(5, () => 0.99), 2)
 
   const rolls = [0.12, 0.99]
   assert.deepEqual(resolvePachinkoReward(4, () => rolls.shift()), {
     weaponId: 'acid-sprayer',
-    star: 5,
+    star: 2,
   })
+})
+
+test('player level raises pachinko star range before live table rolls stars', () => {
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(1), { minStar: 1, maxStar: 2 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(5), { minStar: 1, maxStar: 3 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(9), { minStar: 2, maxStar: 4 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(17), { minStar: 3, maxStar: 5 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(25), { minStar: 4, maxStar: 5 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(33), { minStar: 5, maxStar: 5 })
+
+  const lowLevelStars = buildPachinkoSlotRewards(42, PACHINKO_SLOT_COUNT, 0, 1).map((slot) => slot.star)
+  const midLevelStars = buildPachinkoSlotRewards(42, PACHINKO_SLOT_COUNT, 0, 9).map((slot) => slot.star)
+  const highLevelStars = buildPachinkoSlotRewards(42, PACHINKO_SLOT_COUNT, 0, 25).map((slot) => slot.star)
+
+  assert.equal(Math.min(...lowLevelStars), 1)
+  assert.equal(Math.max(...lowLevelStars), 2)
+  assert.equal(Math.min(...midLevelStars), 2)
+  assert.equal(Math.max(...midLevelStars), 4)
+  assert.equal(Math.min(...highLevelStars), 4)
+  assert.equal(Math.max(...highLevelStars), 5)
 })
 
 test('enemy defeat token progress feeds the same landing reward resolver as the scene', () => {
@@ -445,9 +469,12 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
     rewardLevel: 1,
   })
 
-  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999), {
-    weaponId: 'needle-fan',
-    star: 5,
+  const landingSeed = 7
+  const playerLevel = 17
+  const visibleLandingSlot = resolvePachinkoSlotReward(42, 0.999, PACHINKO_SLOT_COUNT, landingSeed, playerLevel)
+  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999, landingSeed, playerLevel), {
+    weaponId: visibleLandingSlot.weaponId,
+    star: visibleLandingSlot.star,
   })
 })
 
@@ -540,27 +567,16 @@ test('player progression view clamps invalid xp and continues past seeded levels
 test('pachinko slot table makes displayed bottom rewards exact', () => {
   const levelOneSlots = buildPachinkoSlotRewards(0)
   assert.equal(levelOneSlots.length, PACHINKO_SLOT_COUNT)
-  assert.deepEqual(levelOneSlots.map((slot) => slot.weaponId), [
-    'starter-blaster',
-    'acid-sprayer',
-    'frost-lance',
-    'storm-cannon',
-    'arc-loom',
-    'spark-carbine',
-    'mist-vortex',
-    'slime-glaive',
-    'prism-cutter',
-    'needle-fan',
-  ])
+  assert.deepEqual(levelOneSlots.map((slot) => WEAPON_IDS.includes(slot.weaponId)), Array(PACHINKO_SLOT_COUNT).fill(true))
   assert.deepEqual(levelOneSlots[0], {
     slotIndex: 0,
     slotCount: 10,
     ratioStart: 0,
     ratioEnd: 0.1,
     sampleRatio: 0.09999999999999978,
-    weaponId: 'starter-blaster',
+    weaponId: 'acid-sprayer',
     star: 1,
-    iconKey: 'weapon-starter-blaster',
+    iconKey: 'weapon-acid-sprayer',
   })
 
   for (const slot of levelOneSlots) {
@@ -572,37 +588,54 @@ test('pachinko slot table makes displayed bottom rewards exact', () => {
     })
   }
 
-  const levelFiveSlots = buildPachinkoSlotRewards(42)
-  assert.equal(levelFiveSlots.at(-1)?.weaponId, 'needle-fan')
-  assert.equal(levelFiveSlots.at(-1)?.star, 5)
-  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999), {
-    weaponId: 'needle-fan',
-    star: 5,
+  const nextTable = buildPachinkoSlotRewards(0, PACHINKO_SLOT_COUNT, 1)
+  assert.notDeepEqual(nextTable.map((slot) => `${slot.weaponId}:${slot.star}`), levelOneSlots.map((slot) => `${slot.weaponId}:${slot.star}`))
+
+  const levelFiveSlots = buildPachinkoSlotRewards(42, PACHINKO_SLOT_COUNT, 0, 17)
+  assert.ok(levelFiveSlots.every((slot) => slot.star >= 3 && slot.star <= 5), 'player level should bound visible star outcomes')
+  const levelFiveLandingSlot = resolvePachinkoSlotReward(42, 0.999, PACHINKO_SLOT_COUNT, 0, 17)
+  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999, 0, 17), {
+    weaponId: levelFiveLandingSlot.weaponId,
+    star: levelFiveLandingSlot.star,
   })
 })
 
 test('pachinko slot index clamps boundaries and live table timing', () => {
+  assert.equal(PACHINKO_REWARD_TABLE_REFRESH_MS, 850)
+  assert.equal(getPachinkoRewardTableSeed(0), 0)
+  assert.equal(getPachinkoRewardTableSeed(849), 0)
+  assert.equal(getPachinkoRewardTableSeed(850), 1)
+  assert.equal(getPachinkoRewardTableSeed(1700), 2)
+
   assert.equal(resolvePachinkoSlotIndex(-1), 0)
   assert.equal(resolvePachinkoSlotIndex(0), 0)
   assert.equal(resolvePachinkoSlotIndex(0.1), 1)
   assert.equal(resolvePachinkoSlotIndex(0.999), 9)
   assert.equal(resolvePachinkoSlotIndex(1), 9)
 
-  const launchedAtLevelOne = resolvePachinkoSlotReward(0, 0.95)
-  const resolvedAfterLevelUp = resolvePachinkoSlotReward(42, 0.95)
+  const launchedAtLevelOne = resolvePachinkoSlotReward(0, 0.95, PACHINKO_SLOT_COUNT, 0)
+  const resolvedAfterRefresh = resolvePachinkoSlotReward(0, 0.95, PACHINKO_SLOT_COUNT, 1)
   assert.deepEqual(launchedAtLevelOne, {
     slotIndex: 9,
     slotCount: 10,
     ratioStart: 0.9,
     ratioEnd: 1,
     sampleRatio: 0.999,
-    weaponId: 'needle-fan',
-    star: 3,
-    iconKey: 'weapon-needle-fan',
+    weaponId: 'starter-blaster',
+    star: 2,
+    iconKey: 'weapon-starter-blaster',
   })
-  assert.deepEqual(resolvedAfterLevelUp, {
-    ...launchedAtLevelOne,
-    star: 5,
+  assert.notDeepEqual(resolvedAfterRefresh, launchedAtLevelOne)
+  assert.deepEqual(resolvePachinkoLandingReward(0, 0.95, 1), {
+    weaponId: resolvedAfterRefresh.weaponId,
+    star: resolvedAfterRefresh.star,
+  })
+
+  const leveledLanding = resolvePachinkoSlotReward(0, 0.95, PACHINKO_SLOT_COUNT, 1, 25)
+  assert.ok(leveledLanding.star >= 4 && leveledLanding.star <= 5)
+  assert.deepEqual(resolvePachinkoLandingReward(0, 0.95, 1, 25), {
+    weaponId: leveledLanding.weaponId,
+    star: leveledLanding.star,
   })
 })
 
