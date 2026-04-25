@@ -71,9 +71,31 @@ export function isFinaleActive(elapsedMs: number): boolean {
 }
 
 export function flattenRunPhaseEntries(phase: RunProgressionPhaseDefinition): EnemyId[] {
-  return phase.entries.flatMap((entry) =>
-    Array.from({ length: Math.max(0, entry.count) }, () => entry.enemyId),
-  )
+  const weightedEntries = phase.entries.filter((entry) => entry.count > 0)
+  if (weightedEntries.length === 0) {
+    return []
+  }
+
+  const remainingCounts = weightedEntries.map((entry) => Math.max(0, entry.count))
+  const sequence: EnemyId[] = []
+
+  while (remainingCounts.some((count) => count > 0)) {
+    let pickedAny = false
+    for (const [index, entry] of weightedEntries.entries()) {
+      if ((remainingCounts[index] ?? 0) <= 0) {
+        continue
+      }
+      sequence.push(entry.enemyId)
+      remainingCounts[index] = (remainingCounts[index] ?? 0) - 1
+      pickedAny = true
+    }
+
+    if (!pickedAny) {
+      break
+    }
+  }
+
+  return sequence
 }
 
 export function getRunEnemySpawnChanceRows(
