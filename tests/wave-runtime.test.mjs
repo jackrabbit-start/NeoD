@@ -31,8 +31,8 @@ test('wave runtime starts a regular wave with an immediate spawn and scheduled f
   assert.equal(started, true)
   assert.equal(clearedLoops, 1)
   assert.equal(scheduledLoops.length, 1)
-  assert.equal(scheduledLoops[0]?.delayMs, 650)
-  assert.equal(scheduledLoops[0]?.repeat, 17)
+  assert.equal(scheduledLoops[0]?.delayMs, 700)
+  assert.equal(scheduledLoops[0]?.repeat, 8)
   assert.deepEqual(appliedState[0], {
     currentWaveIndex: 0,
     activeWaveLabel: '1 웨이브',
@@ -40,20 +40,20 @@ test('wave runtime starts a regular wave with an immediate spawn and scheduled f
     statusMessage: '1 웨이브 시작.',
     isBossActive: false,
   })
-  assert.deepEqual(spawnedEnemies, ['slime'])
+  assert.deepEqual(spawnedEnemies, ['slime', 'slime'])
   assert.deepEqual(appliedState[1], {
-    remainingSpawns: 17,
+    remainingSpawns: 16,
   })
 
   scheduledLoops[0]?.onTick()
 
-  assert.deepEqual(spawnedEnemies, ['slime', 'slime'])
+  assert.deepEqual(spawnedEnemies, ['slime', 'slime', 'slime', 'slime'])
   assert.deepEqual(appliedState[2], {
-    remainingSpawns: 16,
+    remainingSpawns: 14,
   })
 })
 
-test('wave runtime locks the extreme-density regular wave cadence', () => {
+test('wave runtime locks burst-spawn near-miss pressure cadence', () => {
   const starts = [0, 1, 2].map((index) => {
     const appliedState = []
     const scheduledLoops = []
@@ -81,15 +81,19 @@ test('wave runtime locks the extreme-density regular wave cadence', () => {
   )
   assert.deepEqual(
     starts.map(({ scheduledLoops }) => scheduledLoops[0]?.delayMs),
-    [650, 520, 420],
+    [700, 620, 560],
   )
   assert.deepEqual(
     starts.map(({ scheduledLoops }) => scheduledLoops[0]?.repeat),
-    [17, 23, 26],
+    [8, 7, 6],
   )
   assert.deepEqual(
-    starts.map(({ spawnedEnemies }) => spawnedEnemies[0]),
-    ['slime', 'slime', 'spark-slime'],
+    starts.map(({ spawnedEnemies }) => spawnedEnemies),
+    [
+      ['slime', 'slime'],
+      ['slime', 'slime', 'slime'],
+      ['spark-slime', 'spark-slime', 'spark-slime', 'spark-slime'],
+    ],
   )
 })
 
