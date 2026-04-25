@@ -31,6 +31,8 @@ export class BootScene extends Phaser.Scene {
     generateCircleTexture(this, 'gel-shard', 7, 0x7dffb0)
     generateCircleTexture(this, 'acid-core', 7, 0xb4ff5e)
     generateCircleTexture(this, 'frost-mote', 7, 0x83d5ff)
+    generateCircleTexture(this, 'spark-knot', 7, 0xffd866)
+    generateCircleTexture(this, 'mist-bead', 7, 0xc4f1ff)
 
     this.scene.start('arena')
   }

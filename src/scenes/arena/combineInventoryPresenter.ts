@@ -15,7 +15,7 @@ export function describeInventoryEntries(inventory: InventoryState): string[] {
 
 export function describeAvailableRecipes(recipes: AvailableRecipe[]): string[] {
   if (recipes.length === 0) {
-    return ['No valid combine yet.']
+    return ['No actionable combine yet.']
   }
 
   return recipes.map(

@@ -1,21 +1,50 @@
 import Phaser from 'phaser'
 import { ENEMY_DEFINITIONS } from '../data/enemies.js'
+import { ITEM_DEFINITIONS } from '../data/items.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
+import type {
+  AvailableRecipe,
+  EnemyDefinition,
+  HudOwnedItemView,
+  HudOwnedWeaponView,
+  InventoryState,
+  LootId,
+  RecipeId,
+  WeaponId,
+} from '../domain/types.js'
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
+import type { CodexController } from '../ui/Codex.js'
 import type { HudController } from '../ui/Hud.js'
-import type { EnemyDefinition, InventoryState, LootId, WeaponId } from '../domain/types.js'
-import { getAvailableRecipes } from '../systems/combine.js'
+import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
+import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import {
+  equipOwnedWeapon,
+  getActionableRecipes,
+  seedOwnedWeapons,
+} from '../systems/weaponOwnership.js'
 import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
 import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
-import { applyLootPickup, attemptCombine } from './arena/combineInventoryWorkflow.js'
+import {
+  applyLootPickup,
+  applyRecipeSelectionWorkflow,
+} from './arena/combineInventoryWorkflow.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
+
+interface EnemyHealthBar {
+  background: Phaser.GameObjects.Rectangle
+  fill: Phaser.GameObjects.Rectangle
+  width: number
+  height: number
+  offsetY: number
+}
 
 interface EnemyEntity {
   sprite: PhysicsImage
   config: EnemyDefinition
   currentHealth: number
+  healthBar: EnemyHealthBar
   lastHitAt: number
 }
 
@@ -32,11 +61,17 @@ interface ProjectileEntity {
 export class ArenaScene extends Phaser.Scene {
   private hud!: HudController
 
+  private codex!: CodexController
+
   private player!: PhysicsImage
+
+  private enemySprites!: Phaser.Physics.Arcade.Group
+
+  private enemySpacingCollider?: Phaser.Physics.Arcade.Collider
 
   private cursors!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
 
-  private combineKey!: Phaser.Input.Keyboard.Key
+  private codexKey!: Phaser.Input.Keyboard.Key
 
   private enemies: EnemyEntity[] = []
 
@@ -44,9 +79,15 @@ export class ArenaScene extends Phaser.Scene {
 
   private projectiles: ProjectileEntity[] = []
 
+  private ownedWeaponIds: WeaponId[] = seedOwnedWeapons()
+
   private activeWeaponId: WeaponId = 'starter-blaster'
 
   private inventory: InventoryState = {}
+
+  private isInventoryOpen = false
+
+  private isCodexOpen = false
 
   private playerHealth = 100
 
@@ -68,8 +109,6 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private isCombining = false
-
   private statusMessage = 'Move with WASD, aim with the mouse, and click to fire.'
 
   private lastPlayerHitAt = 0
@@ -80,6 +119,21 @@ export class ArenaScene extends Phaser.Scene {
 
   create(): void {
     this.hud = this.game.registry.get('hud') as HudController
+    this.codex = this.game.registry.get('codex') as CodexController
+    this.hud.setHandlers({
+      onInventoryToggle: () => {
+        this.toggleInventory()
+      },
+      onInventoryClose: () => {
+        this.closeInventory()
+      },
+      onRecipeSelect: (recipeId) => {
+        this.handleRecipeSelection(recipeId)
+      },
+      onWeaponEquip: (weaponId) => {
+        this.handleWeaponEquip(weaponId)
+      },
+    })
 
     this.cameras.main.setBackgroundColor('#07111f')
     this.physics.world.setBounds(24, 24, GAME_WIDTH - 48, GAME_HEIGHT - 48)
@@ -105,6 +159,9 @@ export class ArenaScene extends Phaser.Scene {
     this.player.setCircle(14)
     this.player.setCollideWorldBounds(true)
 
+    this.enemySprites = this.physics.add.group()
+    this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
+
     const keyboard = this.input.keyboard
     if (!keyboard) {
       throw new Error('Keyboard input is required for the NeoD prototype.')
@@ -116,28 +173,53 @@ export class ArenaScene extends Phaser.Scene {
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D,
     }) as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
-    this.combineKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C)
+    this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
 
     this.startWave(0)
     this.updateHud()
+    this.updateCodex()
   }
 
   update(time: number): void {
+    this.handleCodexToggle()
     this.handlePlayerMovement()
     this.handleFiring(time)
-    this.handleCombine()
     this.updateEnemies()
     this.updateProjectiles()
     this.cleanupDestroyedEntities()
 
-    if (shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
+    if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
       this.advanceWave()
     }
 
     this.updateHud()
+    this.updateCodex()
+  }
+
+  private isInteractionBlocked(): boolean {
+    return this.isInventoryOpen || this.isCodexOpen
+  }
+
+  private handleCodexToggle(): void {
+    if (!Phaser.Input.Keyboard.JustDown(this.codexKey) || this.isInventoryOpen) {
+      return
+    }
+
+    this.isCodexOpen = !this.isCodexOpen
+    this.applyInteractionPause(this.isCodexOpen)
+    this.statusMessage = this.isCodexOpen
+      ? 'Field Codex open. Combat is paused while you inspect shared data.'
+      : 'Field Codex closed. Combat resumed.'
+    this.updateCodex()
+    this.updateHud()
   }
 
   private handlePlayerMovement(): void {
+    if (this.isInteractionBlocked()) {
+      this.player.setVelocity(0, 0)
+      return
+    }
+
     const velocity = new Phaser.Math.Vector2(
       Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
       Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
@@ -151,7 +233,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleFiring(time: number): void {
-    if (this.isCombining || !this.input.activePointer.isDown || time < this.nextFireAt) {
+    if (this.isInteractionBlocked() || !this.input.activePointer.isDown || time < this.nextFireAt) {
       return
     }
 
@@ -183,39 +265,15 @@ export class ArenaScene extends Phaser.Scene {
     this.nextFireAt = time + weapon.fireRateMs
   }
 
-  private handleCombine(): void {
-    if (this.isCombining || !Phaser.Input.Keyboard.JustDown(this.combineKey)) {
-      return
-    }
-
-    const combineAttempt = attemptCombine(this.inventory)
-    if (combineAttempt.kind !== 'success') {
-      this.statusMessage = combineAttempt.statusMessage
-      return
-    }
-
-    this.isCombining = true
-    this.inventory = combineAttempt.nextInventory
-    this.activeWeaponId = combineAttempt.weaponId
-    this.statusMessage = combineAttempt.statusMessage
-
-    if (combineAttempt.shouldPauseCombat) {
-      this.freezeCombat(true)
-      this.time.delayedCall(450, () => {
-        this.isCombining = false
-        this.freezeCombat(false)
-      })
-    }
-  }
-
   private updateEnemies(): void {
     for (const enemy of this.enemies) {
       if (!enemy.sprite.active) {
         continue
       }
 
-      if (this.isCombining) {
+      if (this.isInteractionBlocked()) {
         enemy.sprite.setVelocity(0, 0)
+        this.syncEnemyHealthBar(enemy)
         continue
       }
 
@@ -226,6 +284,7 @@ export class ArenaScene extends Phaser.Scene {
 
       if (direction.lengthSq() === 0) {
         enemy.sprite.setVelocity(0, 0)
+        this.syncEnemyHealthBar(enemy)
         continue
       }
 
@@ -244,10 +303,16 @@ export class ArenaScene extends Phaser.Scene {
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
       }
+
+      this.syncEnemyHealthBar(enemy)
     }
   }
 
   private updateProjectiles(): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
     for (const projectile of this.projectiles) {
       if (!projectile.sprite.active) {
         continue
@@ -308,6 +373,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private cleanupDestroyedEntities(): void {
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active) {
+        this.destroyEnemyHealthBar(enemy)
+      }
+    }
+
     this.enemies = this.enemies.filter((enemy) => enemy.sprite.active)
     this.lootDrops = this.lootDrops.filter((loot) => loot.sprite.active)
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
@@ -376,19 +447,23 @@ export class ArenaScene extends Phaser.Scene {
           ? 48
           : GAME_HEIGHT - 48
 
-    const texture = enemyId === 'slime-boss' ? 'boss' : 'slime'
-    const sprite = this.physics.add.image(x, y, texture)
+    const sprite = this.physics.add.image(x, y, config.textureKey)
     sprite.setTint(config.tint)
     sprite.setCircle(config.size / 2)
     sprite.setCollideWorldBounds(true)
-    sprite.setBounce(0.2)
+    sprite.setBounce(0)
+    this.enemySprites.add(sprite)
 
-    this.enemies.push({
+    const enemy: EnemyEntity = {
       sprite,
       config,
       currentHealth: config.maxHealth,
+      healthBar: this.createEnemyHealthBar(sprite, config),
       lastHitAt: 0,
-    })
+    }
+
+    this.syncEnemyHealthBar(enemy)
+    this.enemies.push(enemy)
   }
 
   private damageEnemy(enemy: EnemyEntity, damage: number): void {
@@ -399,6 +474,7 @@ export class ArenaScene extends Phaser.Scene {
 
     enemy.lastHitAt = now
     enemy.currentHealth -= damage
+    this.syncEnemyHealthBar(enemy)
 
     if (enemy.currentHealth > 0) {
       enemy.sprite.setScale(1.08)
@@ -423,6 +499,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     const wasBoss = enemy.config.id === 'slime-boss'
+    this.destroyEnemyHealthBar(enemy)
     enemy.sprite.destroy()
 
     if (wasBoss) {
@@ -435,7 +512,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private damagePlayer(damage: number): void {
     const now = this.time.now
-    if (now - this.lastPlayerHitAt < 450 || this.isCombining) {
+    if (now - this.lastPlayerHitAt < 450 || this.isInteractionBlocked()) {
       return
     }
 
@@ -453,7 +530,97 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private toggleInventory(): void {
+    if (this.isInventoryOpen) {
+      this.closeInventory()
+      return
+    }
+
+    if (this.isCodexOpen) {
+      return
+    }
+
+    this.openInventory()
+  }
+
+  private openInventory(): void {
+    this.isInventoryOpen = true
+    this.applyInteractionPause(true)
+    this.statusMessage = 'Inventory opened. Combat is paused while you inspect and combine.'
+    this.updateHud()
+  }
+
+  private closeInventory(): void {
+    if (!this.isInventoryOpen) {
+      return
+    }
+
+    this.isInventoryOpen = false
+    this.applyInteractionPause(false)
+    this.statusMessage = 'Inventory closed. Combat resumed.'
+    this.updateHud()
+  }
+
+  private applyInteractionPause(shouldPause: boolean): void {
+    if (shouldPause) {
+      this.player.setVelocity(0, 0)
+      this.physics.world.pause()
+    } else {
+      this.physics.world.resume()
+    }
+
+    if (this.spawnTimer) {
+      this.spawnTimer.paused = shouldPause
+    }
+
+    this.freezeCombat(shouldPause)
+  }
+
+  private handleRecipeSelection(recipeId: RecipeId): void {
+    if (!this.isInventoryOpen) {
+      return
+    }
+
+    const result = applyRecipeSelectionWorkflow({
+      inventory: this.inventory,
+      ownedWeaponIds: this.ownedWeaponIds,
+    }, recipeId)
+
+    if (result.kind !== 'success') {
+      this.statusMessage = result.statusMessage
+      this.updateHud()
+      return
+    }
+
+    this.inventory = result.nextInventory
+    this.ownedWeaponIds = result.ownedWeaponIds
+    this.activeWeaponId = result.activeWeaponId
+    this.statusMessage = result.statusMessage
+    this.updateHud()
+  }
+
+  private handleWeaponEquip(weaponId: WeaponId): void {
+    if (!this.isInventoryOpen) {
+      return
+    }
+
+    const nextWeaponId = equipOwnedWeapon(this.ownedWeaponIds, this.activeWeaponId, weaponId)
+    if (nextWeaponId === this.activeWeaponId) {
+      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} is already equipped.`
+      this.updateHud()
+      return
+    }
+
+    this.activeWeaponId = nextWeaponId
+    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} equipped.`
+    this.updateHud()
+  }
+
   private freezeCombat(shouldFreeze: boolean): void {
+    if (this.enemySpacingCollider) {
+      this.enemySpacingCollider.active = !shouldFreeze
+    }
+
     if (!shouldFreeze) {
       return
     }
@@ -463,8 +630,66 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private createEnemyHealthBar(
+    sprite: PhysicsImage,
+    config: EnemyDefinition,
+  ): EnemyHealthBar {
+    const { width, height, offsetY } = getEnemyHealthBarMetrics(config.size)
+
+    const background = this.add
+      .rectangle(0, 0, width, height, 0x000000, 0.9)
+      .setOrigin(0, 0.5)
+      .setDepth(sprite.depth + 2)
+
+    const fill = this.add
+      .rectangle(0, 0, width, height, 0xff4d4d, 1)
+      .setOrigin(0, 0.5)
+      .setDepth(sprite.depth + 3)
+
+    return {
+      background,
+      fill,
+      width,
+      height,
+      offsetY,
+    }
+  }
+
+  private syncEnemyHealthBar(enemy: EnemyEntity): void {
+    if (!enemy.sprite.active) {
+      return
+    }
+
+    const { background, fill, width, height, offsetY } = enemy.healthBar
+    const left = enemy.sprite.x - width / 2
+    const y = enemy.sprite.y - offsetY
+    const fillWidth = getEnemyHealthFillWidth(
+      enemy.currentHealth,
+      enemy.config.maxHealth,
+      width,
+    )
+
+    background.setPosition(left, y)
+    fill.setPosition(left, y)
+    fill.setVisible(fillWidth > 0)
+    fill.setDisplaySize(fillWidth, height)
+  }
+
+  private destroyEnemyHealthBar(enemy: EnemyEntity): void {
+    if (enemy.healthBar.background.active) {
+      enemy.healthBar.background.destroy()
+    }
+
+    if (enemy.healthBar.fill.active) {
+      enemy.healthBar.fill.destroy()
+    }
+  }
+
   private endRun(outcome: 'win' | 'loss'): void {
     this.spawnTimer?.remove(false)
+    this.isInventoryOpen = false
+    this.isCodexOpen = false
+    this.codex.update(getCodexState(false))
     this.freezeCombat(true)
     this.hud.update({
       title: outcome === 'win' ? 'Run complete' : 'Run failed',
@@ -476,8 +701,16 @@ export class ArenaScene extends Phaser.Scene {
       inventory: [],
       recipes: [],
       objective: 'Press R on the result screen to restart.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · C combine',
+      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to swap or combine · Q codex',
       status: this.statusMessage,
+      inventoryButtonLabel: 'Inventory unavailable',
+      inventoryButtonDisabled: true,
+      modal: {
+        isOpen: false,
+        items: [],
+        recipes: [],
+        weapons: [],
+      },
     })
 
     this.time.delayedCall(600, () => {
@@ -491,7 +724,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private updateHud(): void {
     const weapon = WEAPON_DEFINITIONS[this.activeWeaponId]
-    const recipes = getAvailableRecipes(this.inventory)
+    const actionableRecipes = getActionableRecipes(this.inventory, this.ownedWeaponIds)
 
     this.hud.update({
       title: 'NeoD Prototype',
@@ -503,12 +736,58 @@ export class ArenaScene extends Phaser.Scene {
         `Remaining spawns: ${this.remainingSpawns}`,
       ],
       inventory: describeInventoryEntries(this.inventory),
-      recipes: describeAvailableRecipes(recipes),
+      recipes: describeAvailableRecipes(actionableRecipes),
       objective: this.isBossActive
         ? 'Defeat the Crown Slime to clear the run.'
-        : 'Survive the waves, collect drops, and press C when a combine is ready.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · C combine',
+        : 'Survive the waves, collect drops, and open inventory to combine upgrades.',
+      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to combine or swap weapons · Q codex',
       status: this.statusMessage,
+      inventoryButtonLabel: this.isInventoryOpen ? 'Resume run' : 'Open inventory',
+      inventoryButtonDisabled: this.isCodexOpen,
+      modal: {
+        isOpen: this.isInventoryOpen,
+        items: this.getOwnedItemViews(),
+        recipes: this.getRecipeViews(actionableRecipes),
+        weapons: this.getOwnedWeaponViews(),
+      },
+    })
+  }
+
+  private updateCodex(): void {
+    this.codex.update(getCodexState(this.isCodexOpen))
+  }
+
+  private getOwnedItemViews(): HudOwnedItemView[] {
+    return (Object.entries(this.inventory) as [LootId, number][]).map(([itemId, count]) => ({
+      id: itemId,
+      name: ITEM_DEFINITIONS[itemId].name,
+      description: ITEM_DEFINITIONS[itemId].description,
+      count,
+    }))
+  }
+
+  private getRecipeViews(recipes: AvailableRecipe[]) {
+    return recipes.map(({ recipe, weapon }) => ({
+      id: recipe.id,
+      name: recipe.name,
+      outputWeaponId: recipe.outputWeaponId,
+      outputWeaponName: weapon.name,
+      damage: weapon.damage,
+      inputs: recipe.inputs.map((itemId) => ITEM_DEFINITIONS[itemId].name),
+    }))
+  }
+
+  private getOwnedWeaponViews(): HudOwnedWeaponView[] {
+    return this.ownedWeaponIds.map((weaponId) => {
+      const ownedWeapon = WEAPON_DEFINITIONS[weaponId]
+
+      return {
+        id: weaponId,
+        name: ownedWeapon.name,
+        description: ownedWeapon.description,
+        damage: ownedWeapon.damage,
+        isEquipped: weaponId === this.activeWeaponId,
+      }
     })
   }
 }

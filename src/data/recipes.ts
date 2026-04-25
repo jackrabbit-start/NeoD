@@ -22,4 +22,11 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
     outputWeaponId: 'storm-cannon',
     note: 'Combines volatile acid and frost into a stronger hybrid build.',
   },
+  {
+    id: 'arc-loom-recipe',
+    name: 'Arc Loom',
+    inputs: ['spark-knot', 'mist-bead'],
+    outputWeaponId: 'arc-loom',
+    note: 'Braids bright charge and cool mist into a faster lattice weapon.',
+  },
 ]
