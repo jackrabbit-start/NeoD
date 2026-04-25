@@ -2,6 +2,12 @@ import type { EnemyId } from '../data/contentIds.js'
 
 export const PLAYER_LEVEL_XP_THRESHOLDS = [0, 5, 12, 22, 36] as const
 
+const MIN_PLAYER_LEVEL = 1
+const LAST_SEEDED_LEVEL = PLAYER_LEVEL_XP_THRESHOLDS.length
+const LAST_SEEDED_LEVEL_XP = PLAYER_LEVEL_XP_THRESHOLDS[LAST_SEEDED_LEVEL - 1]
+const LAST_SEEDED_LEVEL_XP_REQUIREMENT =
+  PLAYER_LEVEL_XP_THRESHOLDS[LAST_SEEDED_LEVEL - 1] - PLAYER_LEVEL_XP_THRESHOLDS[LAST_SEEDED_LEVEL - 2]
+
 export const ENEMY_PLAYER_XP: Record<EnemyId, number> = {
   slime: 1,
   'spark-slime': 2,
@@ -35,7 +41,31 @@ export interface PlayerProgressionResult {
   view: PlayerProgressionView
 }
 
-const clampTotalXp = (totalXp: number): number => Math.max(0, Math.floor(totalXp))
+const clampTotalXp = (totalXp: number): number =>
+  Number.isFinite(totalXp) ? Math.max(0, Math.floor(totalXp)) : 0
+
+function getXpRequiredForLevel(level: number): number {
+  const targetLevel = Math.max(MIN_PLAYER_LEVEL, Math.floor(level))
+  const seededThreshold = PLAYER_LEVEL_XP_THRESHOLDS[targetLevel - 1]
+
+  if (seededThreshold !== undefined) {
+    return seededThreshold
+  }
+
+  let threshold = LAST_SEEDED_LEVEL_XP
+  let xpToNextLevel = LAST_SEEDED_LEVEL_XP_REQUIREMENT + LAST_SEEDED_LEVEL
+
+  for (let currentLevel = LAST_SEEDED_LEVEL; currentLevel < targetLevel; currentLevel += 1) {
+    threshold += xpToNextLevel
+    xpToNextLevel += currentLevel + 1
+  }
+
+  return threshold
+}
+
+function getXpRequiredForNextLevel(level: number): number {
+  return getXpRequiredForLevel(level + 1) - getXpRequiredForLevel(level)
+}
 
 export function createInitialPlayerProgressionState(): PlayerProgressionState {
   return {
@@ -50,26 +80,23 @@ export function getPlayerXpForEnemy(enemyId: EnemyId): number {
 
 export function getPlayerLevelForXp(totalXp: number): number {
   const xp = clampTotalXp(totalXp)
-  let level = 1
+  let level = MIN_PLAYER_LEVEL
 
-  for (let index = 0; index < PLAYER_LEVEL_XP_THRESHOLDS.length; index += 1) {
-    if (xp >= PLAYER_LEVEL_XP_THRESHOLDS[index]) {
-      level = index + 1
-    }
+  while (xp >= getXpRequiredForLevel(level + 1)) {
+    level += 1
   }
 
-  return Math.min(level, PLAYER_LEVEL_XP_THRESHOLDS.length)
+  return level
 }
 
 export function getPlayerProgressionView(totalXp: number): PlayerProgressionView {
   const xp = clampTotalXp(totalXp)
   const level = getPlayerLevelForXp(xp)
-  const currentLevelXp = PLAYER_LEVEL_XP_THRESHOLDS[level - 1] ?? 0
-  const nextLevelAt = PLAYER_LEVEL_XP_THRESHOLDS[level] ?? null
-  const isMaxLevel = nextLevelAt === null
-  const xpToNextLevel = isMaxLevel ? 0 : Math.max(1, nextLevelAt - currentLevelXp)
-  const xpIntoLevel = isMaxLevel ? xp - currentLevelXp : Math.max(0, xp - currentLevelXp)
-  const progressRatio = isMaxLevel ? 1 : Math.min(xpIntoLevel / xpToNextLevel, 1)
+  const currentLevelXp = getXpRequiredForLevel(level)
+  const nextLevelAt = getXpRequiredForLevel(level + 1)
+  const xpToNextLevel = Math.max(1, getXpRequiredForNextLevel(level))
+  const xpIntoLevel = Math.max(0, xp - currentLevelXp)
+  const progressRatio = Math.min(xpIntoLevel / xpToNextLevel, 1)
 
   return {
     totalXp: xp,
@@ -79,7 +106,7 @@ export function getPlayerProgressionView(totalXp: number): PlayerProgressionView
     xpToNextLevel,
     nextLevelAt,
     progressRatio,
-    isMaxLevel,
+    isMaxLevel: false,
   }
 }
 

@@ -2123,11 +2123,7 @@ export class ArenaScene extends Phaser.Scene {
     fill.setVisible(fillWidth > 0)
     fill.setDisplaySize(fillWidth, height - 4)
     label.setText(`HP ${this.playerHealth}/${this.playerMaxHealth}`)
-    levelLabel.setText(
-      progression.isMaxLevel
-        ? `Lv.${progression.level} · XP MAX`
-        : `Lv.${progression.level} · XP ${progression.xpIntoLevel}/${progression.xpToNextLevel}`,
-    )
+    levelLabel.setText(`Lv.${progression.level} · XP ${progression.xpIntoLevel}/${progression.xpToNextLevel}`)
     xpFill.setVisible(xpFillWidth > 0)
     xpFill.setDisplaySize(xpFillWidth, xpHeight - 2)
   }
@@ -2324,9 +2320,7 @@ export class ArenaScene extends Phaser.Scene {
       subtitle: this.activeRunLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
-        playerProgression.isMaxLevel
-          ? `플레이어 레벨: Lv.${playerProgression.level} · XP MAX`
-          : `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel}`,
+        `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel}`,
         `무기: ${weapon.name} ${'★'.repeat(activeStar)} · ${getWeaponSummary(weapon)}`,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,

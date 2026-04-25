@@ -472,7 +472,9 @@ test('player progression starts per run and levels from enemy defeat xp', () => 
   assert.equal(getPlayerLevelForXp(4), 1)
   assert.equal(getPlayerLevelForXp(5), 2)
   assert.equal(getPlayerLevelForXp(12), 3)
-  assert.equal(getPlayerLevelForXp(999), 5)
+  assert.equal(getPlayerLevelForXp(36), 5)
+  assert.equal(getPlayerLevelForXp(55), 6)
+  assert.equal(getPlayerLevelForXp(999), 17)
 
   const firstDefeat = applyEnemyPlayerXp(initial, 'prism-slime')
   assert.deepEqual(firstDefeat.state, { totalXp: 5, level: 2 })
@@ -493,7 +495,7 @@ test('player progression starts per run and levels from enemy defeat xp', () => 
   assert.equal(bossDefeat.didLevelUp, false)
 })
 
-test('player progression view clamps invalid and max-level xp', () => {
+test('player progression view clamps invalid xp and continues past seeded levels', () => {
   assert.deepEqual(getPlayerProgressionView(-5), {
     totalXp: 0,
     level: 1,
@@ -510,10 +512,21 @@ test('player progression view clamps invalid and max-level xp', () => {
     level: 5,
     currentLevelXp: 36,
     xpIntoLevel: 4,
-    xpToNextLevel: 0,
-    nextLevelAt: null,
-    progressRatio: 1,
-    isMaxLevel: true,
+    xpToNextLevel: 19,
+    nextLevelAt: 55,
+    progressRatio: 4 / 19,
+    isMaxLevel: false,
+  })
+
+  assert.deepEqual(getPlayerProgressionView(999), {
+    totalXp: 999,
+    level: 17,
+    currentLevelXp: 880,
+    xpIntoLevel: 119,
+    xpToNextLevel: 157,
+    nextLevelAt: 1037,
+    progressRatio: 119 / 157,
+    isMaxLevel: false,
   })
 
   assert.deepEqual(applyPlayerXp({ totalXp: 4, level: 1 }, 8).state, {
