@@ -147,6 +147,13 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     fallback: { radius: 7, color: 0xc4f1ff },
   },
   {
+    key: 'tuning-capsule',
+    path: 'assets/loot/tuning-capsule.svg',
+    width: 14,
+    height: 14,
+    fallback: { radius: 7, color: 0xff9df3 },
+  },
+  {
     key: 'weapon-starter-blaster',
     path: getHudWeaponAssetPath('weapon-starter-blaster'),
     width: 96,

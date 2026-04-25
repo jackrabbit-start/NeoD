@@ -36,4 +36,11 @@ export const ITEM_DEFINITIONS = {
     color: 0xc4f1ff,
     textureKey: 'mist-bead',
   },
+  'tuning-capsule': {
+    id: 'tuning-capsule',
+    name: '튜닝 캡슐',
+    description: '조합 무기를 한 번 튜닝하는 런 전용 캡슐입니다.',
+    color: 0xff9df3,
+    textureKey: 'tuning-capsule',
+  },
 } as const satisfies Record<LootId, ItemDefinition>

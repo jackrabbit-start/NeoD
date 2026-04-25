@@ -379,6 +379,11 @@ button {
   background: rgba(11, 18, 38, 0.92);
 }
 
+.hud-button--compact {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 .hud-modal-layer {
   position: fixed;
   inset: 0;
@@ -544,8 +549,20 @@ button {
   outline: none;
 }
 
+.hud-modal__item--weapon {
+  align-items: stretch;
+  cursor: default;
+}
+
 .hud-modal__item--weapon.is-equipped .hud-modal__weapon-meta {
   color: #a6ffd0;
+}
+
+.hud-modal__weapon-actions {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  min-width: 112px;
 }
 
 .hud-modal__recipe-output,
