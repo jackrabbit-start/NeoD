@@ -117,32 +117,39 @@ export class HudController {
     this.modalLayer.className = 'hud-modal-layer'
     this.modalLayer.innerHTML = `
       <div class="hud-modal__backdrop" data-action="inventory-close"></div>
-      <section class="hud-modal" role="dialog" aria-modal="true" aria-label="인벤토리">
-        <header class="hud-modal__header">
-          <div>
-            <p class="hud-modal__eyebrow">인벤토리 일시정지</p>
-            <h2>무기 인벤토리</h2>
-            <p class="hud-modal__summary">같은 무기·같은 별 3개는 자동으로 합쳐집니다.</p>
+      <div class="hud-modal__cluster hud-modal__cluster--inventory">
+        <section class="hud-modal hud-modal--inventory-stats" role="dialog" aria-modal="true" aria-label="캐릭터 스탯">
+          <header class="hud-modal__header hud-modal__header--compact">
+            <div>
+              <p class="hud-modal__eyebrow">현재 상태</p>
+              <h2>캐릭터 스탯</h2>
+              <p class="hud-modal__summary">현재 레벨과 장착 무기 기준 실시간 수치입니다.</p>
+            </div>
+          </header>
+          <div class="hud-modal__stats" data-region="character-stats"></div>
+        </section>
+        <section class="hud-modal hud-modal--inventory-main" role="dialog" aria-modal="true" aria-label="인벤토리">
+          <header class="hud-modal__header">
+            <div>
+              <p class="hud-modal__eyebrow">인벤토리 일시정지</p>
+              <h2>무기 인벤토리</h2>
+              <p class="hud-modal__summary">같은 무기·같은 별 3개는 자동으로 합쳐집니다.</p>
+            </div>
+            <button type="button" class="hud-button hud-button--secondary" data-action="inventory-close">런 재개</button>
+          </header>
+          <div class="hud-modal__grid hud-modal__grid--inventory">
+            <section class="hud-modal__section hud-modal__section--equipped">
+              <h3>현재 장착</h3>
+              <div class="hud-modal__list" data-region="equipped-weapons"></div>
+            </section>
+            <section class="hud-modal__section hud-modal__section--owned">
+              <h3>보유 아이템</h3>
+              <p class="hud-modal__hint">장착할 무기만 고르세요. 스펙은 항목에 마우스를 올리면 보입니다.</p>
+              <div class="hud-modal__list" data-region="weapons"></div>
+            </section>
           </div>
-          <button type="button" class="hud-button hud-button--secondary" data-action="inventory-close">런 재개</button>
-        </header>
-        <div class="hud-modal__grid hud-modal__grid--inventory">
-          <section class="hud-modal__section hud-modal__section--equipped">
-            <h3>현재 장착</h3>
-            <div class="hud-modal__list" data-region="equipped-weapons"></div>
-          </section>
-          <section class="hud-modal__section hud-modal__section--owned">
-            <h3>보유 아이템</h3>
-            <p class="hud-modal__hint">장착할 무기만 고르세요. 스펙은 항목에 마우스를 올리면 보입니다.</p>
-            <div class="hud-modal__list" data-region="weapons"></div>
-          </section>
-          <section class="hud-modal__section hud-modal__section--character">
-            <h3>현재 캐릭터 스탯</h3>
-            <p class="hud-modal__hint">현재 레벨과 장착 무기 기준 실시간 수치입니다.</p>
-            <div class="hud-modal__stats" data-region="character-stats"></div>
-          </section>
-        </div>
-      </section>
+        </section>
+      </div>
     `
 
     this.stageModalLayer = document.createElement('div')

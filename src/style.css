@@ -531,6 +531,18 @@ button {
   pointer-events: auto;
 }
 
+.hud-modal__cluster {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  width: min(1080px, calc(100% - 48px));
+  max-height: calc(100% - 48px);
+}
+
 .hud-modal__backdrop {
   position: absolute;
   inset: 0;
@@ -553,6 +565,25 @@ button {
     rgba(7, 14, 31, 0.96);
   box-shadow: var(--ui-shadow);
   padding: 20px;
+}
+
+.hud-modal__cluster .hud-modal {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  max-height: calc(100vh - 48px);
+}
+
+.hud-modal--inventory-main {
+  flex: 1 1 760px;
+  width: auto;
+  min-width: 0;
+}
+
+.hud-modal--inventory-stats {
+  flex: 0 0 290px;
+  width: 290px;
 }
 
 .hud-modal--stage {
@@ -598,8 +629,12 @@ button {
 }
 
 .hud-modal__grid--inventory {
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr) minmax(220px, 0.85fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
   align-items: start;
+}
+
+.hud-modal__header--compact {
+  margin-bottom: 16px;
 }
 
 .hud-modal__section {
@@ -891,10 +926,21 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .hud-modal__cluster {
+    flex-direction: column;
+    width: min(760px, calc(100% - 24px));
+  }
+
   .hud-modal {
     width: min(760px, calc(100% - 24px));
     max-height: calc(100% - 24px);
     padding: 16px;
+  }
+
+  .hud-modal--inventory-main,
+  .hud-modal--inventory-stats {
+    width: 100%;
+    flex: 0 0 auto;
   }
 
   .codex-panel {
