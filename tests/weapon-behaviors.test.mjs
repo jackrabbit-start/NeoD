@@ -179,7 +179,9 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
           zoneRadius: 44,
           zoneDurationMs: 1800,
           zoneTickMs: 210,
-          zoneDamage: 8,
+          zoneDamage: 24,
+          zoneTriggerMode: 'trigger-explode',
+          armingDelayMs: 140,
           speedMultiplier: 0.52,
         },
       },
@@ -294,7 +296,8 @@ test('deploy, summon, zone, split, and ricochet weapons expose distinct plans', 
 
   assert.equal(mist.attackBehavior.kind, 'zone-control')
   assert.equal(mistPlan.projectiles[0].hazardOnHit?.radius, 44)
-  assert.equal(getWeaponSpecialEffectProfile(mist), 'hazard-linger')
+  assert.equal(mistPlan.projectiles[0].hazardOnHit?.mode, 'trigger-trap')
+  assert.equal(getWeaponSpecialEffectProfile(mist), 'impact-splash')
 
   assert.equal(storm.attackBehavior.kind, 'split-shot')
   assert.equal(stormPlan.projectiles.length, 8)

@@ -1,9 +1,8 @@
 <svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="9" y="11" width="78" height="74" rx="22" fill="#0F2630"/>
-  <path d="M26 55C22 42 33 29 49 30C66 31 75 46 67 59C59 72 35 73 30 58" stroke="#A5F3FC" stroke-width="7" stroke-linecap="round"/>
-  <path d="M34 47C40 39 54 39 59 48C63 55 58 63 49 64" stroke="#67E8F9" stroke-width="5" stroke-linecap="round"/>
-  <rect x="22" y="22" width="18" height="15" rx="4" fill="#D9F99D"/>
-  <path d="M26 29H36M29 34H33" stroke="#0F2630" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="65" cy="26" r="5" fill="#BAE6FD"/>
-  <circle cx="73" cy="32" r="3" fill="#E0F2FE"/>
+  <rect x="8" y="10" width="80" height="76" rx="20" fill="#0F2630"/>
+  <rect x="21" y="22" width="52" height="15" rx="6" fill="#D9F99D"/>
+  <path d="M28 29H47M52 29H66" stroke="#0F2630" stroke-width="3" stroke-linecap="round"/>
+  <path d="M27 55C24 43 33 31 49 31C64 31 74 44 67 58C60 71 37 73 30 60" stroke="#A5F3FC" stroke-width="7" stroke-linecap="round"/>
+  <path d="M35 48C41 42 53 42 58 49" stroke="#67E8F9" stroke-width="5" stroke-linecap="round"/>
+  <path d="M41 66H59" stroke="#E0F2FE" stroke-width="4" stroke-linecap="round"/>
 </svg>

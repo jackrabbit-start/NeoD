@@ -1000,7 +1000,8 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   assert.match(sparkSummary ?? '', /포탑당 9/)
   assert.match(mistSummary ?? '', /컴파일러 \[문법 폭발]/)
   assert.match(mistSummary ?? '', /직격 8/)
-  assert.match(mistSummary ?? '', /지대 44/)
+  assert.match(mistSummary ?? '', /폭발 24/)
+  assert.match(mistSummary ?? '', /함정 44/)
 
   const needleRecipes = getActionableRecipes(
     {
@@ -2389,7 +2390,8 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
   const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
   assert.equal(levelTwentyMist.attackBehavior.kind, 'zone-control')
   assert.equal(levelTwentyMist.attackBehavior.zoneRadius, 58)
-  assert.equal(levelTwentyMist.attackBehavior.zoneDamage, 16)
+  assert.equal(levelTwentyMist.attackBehavior.zoneDamage, 47)
+  assert.equal(levelTwentyMist.attackBehavior.zoneTriggerMode, 'trigger-explode')
 
   const levelTwentySpark = deriveEffectiveWeaponStats('spark-carbine', {}, 1, 20)
   assert.equal(levelTwentySpark.attackBehavior.kind, 'deploy-turret')
@@ -2446,7 +2448,7 @@ test('combat effects are split out for projectile trails and lingering hazard pu
   assert.ok(arenaSceneSource.includes('createHazardZoneEffect('))
   assert.ok(combatEffectsSource.includes('spawnHazardTickEffect'))
   assert.ok(combatEffectsSource.includes('scene.add.graphics({ x, y })'))
-  assert.ok(combatEffectsSource.includes('scene.add.graphics({ x: point.x, y: point.y })'))
+  assert.ok(combatEffectsSource.includes('scene.add.container(point.x, point.y)'))
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {

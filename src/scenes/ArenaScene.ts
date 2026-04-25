@@ -178,7 +178,9 @@ import type {
 import {
   createHazardZoneEffect,
   destroyHazardZoneEffect,
+  type ProjectileTrailStyle,
   spawnChainLightningEffect,
+  spawnExplosionEffect,
   spawnHazardTickEffect,
   spawnMeleeSwingEffect,
   spawnProjectileTrailEffect,
@@ -384,6 +386,7 @@ interface ProjectileEntity {
   baseMaxHits: number
   visualPowerTier: number
   trailCooldownMs: number
+  trailStyle: ProjectileTrailStyle
 }
 
 interface EnemyProjectileEntity extends EnemyProjectileState {
@@ -398,6 +401,8 @@ interface HazardZoneEntity {
   radius: number
   damage: number
   baseDamage: number
+  mode: 'damage-zone' | 'trigger-trap'
+  armingDelayMs: number
   remainingLifetimeMs: number
   totalLifetimeMs: number
   tickEveryMs: number
@@ -551,6 +556,12 @@ export class ArenaScene extends Phaser.Scene {
   private rememberedWeaponTargetDirection?: Phaser.Math.Vector2
 
   private nextFireAt = 0
+
+  private bloodReaverAuraCore?: Phaser.GameObjects.Arc
+
+  private bloodReaverAuraRing?: Phaser.GameObjects.Arc
+
+  private nextBloodReaverAuraTickAt = 0
 
   private runElapsedMs = 0
 
@@ -750,6 +761,7 @@ export class ArenaScene extends Phaser.Scene {
     this.updateMagnetPickups(time, delta)
     this.updatePachinkoTokenPickups(time, delta)
     this.updatePachinko()
+    this.updateBloodReaverAura(time)
     this.updateHazards(delta)
     if (this.isRunEnding) {
       return
@@ -1060,6 +1072,96 @@ export class ArenaScene extends Phaser.Scene {
       duration: 70,
       yoyo: true,
     })
+  }
+
+  private updateBloodReaverAura(time: number): void {
+    const weapon = this.getActiveEffectiveWeapon()
+    const isBloodReaver =
+      weapon.id === 'slime-glaive' &&
+      weapon.attackBehavior.kind === 'melee-cleave' &&
+      Boolean(weapon.attackBehavior.healOnHit)
+
+    if (!isBloodReaver || this.isInteractionBlocked() || !this.player?.active) {
+      this.destroyBloodReaverAura()
+      return
+    }
+
+    const behavior = weapon.attackBehavior
+    if (behavior.kind !== 'melee-cleave') {
+      this.destroyBloodReaverAura()
+      return
+    }
+
+    const radius = Math.max(28, Math.round(behavior.range * 0.62))
+    const tint = weapon.projectileTint
+
+    if (!this.bloodReaverAuraCore?.active) {
+      this.bloodReaverAuraCore = this.add.circle(this.player.x, this.player.y, radius, tint, 0.08).setDepth(0.55)
+      this.bloodReaverAuraRing = this.add.circle(this.player.x, this.player.y, radius * 1.08, tint, 0)
+        .setStrokeStyle(3, 0xffc06b, 0.38)
+        .setDepth(0.58)
+
+      this.tweens.add({
+        targets: [this.bloodReaverAuraCore, this.bloodReaverAuraRing],
+        scaleX: 1.06,
+        scaleY: 1.06,
+        alpha: { from: 0.28, to: 0.12 },
+        yoyo: true,
+        repeat: -1,
+        duration: 260,
+      })
+    }
+
+    this.bloodReaverAuraCore?.setPosition(this.player.x, this.player.y).setRadius(radius)
+    this.bloodReaverAuraRing?.setPosition(this.player.x, this.player.y).setRadius(radius * 1.08)
+
+    if (time < this.nextBloodReaverAuraTickAt) {
+      return
+    }
+
+    const impactedIds = new Set(
+      collectTargetsInRadius(
+        { x: this.player.x, y: this.player.y },
+        radius,
+        this.enemies
+          .filter((enemy) => enemy.sprite.active)
+          .map((enemy) => ({
+            id: enemy.runtimeId,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            radius: enemy.config.size / 2,
+          })),
+      ),
+    )
+
+    if (impactedIds.size > 0) {
+      const auraDamage = Math.max(1, Math.round(weapon.damage * 0.18))
+      for (const enemy of this.enemies) {
+        if (!enemy.sprite.active || !impactedIds.has(enemy.runtimeId)) {
+          continue
+        }
+        this.damageEnemy(enemy, auraDamage, {
+          ignoreRecentHit: true,
+          baseDamage: auraDamage,
+        })
+        if (this.isRunEnding) {
+          return
+        }
+      }
+    }
+
+    this.nextBloodReaverAuraTickAt = time + 240
+  }
+
+  private destroyBloodReaverAura(): void {
+    if (this.bloodReaverAuraCore?.active) {
+      this.bloodReaverAuraCore.destroy()
+    }
+    if (this.bloodReaverAuraRing?.active) {
+      this.bloodReaverAuraRing.destroy()
+    }
+    this.bloodReaverAuraCore = undefined
+    this.bloodReaverAuraRing = undefined
   }
 
   private updateEnemies(delta: number): void {
@@ -1624,6 +1726,7 @@ export class ArenaScene extends Phaser.Scene {
           { x: projectile.sprite.x, y: projectile.sprite.y },
           projectile.tint,
           projectile.visualPowerTier,
+          projectile.trailStyle,
         )
         projectile.trailCooldownMs = projectile.chain ? 70 : 110
       }
@@ -1782,6 +1885,23 @@ export class ArenaScene extends Phaser.Scene {
     sprite.setDepth(defeatedEnemy.sprite.depth)
     sprite.setCircle(Math.max(10, summon.contactRadius - 4))
     sprite.play(defeatedEnemy.config.animationKey, true)
+    const aura = this.add.circle(
+      defeatedEnemy.sprite.x,
+      defeatedEnemy.sprite.y,
+      Math.max(10, summon.contactRadius * 0.7),
+      0x8cffbf,
+      0.14,
+    ).setDepth(defeatedEnemy.sprite.depth - 0.1)
+    this.tweens.add({
+      targets: aura,
+      alpha: 0.05,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      yoyo: true,
+      repeat: -1,
+      duration: 280,
+    })
+    sprite.once(Phaser.GameObjects.Events.DESTROY, () => aura.destroy())
 
     this.alliedMinions.push({
       runtimeId: this.nextFriendlyRuntimeId,
@@ -1815,6 +1935,28 @@ export class ArenaScene extends Phaser.Scene {
     const ring = this.add.circle(x, y, 18 + Math.max(0, deploy.visualPowerTier ?? 0) * 2, deploy.tint, 0.18)
       .setStrokeStyle(2, deploy.tint, 0.58)
       .setDepth(2.4)
+    const barrel = this.add.rectangle(
+      x + 10 + Math.max(0, deploy.visualPowerTier ?? 0),
+      y,
+      14,
+      4,
+      0xfff7c2,
+      0.88,
+    ).setDepth(2.7)
+    const innerRing = this.add.circle(x, y, 8, 0xffffff, 0.18).setDepth(2.65)
+    this.tweens.add({
+      targets: [ring, innerRing],
+      alpha: 0.12,
+      scaleX: 1.08,
+      scaleY: 1.08,
+      yoyo: true,
+      repeat: -1,
+      duration: 260,
+    })
+    core.once(Phaser.GameObjects.Events.DESTROY, () => {
+      barrel.destroy()
+      innerRing.destroy()
+    })
 
     this.deployedTurrets.push({
       runtimeId: this.nextFriendlyRuntimeId,
@@ -2299,6 +2441,8 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
+      hazard.armingDelayMs = Math.max(0, hazard.armingDelayMs - delta)
+
       const hazardStep = advanceHazardState(
         hazard.remainingLifetimeMs,
         hazard.tickCountdownMs,
@@ -2307,6 +2451,47 @@ export class ArenaScene extends Phaser.Scene {
       )
       hazard.remainingLifetimeMs = hazardStep.remainingLifetimeMs
       hazard.tickCountdownMs = hazardStep.tickCountdownMs
+
+      if (hazard.mode === 'trigger-trap') {
+        if (hazard.armingDelayMs <= 0) {
+          const triggeredEnemyIds = new Set(
+            collectTargetsInRadius(
+              { x: hazard.x, y: hazard.y },
+              hazard.radius,
+              this.enemies
+                .filter((enemy) => enemy.sprite.active)
+                .map((enemy) => ({
+                  id: enemy.runtimeId,
+                  x: enemy.sprite.x,
+                  y: enemy.sprite.y,
+                  radius: enemy.config.size / 2,
+                })),
+            ),
+          )
+
+          if (triggeredEnemyIds.size > 0) {
+            this.applyImpactExplosion(hazard.x, hazard.y, {
+              radius: hazard.radius,
+              durationMs: 1,
+              tickEveryMs: 1,
+              damage: hazard.damage,
+              tint: hazard.tint,
+              mode: 'trigger-trap',
+              visualPowerTier: hazard.visualPowerTier,
+            })
+            destroyHazardZoneEffect(hazard.effect)
+            continue
+          }
+        }
+
+        if (hazardStep.expired) {
+          destroyHazardZoneEffect(hazard.effect)
+          continue
+        }
+
+        updateHazardZoneEffect(hazard.effect, hazard.remainingLifetimeMs / hazard.totalLifetimeMs)
+        continue
+      }
 
       for (let tickIndex = 0; tickIndex < hazardStep.ticks; tickIndex += 1) {
         const affectedEnemyIds = new Set(
@@ -3458,6 +3643,7 @@ export class ArenaScene extends Phaser.Scene {
     this.destroyPlayerHealthBar()
     this.destroyMiniMap()
     this.destroyEquippedWeaponVisual()
+    this.destroyBloodReaverAura()
 
     if (this.player?.active) {
       this.player.destroy()
@@ -3537,6 +3723,7 @@ export class ArenaScene extends Phaser.Scene {
     this.activePachinkoTokens = []
     this.nextPachinkoTokenRuntimeId = 1
     this.lastPachinkoTokenLaunchAt = 0
+    this.nextBloodReaverAuraTickAt = 0
     this.projectiles = []
     this.enemyProjectiles = []
     this.hazardZones = []
@@ -4420,7 +4607,36 @@ export class ArenaScene extends Phaser.Scene {
       isReturning: false,
       visualPowerTier: visualTier,
       trailCooldownMs: 0,
+      trailStyle: this.getProjectileTrailStyle(projectileSpec, textureKey),
     })
+  }
+
+  private getProjectileTrailStyle(
+    projectileSpec: ProjectileSpawnSpec,
+    textureKey: string,
+  ): ProjectileTrailStyle {
+    if (projectileSpec.deployTurret) {
+      return 'turret'
+    }
+    if (projectileSpec.summonOnKill) {
+      return 'necro'
+    }
+    if (projectileSpec.ricochet) {
+      return 'kickball'
+    }
+    if (projectileSpec.explosionOnHit || projectileSpec.explosionOnExpire) {
+      return 'rocket'
+    }
+    if (projectileSpec.hazardOnHit || projectileSpec.hazardOnExpire) {
+      return textureKey === 'mist-projectile' ? 'compiler' : 'acid'
+    }
+    if (textureKey === 'starter-projectile') {
+      return 'machinegun'
+    }
+    if (textureKey === 'storm-projectile') {
+      return 'shotgun'
+    }
+    return 'default'
   }
 
   private dispatchProjectileSpec(projectileSpec: ProjectileSpawnSpec, textureKey: string): void {
@@ -4604,16 +4820,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnImpactBurstVisual(x: number, y: number, impactBurst: ImpactBurstSpec): void {
-    const burst = this.add.circle(x, y, Math.max(18, impactBurst.radius * 0.45), impactBurst.tint, 0.28)
-    burst.setDepth(0.65)
-
-    this.tweens.add({
-      targets: burst,
-      alpha: 0,
-      scaleX: 1.8,
-      scaleY: 1.8,
-      duration: 120,
-      onComplete: () => burst.destroy(),
+    spawnExplosionEffect(this, x, y, {
+      radius: impactBurst.radius,
+      durationMs: 1,
+      tickEveryMs: 1,
+      damage: impactBurst.damage,
+      tint: impactBurst.tint,
     })
   }
 
@@ -4653,6 +4865,8 @@ export class ArenaScene extends Phaser.Scene {
       radius: hazard.radius,
       damage: hazard.damage,
       baseDamage: hazard.damage,
+      mode: hazard.mode ?? 'damage-zone',
+      armingDelayMs: Math.max(0, hazard.armingDelayMs ?? 0),
       remainingLifetimeMs: hazard.durationMs,
       totalLifetimeMs: hazard.durationMs,
       tickEveryMs: hazard.tickEveryMs,
@@ -4678,15 +4892,7 @@ export class ArenaScene extends Phaser.Scene {
       ),
     )
 
-    const visual = this.add.circle(x, y, explosion.radius, explosion.tint, 0.22).setDepth(0.62)
-    this.tweens.add({
-      targets: visual,
-      alpha: 0,
-      scaleX: 1.22,
-      scaleY: 1.22,
-      duration: 110,
-      onComplete: () => visual.destroy(),
-    })
+    spawnExplosionEffect(this, x, y, explosion)
 
     for (const enemy of this.enemies) {
       if (!enemy.sprite.active || !impactedIds.has(enemy.runtimeId)) {

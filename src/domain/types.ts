@@ -208,6 +208,8 @@ export interface WeaponZoneControlBehavior {
   zoneDurationMs: number
   zoneTickMs: number
   zoneDamage: number
+  zoneTriggerMode?: 'damage-over-time' | 'trigger-explode'
+  armingDelayMs?: number
   speedMultiplier?: number
   boomerang?: WeaponBoomerangDefinition
 }

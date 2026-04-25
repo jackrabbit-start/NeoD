@@ -39,6 +39,8 @@ export interface HazardSpawnSpec {
   tickEveryMs: number
   damage: number
   tint: number
+  mode?: 'damage-zone' | 'trigger-trap'
+  armingDelayMs?: number
   visualPowerTier?: number
 }
 
@@ -224,6 +226,10 @@ const createHazardSpec = (
   tickEveryMs: behavior.kind === 'zone-control' ? behavior.zoneTickMs : behavior.hazardTickMs,
   damage: behavior.kind === 'zone-control' ? behavior.zoneDamage : behavior.hazardDamage,
   tint: weapon.projectileTint,
+  mode: behavior.kind === 'zone-control' && behavior.zoneTriggerMode === 'trigger-explode'
+    ? 'trigger-trap'
+    : 'damage-zone',
+  armingDelayMs: behavior.kind === 'zone-control' ? behavior.armingDelayMs : undefined,
   visualPowerTier: weapon.visualPowerTier,
 })
 
@@ -767,7 +773,9 @@ export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponS
   switch (weapon.attackBehavior.kind) {
     case 'spray-hazard':
     case 'zone-control':
-      return 'hazard-linger'
+      return weapon.attackBehavior.kind === 'zone-control' && weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
+        ? 'impact-splash'
+        : 'hazard-linger'
     case 'chain':
       return 'chain-bounce'
     case 'deploy-turret':
@@ -830,7 +838,9 @@ export function getWeaponSummary(weapon: WeaponDefinition): string {
     case 'impact-aoe':
       return `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.explosionDamage} · 반경 ${weapon.attackBehavior.explosionRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'zone-control':
-      return `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
+        ? `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.zoneDamage} · 함정 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+        : `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'deploy-turret':
       return `배치 ${weapon.attackBehavior.deploy.maxTurrets}기 · 포탑당 ${weapon.attackBehavior.deploy.projectileDamage} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'melee-cleave':
@@ -939,10 +949,14 @@ export function getWeaponAttackContract(weapon: WeaponDefinition): WeaponAttackC
       }
     case 'zone-control':
       return {
-        family: weapon.attackBehavior.boomerang ? 'anchor-zone' : 'zone-control',
+        family: weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
+          ? 'trigger-trap'
+          : weapon.attackBehavior.boomerang ? 'anchor-zone' : 'zone-control',
         geometry: `single-zone:${weapon.attackBehavior.zoneRadius}:${weapon.attackBehavior.zoneDurationMs}`,
         cadence: `cooldown:${weapon.fireRateMs}`,
-        followUp: weapon.attackBehavior.boomerang ? 'return-anchor' : 'linger-zone',
+        followUp: weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
+          ? 'armed-detonation'
+          : weapon.attackBehavior.boomerang ? 'return-anchor' : 'linger-zone',
       }
     case 'deploy-turret':
       return {

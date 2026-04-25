@@ -231,7 +231,9 @@ function getWeaponLevelUpgradeLabel(
     case 'impact-aoe':
       return `Lv.${playerStats.level} 공명 · 폭심 확대 · ${rangeLabel}`
     case 'zone-control':
-      return `Lv.${playerStats.level} 공명 · 포드 지속 · 장판 강화`
+      return weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
+        ? `Lv.${playerStats.level} 공명 · 함정 유지 · 폭발 확대`
+        : `Lv.${playerStats.level} 공명 · 포드 지속 · 장판 강화`
     case 'deploy-turret':
       return `Lv.${playerStats.level} 공명 · 포탑 증설 · ${rangeLabel}`
     case 'melee-cleave':
@@ -271,7 +273,9 @@ function getWeaponLevelUpgradeDescription(
     case 'impact-aoe':
       return '캐릭터 레벨 공명으로 폭심지 반경과 폭발 피해가 동시에 커졌습니다.'
     case 'zone-control':
-      return '캐릭터 레벨 공명으로 감시 구역이 더 오래 남고 틱 피해가 더 단단해졌습니다.'
+      return weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
+        ? '캐릭터 레벨 공명으로 폭발 문장이 더 오래 남고 터질 때의 반경과 위력이 함께 커졌습니다.'
+        : '캐릭터 레벨 공명으로 감시 구역이 더 오래 남고 틱 피해가 더 단단해졌습니다.'
     case 'deploy-turret':
       return '캐릭터 레벨 공명으로 포탑 유지 시간과 자동 사격 화력이 함께 강화됐습니다.'
     case 'melee-cleave':

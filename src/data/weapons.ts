@@ -208,7 +208,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
       zoneRadius: 44,
       zoneDurationMs: 1800,
       zoneTickMs: 210,
-      zoneDamage: 8,
+      zoneDamage: 24,
+      zoneTriggerMode: 'trigger-explode',
+      armingDelayMs: 140,
       speedMultiplier: 0.52,
     },
     visual: {
