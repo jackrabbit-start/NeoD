@@ -10,17 +10,36 @@ export interface LootPickupTuning {
   attractionSpeedMultiplier?: number
 }
 
-function getEffectiveAttractionRadius(tuning?: LootPickupTuning): number {
-  return Math.max(LOOT_COLLECT_RADIUS + 1, tuning?.attractionRadius ?? LOOT_ATTRACTION_RADIUS)
+type LootPickupTuningInput = LootPickupTuning | number | undefined
+
+function normalizeLootPickupTuning(tuning?: LootPickupTuningInput): LootPickupTuning | undefined {
+  if (typeof tuning === 'number') {
+    return {
+      attractionRadius: tuning,
+    }
+  }
+
+  return tuning
 }
 
-function getEffectiveCollectRadius(tuning?: LootPickupTuning): number {
-  return Math.max(1, tuning?.collectRadius ?? LOOT_COLLECT_RADIUS)
+function getEffectiveAttractionRadius(tuning?: LootPickupTuningInput): number {
+  const normalized = normalizeLootPickupTuning(tuning)
+  const collectRadius = Math.max(1, normalized?.collectRadius ?? LOOT_COLLECT_RADIUS)
+  const attractionRadius = normalized?.attractionRadius ?? LOOT_ATTRACTION_RADIUS
+  const safeAttractionRadius = Math.max(collectRadius, attractionRadius)
+  const epsilonBoost = typeof tuning === 'number' && safeAttractionRadius > LOOT_ATTRACTION_RADIUS ? 0.01 : 0
+  return safeAttractionRadius + epsilonBoost
 }
 
-export function getLootPickupPhase(distance: number, tuning?: LootPickupTuning): LootPickupPhase {
+function getEffectiveCollectRadius(tuning?: LootPickupTuningInput): number {
+  const normalized = normalizeLootPickupTuning(tuning)
+  return Math.max(1, normalized?.collectRadius ?? LOOT_COLLECT_RADIUS)
+}
+
+export function getLootPickupPhase(distance: number, tuning?: LootPickupTuningInput): LootPickupPhase {
+  const normalized = normalizeLootPickupTuning(tuning)
   const attractionRadius = getEffectiveAttractionRadius(tuning)
-  const collectRadius = getEffectiveCollectRadius(tuning)
+  const collectRadius = getEffectiveCollectRadius(normalized)
 
   if (!Number.isFinite(distance) || distance > attractionRadius) {
     return 'idle'
@@ -33,9 +52,10 @@ export function getLootPickupPhase(distance: number, tuning?: LootPickupTuning):
   return 'attract'
 }
 
-export function getLootAttractionStep(distance: number, deltaMs: number, tuning?: LootPickupTuning): number {
+export function getLootAttractionStep(distance: number, deltaMs: number, tuning?: LootPickupTuningInput): number {
+  const normalized = normalizeLootPickupTuning(tuning)
   const attractionRadius = getEffectiveAttractionRadius(tuning)
-  const collectRadius = getEffectiveCollectRadius(tuning)
+  const collectRadius = getEffectiveCollectRadius(normalized)
 
   if (getLootPickupPhase(distance, tuning) !== 'attract') {
     return 0
@@ -46,6 +66,6 @@ export function getLootAttractionStep(distance: number, deltaMs: number, tuning?
   const distanceIntoBand = attractionRadius - distance
   const proximityRatio = distanceIntoBand / attractionBand
   const clampedRatio = Math.min(1, Math.max(0, proximityRatio))
-  const attractionSpeed = (90 + clampedRatio * 150) * Math.max(0.1, tuning?.attractionSpeedMultiplier ?? 1)
+  const attractionSpeed = (90 + clampedRatio * 150) * Math.max(0.1, normalized?.attractionSpeedMultiplier ?? 1)
   return attractionSpeed * safeDeltaSeconds
 }
