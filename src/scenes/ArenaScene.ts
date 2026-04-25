@@ -2612,7 +2612,8 @@ export class ArenaScene extends Phaser.Scene {
     const cappedRows = rows.slice(0, 4)
     const extraCount = Math.max(0, rows.length - cappedRows.length)
     const suffix = extraCount > 0 ? ` 외 ${extraCount}` : ''
-    const text = `적 출현 확률 · ${phase.minuteIndex + 1}분차 · ${cappedRows.join(' · ')}${suffix}`
+    const currentTimeLabel = formatRunTime(this.runElapsedMs)
+    const text = `현재 시간 ${currentTimeLabel} · 적 출현 확률 · ${phase.minuteIndex + 1}분차 · ${cappedRows.join(' · ')}${suffix}`
 
     this.playerHealthBar.enemyOddsLabel.setText(text)
     this.playerHealthBar.enemyOddsBackground.setVisible(rows.length > 0)
