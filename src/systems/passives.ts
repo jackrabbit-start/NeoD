@@ -26,6 +26,7 @@ interface PassiveEffects {
 }
 
 export type PassiveCardGrade = 'common' | 'rare' | 'epic' | 'legendary'
+export type PassiveCardKind = 'general' | 'weapon-specialized'
 
 export interface PassiveCardChoice {
   id: PassiveCardId
@@ -33,6 +34,8 @@ export interface PassiveCardChoice {
   description: string
   effectSummary: string
   effects: PassiveEffects
+  kind: PassiveCardKind
+  kindLabel: string
   grade: PassiveCardGrade
   gradeLabel: string
   iconKey?: string
@@ -52,6 +55,7 @@ interface PassiveCardTemplate {
   id: string
   name: string
   description: string
+  kind?: PassiveCardKind
   preferredFamilies?: PachinkoWeaponFamily[]
   weight: {
     base: number
@@ -122,11 +126,17 @@ const PASSIVE_GRADE_LABELS: Record<PassiveCardGrade, string> = {
   legendary: '전설',
 }
 
+const PASSIVE_KIND_LABELS: Record<PassiveCardKind, string> = {
+  general: '일반 패시브',
+  'weapon-specialized': '무기 특화',
+}
+
 const PASSIVE_CARD_TEMPLATES = [
   {
     id: 'rapid-trigger',
     name: '속사 트리거',
     description: '모든 무기의 공격 주기가 짧아집니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['rapid', 'starter'],
     weight: { base: 1.25, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.52 },
     roll(level, random) {
@@ -139,6 +149,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'keen-sense',
     name: '예리한 감각',
     description: '약점을 노려 치명타가 발생할 수 있습니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['precision', 'rapid'],
     weight: { base: 1.12, levelScale: 0.018, repeatPenalty: 0.42, familyBonus: 0.44 },
     roll(level, random) {
@@ -151,6 +162,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'big-hit',
     name: '한방 각',
     description: '치명타가 더 크게 터집니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['heavy', 'precision'],
     weight: { base: 0.9, levelScale: 0.02, repeatPenalty: 0.5, familyBonus: 0.46 },
     roll(level, random) {
@@ -163,6 +175,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'long-barrel',
     name: '롱배럴 감성',
     description: '투사체 속도와 사거리가 늘어납니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['pierce', 'precision', 'rapid'],
     weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.5 },
     roll(level, random) {
@@ -183,6 +196,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'heavy-push',
     name: '묵직한 밀어내기',
     description: '무기 충격이 강해져 적을 더 잘 밀어냅니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['heavy', 'melee'],
     weight: { base: 0.9, levelScale: 0.018, repeatPenalty: 0.45, familyBonus: 0.5 },
     roll(level, random) {
@@ -203,6 +217,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'wide-zone',
     name: '영역 장악',
     description: '장판과 근접 범위가 넓어져 공간을 더 잘 지킵니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['spray', 'zone', 'melee'],
     weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.56 },
     roll(level, random) {
@@ -223,6 +238,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'split-focus',
     name: '분산 집중',
     description: '분사형 무기가 탄을 더 흩뿌립니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['spray', 'zone'],
     weight: { base: 0.82, levelScale: 0.03, repeatPenalty: 0.55, familyBonus: 0.72 },
     roll(level, random) {
@@ -247,6 +263,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'magnet-array',
     name: '마그넷 어레이',
     description: '토큰과 하트가 더 먼 거리에서도 빨려 들어옵니다.',
+    kind: 'general',
     preferredFamilies: ['starter', 'zone', 'rapid'],
     weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.36, familyBonus: 0.42 },
     roll(level, random) {
@@ -282,6 +299,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'recovery-loop',
     name: '리커버리 루프',
     description: '하트 회복량이 늘고 안전하게 회수할 범위도 소폭 넓어집니다.',
+    kind: 'general',
     preferredFamilies: ['heavy', 'melee', 'starter'],
     weight: { base: 0.84, levelScale: 0.018, repeatPenalty: 0.4, familyBonus: 0.38 },
     roll(level, random) {
@@ -302,6 +320,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'scavenger-route',
     name: '스캐빈저 루트',
     description: '회수 경로를 최적화해 토큰 경험치와 흡입 속도를 함께 높입니다.',
+    kind: 'general',
     preferredFamilies: ['rapid', 'starter', 'chain'],
     weight: { base: 0.82, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.44 },
     roll(level, random) {
@@ -340,6 +359,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'loaded-reel',
     name: '로드드 릴',
     description: '현재 장착 무기 계열이 파친코 배정표에 더 자주 올라옵니다.',
+    kind: 'general',
     preferredFamilies: ['starter', 'rapid', 'precision', 'heavy'],
     weight: { base: 0.86, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.48 },
     roll(level, random) {
@@ -355,6 +375,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'wide-catalog',
     name: '와이드 카탈로그',
     description: '비활성 무기들도 더 자주 배정되어 보상풀이 넓어집니다.',
+    kind: 'general',
     preferredFamilies: ['chain', 'zone', 'spray'],
     weight: { base: 0.8, levelScale: 0.018, repeatPenalty: 0.44, familyBonus: 0.42 },
     roll(level, random) {
@@ -370,6 +391,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'lane-reading',
     name: '레인 리딩',
     description: '파친코 흐름을 읽듯 장거리 화력과 투사체 제어가 좋아집니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['pierce', 'precision', 'rapid'],
     weight: { base: 0.86, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.52 },
     roll(level, random) {
@@ -390,6 +412,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'guard-breaker',
     name: '가드 브레이커',
     description: '강한 적일수록 더 세게 찍어눌러 보스전에 힘을 실어 줍니다.',
+    kind: 'general',
     preferredFamilies: ['heavy', 'melee', 'precision'],
     weight: { base: 0.78, levelScale: 0.03, repeatPenalty: 0.5, familyBonus: 0.58 },
     roll(level, random) {
@@ -402,6 +425,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'crowd-reaper',
     name: '군중 수확',
     description: '일반 적 무리를 정리하는 화력이 한층 안정적으로 올라갑니다.',
+    kind: 'general',
     preferredFamilies: ['spray', 'chain', 'zone'],
     weight: { base: 1.0, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.54 },
     roll(level, random) {
@@ -414,6 +438,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'panic-shield',
     name: '패닉 실드',
     description: '위험한 순간 받는 피해를 덜어 생존 여유를 벌어줍니다.',
+    kind: 'general',
     preferredFamilies: ['melee', 'heavy', 'starter'],
     weight: { base: 0.92, levelScale: 0.022, repeatPenalty: 0.36, familyBonus: 0.42 },
     roll(level, random) {
@@ -426,6 +451,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'finisher-instinct',
     name: '마무리 본능',
     description: '결정타를 노리는 감각으로 치확과 화력을 함께 보강합니다.',
+    kind: 'general',
     preferredFamilies: ['precision', 'rapid', 'heavy'],
     weight: { base: 0.78, levelScale: 0.018, repeatPenalty: 0.5, familyBonus: 0.52 },
     roll(level, random) {
@@ -446,6 +472,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'steady-hands',
     name: '스테디 핸즈',
     description: '반동을 다듬듯 명중 안정성과 화력을 함께 끌어올립니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['precision', 'pierce', 'rapid'],
     weight: { base: 0.9, levelScale: 0.016, repeatPenalty: 0.4, familyBonus: 0.48 },
     roll(level, random) {
@@ -466,6 +493,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'salvage-routine',
     name: '회수 루틴',
     description: '파친코 흐름과 이동 리듬을 다듬어 토큰 수급과 기동성을 함께 챙깁니다.',
+    kind: 'general',
     preferredFamilies: ['starter', 'rapid', 'zone'],
     weight: { base: 0.84, levelScale: 0.022, repeatPenalty: 0.38, familyBonus: 0.5 },
     roll(level, random) {
@@ -507,6 +535,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'critical-mass',
     name: '크리티컬 매스',
     description: '치명타 확률과 피해를 함께 밀어주는 하이리스크 카드입니다.',
+    kind: 'general',
     preferredFamilies: ['precision', 'rapid', 'heavy'],
     weight: { base: 0.68, levelScale: 0.02, repeatPenalty: 0.56, familyBonus: 0.54 },
     roll(level, random) {
@@ -547,6 +576,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'needle-lattice',
     name: '니들 래티스',
     description: '관통/정밀 계열 무기가 더 빠르고 치명적으로 박힙니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['pierce', 'precision'],
     weight: { base: 0.78, levelScale: 0.022, repeatPenalty: 0.46, familyBonus: 0.74 },
     roll(level, random) {
@@ -567,6 +597,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'arc-echo',
     name: '아크 에코',
     description: '연쇄/속사 계열 무기가 리듬을 타며 화력을 더 뽑아냅니다.',
+    kind: 'weapon-specialized',
     preferredFamilies: ['chain', 'rapid'],
     weight: { base: 0.78, levelScale: 0.022, repeatPenalty: 0.46, familyBonus: 0.72 },
     roll(level, random) {
@@ -655,6 +686,10 @@ function getPassiveTemplate(id: PassiveCardId): PassiveCardTemplate {
 
 export function getPassiveGradeLabel(grade: PassiveCardGrade): string {
   return PASSIVE_GRADE_LABELS[grade]
+}
+
+export function getPassiveKindLabel(kind: PassiveCardKind): string {
+  return PASSIVE_KIND_LABELS[kind]
 }
 
 function formatEffectSummary(effects: PassiveEffects): string {
@@ -764,9 +799,10 @@ export function createPassiveCardChoice(
   const template = getPassiveTemplate(id)
   const roll = template.roll(level, random)
   const grade = gradeFromQuality(roll.quality)
+  const kind = template.kind ?? 'general'
   const activeFamily = activeWeaponId ? getPachinkoWeaponFamily(activeWeaponId) : null
   const iconKey =
-    activeWeaponId && activeFamily && template.preferredFamilies?.includes(activeFamily)
+    kind === 'weapon-specialized' && activeWeaponId && activeFamily && template.preferredFamilies?.includes(activeFamily)
       ? `weapon-${activeWeaponId}`
       : undefined
   return {
@@ -775,6 +811,8 @@ export function createPassiveCardChoice(
     description: template.description,
     effectSummary: formatEffectSummary(roll.effects),
     effects: roll.effects,
+    kind,
+    kindLabel: getPassiveKindLabel(kind),
     grade,
     gradeLabel: getPassiveGradeLabel(grade),
     iconKey,

@@ -386,6 +386,8 @@ export interface HudPassiveChoiceView {
   name: string
   description: string
   effectSummary: string
+  kind: 'general' | 'weapon-specialized'
+  kindLabel: string
   grade: 'common' | 'rare' | 'epic' | 'legendary'
   gradeLabel: string
   iconKey?: string

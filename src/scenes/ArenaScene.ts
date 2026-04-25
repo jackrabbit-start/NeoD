@@ -3149,6 +3149,8 @@ export class ArenaScene extends Phaser.Scene {
           name: choice.name,
           description: choice.description,
           effectSummary: choice.effectSummary,
+          kind: choice.kind,
+          kindLabel: choice.kindLabel,
           grade: choice.grade,
           gradeLabel: choice.gradeLabel,
           iconKey: choice.iconKey,

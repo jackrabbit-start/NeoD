@@ -907,6 +907,28 @@ button {
   border-color: rgba(255, 196, 92, 0.36);
 }
 
+.hud-modal__passive-kind {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.hud-modal__passive-kind--general {
+  color: #cbe3ff;
+  background: rgba(143, 228, 255, 0.08);
+  border-color: rgba(143, 228, 255, 0.18);
+}
+
+.hud-modal__passive-kind--weapon-specialized {
+  color: #ffdca2;
+  background: rgba(255, 196, 92, 0.12);
+  border-color: rgba(255, 196, 92, 0.24);
+}
+
 .hud-modal__item--weapon.is-equipped .hud-modal__weapon-meta {
   color: #a6ffd0;
 }
