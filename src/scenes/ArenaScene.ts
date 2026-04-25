@@ -384,6 +384,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private dashKey!: Phaser.Input.Keyboard.Key
 
+  private passiveChoiceKeys: Phaser.Input.Keyboard.Key[] = []
+
   private enemies: EnemyEntity[] = []
 
   private healthPickups: HealthPickupEntity[] = []
@@ -570,6 +572,11 @@ export class ArenaScene extends Phaser.Scene {
     this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
+    this.passiveChoiceKeys = [
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+    ]
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
@@ -588,6 +595,13 @@ export class ArenaScene extends Phaser.Scene {
 
     this.handleInventoryToggle()
     this.handleCodexToggle()
+    this.handlePassiveSelectionHotkeys()
+    if (this.isPassiveSelectionOpen) {
+      this.updateHud()
+      this.updateCodex()
+      return
+    }
+
     this.handlePlayerMovement(time, delta)
     this.syncEquippedWeaponVisual(time)
     this.handleFiring(time)
@@ -2121,10 +2135,35 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.pendingPassiveChoices = getPassiveCardChoices(level, this.passiveState)
+    if (this.pendingPassiveChoices.length === 0) {
+      this.statusMessage = `Lv.${level} 달성! 패시브 후보를 만들지 못해 전투를 계속합니다.`
+      this.updateHud()
+      return
+    }
+
     this.isPassiveSelectionOpen = true
     this.applyInteractionPause(true)
     this.statusMessage = `Lv.${level} 달성! 패시브 카드 1장을 선택하세요.`
     this.updateHud()
+  }
+
+  private handlePassiveSelectionHotkeys(): void {
+    if (!this.isPassiveSelectionOpen || this.pendingPassiveChoices.length === 0) {
+      return
+    }
+
+    for (let index = 0; index < this.passiveChoiceKeys.length; index += 1) {
+      const key = this.passiveChoiceKeys[index]
+      if (!Phaser.Input.Keyboard.JustDown(key)) {
+        continue
+      }
+
+      const choice = this.pendingPassiveChoices[index]
+      if (choice) {
+        this.handlePassiveSelection(choice.id)
+      }
+      return
+    }
   }
 
   private handlePassiveSelection(passiveId: string): void {
