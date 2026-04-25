@@ -13,3 +13,9 @@
 - Added `docs/wiki/post-interview-context-workflow.md` to document the manual `$post-interview-context` flow.
 - Updated `docs/index.md` so future agents can find the workflow.
 - Source artifacts: `.omx/specs/deep-interview-post-deep-interview-context-skill.md` and `.codex/skills/post-interview-context/SKILL.md`.
+
+## [2026-04-25] gameplay | Captured difficulty survival-pressure lesson
+
+- Added `docs/wiki/difficulty-survival-pressure.md` to synthesize the difficulty-too-low interview, plan, implementation, and PR #25.
+- Updated `docs/index.md` so future agents can find the balance guidance.
+- Source artifacts: `.omx/specs/deep-interview-difficulty-too-low.md`, `.omx/interviews/difficulty-too-low-20260425T101734Z.md`, and `.omx/context/post-interview-difficulty-survival-pressure-20260425T105130Z.md`.

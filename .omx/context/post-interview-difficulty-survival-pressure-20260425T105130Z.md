@@ -1,0 +1,43 @@
+# Post-Interview Context — Difficulty Survival Pressure
+
+- Source spec: `.omx/specs/deep-interview-difficulty-too-low.md`
+- Source transcript/context:
+  - `.omx/interviews/difficulty-too-low-20260425T101734Z.md`
+  - `.omx/context/difficulty-too-low-20260425T100901Z.md`
+- Branch/worktree:
+  - Planned on `ai-dev`, implemented on `ai-task/difficulty-survival-pressure`
+  - PR: https://github.com/jackrabbit-start/NeoD/pull/25
+  - Merge commit: `9d1892d8892fc8d0336cb632372d78ee87efd2eb`
+- Summary:
+  - The interview clarified that the difficulty issue was low **survival pressure**, not a need for new content or weapon nerfs.
+  - The approved plan raised danger through existing enemy/wave pressure and a named player-damage cooldown rule.
+  - The feature branch was rebased over a concurrent `ai-dev` enemy expansion; conflict resolution preserved mixed-wave `entries` and applied shorter spawn intervals.
+- Lessons:
+  - For V1 difficulty, prefer data-first pressure tuning before adding new enemies, UI, or progression nerfs.
+  - Keep “3–4 meaningful mistakes put 100 HP in danger” as the concrete balance target for this pass.
+  - When balancing after mixed-wave enemy expansion, tune all current regular enemy roles, not only the older slime/spark/prism/boss set.
+  - Player hit cadence should stay in `src/systems/playerDamageRules.ts` rather than as an inline scene magic number.
+- New files:
+  - `src/systems/playerDamageRules.ts`: exposes `PLAYER_HIT_COOLDOWN_MS = 375` and `shouldApplyPlayerDamage(...)`.
+  - `tests/player-damage-rules.test.mjs`: locks the 375ms boundary and interaction-block immunity.
+- Modified files:
+  - `src/scenes/ArenaScene.ts`: delegates player damage gating to the new helper.
+  - `src/data/enemies.ts`: raises existing enemy pressure values, including dash/orbit slimes from the concurrent enemy expansion.
+  - `src/data/waves.ts`: preserves five-wave shape and mixed-wave entries while tightening regular-wave spawn intervals.
+  - `tests/enemy-behaviors.test.mjs`: locks survival-pressure enemy constants.
+  - `tests/wave-runtime.test.mjs`: locks regular-wave cadence and mixed-wave shape.
+- Decisions / constraints:
+  - No new difficulty UI, enemies, patterns, weapon/tuning nerfs, or material run-length expansion for this pass.
+  - Preserve player baseline HP/max/speed at `100/100/220`.
+  - Preserve interaction-block immunity in damage gating.
+- Verification:
+  - Before PR: `pnpm typecheck`, `pnpm test` (87 passed), `pnpm build`.
+  - PR #25 was mergeable and merged into `ai-dev`.
+  - Build still reports the known Vite chunk-size warning.
+  - Commands ran under Node `v25.5.0`, while `package.json` wants Node `22.x`.
+- Residual risks:
+  - Manual browser feel validation was not run; “mostly clearable but tense” still needs play feel confirmation.
+  - Future tuning may need to soften `PLAYER_HIT_COOLDOWN_MS` before undoing enemy data if contact overlap feels unfair.
+- Next recommended use:
+  - Use this note plus `docs/wiki/difficulty-survival-pressure.md` before future difficulty/balance passes.
+  - If a later pass wants new enemy patterns or difficulty settings, reopen the deep-interview non-goals instead of treating this pass as blanket approval.
