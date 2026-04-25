@@ -80,12 +80,36 @@ jobs:
 
           attempts=3
           delay_seconds=10
+          inspect_timeout=5m
 
           for attempt in $(seq 1 "$attempts"); do
             echo "Vercel deploy attempt ${attempt}/${attempts}"
 
-            if vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}; then
-              exit 0
+            deploy_stdout_file="$(mktemp)"
+            deploy_stderr_file="$(mktemp)"
+            deploy_exit_code=0
+
+            if ! vercel deploy --prebuilt --archive=tgz --prod --no-wait --token=${{ secrets.VERCEL_TOKEN }} >"${deploy_stdout_file}" 2>"${deploy_stderr_file}"; then
+              deploy_exit_code=$?
+            fi
+
+            cat "${deploy_stderr_file}"
+
+            deployment_url="$(tr -d '\r' < "${deploy_stdout_file}" | awk 'NF { last = $0 } END { print last }')"
+
+            if [ -n "${deployment_url}" ]; then
+              echo "Captured deployment URL: ${deployment_url}"
+
+              if vercel inspect "${deployment_url}" --wait --timeout="${inspect_timeout}" --token=${{ secrets.VERCEL_TOKEN }}; then
+                exit 0
+              fi
+
+              echo "Deployment did not become ready through the inspect wait path. Printing available Vercel logs before retry..."
+              vercel inspect "${deployment_url}" --logs --token=${{ secrets.VERCEL_TOKEN }} || true
+            fi
+
+            if [ "${deploy_exit_code}" -ne 0 ]; then
+              echo "vercel deploy exited with code ${deploy_exit_code} before readiness polling succeeded."
             fi
 
             if [ "$attempt" -lt "$attempts" ]; then
