@@ -53,13 +53,15 @@ import {
   advanceHazardState,
   applyProjectileHitState,
   buildAttackPlan,
+  collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
   getWeaponSummary,
+  isAttackPlanActionable,
   isProjectileOutOfBounds,
   selectChainTargets,
 } from '../systems/weaponBehaviors.js'
-import type { ChainSpec, HazardSpawnSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
+import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import {
   deriveEffectiveWeaponStats,
   getTuningEffectLabel,
@@ -383,12 +385,16 @@ export class ArenaScene extends Phaser.Scene {
 
     const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
     const attackPlan = buildAttackPlan(weapon, origin, new Phaser.Math.Vector2(target.x, target.y))
-    if (attackPlan.projectiles.length === 0) {
+    if (!isAttackPlanActionable(attackPlan)) {
       return
     }
 
     for (const projectileSpec of attackPlan.projectiles) {
       this.spawnProjectile(projectileSpec, weapon.projectileTextureKey)
+    }
+
+    for (const meleeSwing of attackPlan.meleeSwings) {
+      this.applyMeleeSwing(meleeSwing)
     }
 
     this.nextFireAt = time + attackPlan.cooldownMs
@@ -1442,11 +1448,87 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
+  private applyMeleeSwing(swing: MeleeSwingSpec): void {
+    const affectedEnemyIds = new Set(
+      collectTargetsInCleave(
+        { x: this.player.x, y: this.player.y },
+        swing.direction,
+        swing.range,
+        swing.arcDegrees,
+        this.enemies
+          .filter((enemy) => enemy.sprite.active)
+          .map((enemy) => ({
+            id: enemy.runtimeId,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            radius: enemy.config.size / 2,
+          })),
+        swing.maxTargets,
+      ),
+    )
+
+    this.spawnMeleeSwingVisual(swing)
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active || !affectedEnemyIds.has(enemy.runtimeId)) {
+        continue
+      }
+
+      const didDamage = this.damageEnemy(enemy, swing.damage)
+      if (didDamage && enemy.sprite.active) {
+        this.applyMeleeSwingKnockback(enemy, swing)
+      }
+    }
+  }
+
+  private spawnMeleeSwingVisual(swing: MeleeSwingSpec): void {
+    const graphics = this.add.graphics({ x: this.player.x, y: this.player.y })
+    const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
+
+    graphics.fillStyle(swing.tint, 0.28)
+    graphics.lineStyle(3, swing.tint, 0.65)
+    graphics.beginPath()
+    graphics.moveTo(0, 0)
+    graphics.slice(0, 0, swing.range, -halfArcRadians, halfArcRadians, false)
+    graphics.closePath()
+    graphics.fillPath()
+    graphics.strokePath()
+    graphics.setRotation(Math.atan2(swing.direction.y, swing.direction.x))
+    graphics.setDepth(0.7)
+
+    this.tweens.add({
+      targets: graphics,
+      alpha: 0,
+      scaleX: 1.08,
+      scaleY: 1.08,
+      duration: swing.visualDurationMs,
+      onComplete: () => graphics.destroy(),
+    })
+  }
+
   private applyDirectProjectileKnockback(enemy: EnemyEntity, projectile: ProjectileEntity): void {
     const result = resolveKnockbackHit({
       source: 'direct-projectile',
       direction: projectile.direction,
       weapon: projectile.knockback,
+      enemy: enemy.config.knockback,
+      activeState: enemy.knockback,
+      targetIsTelegraphing: Boolean(enemy.telegraph),
+      hitTimeMs: this.time.now,
+    })
+
+    enemy.knockback = result.state
+  }
+
+  private applyMeleeSwingKnockback(enemy: EnemyEntity, swing: MeleeSwingSpec): void {
+    const result = resolveKnockbackHit({
+      source: 'melee-swing',
+      direction: {
+        x: enemy.sprite.x - this.player.x,
+        y: enemy.sprite.y - this.player.y,
+      },
+      fallbackDirection: swing.direction,
+      weapon: swing.knockback,
       enemy: enemy.config.knockback,
       activeState: enemy.knockback,
       targetIsTelegraphing: Boolean(enemy.telegraph),

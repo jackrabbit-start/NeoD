@@ -9,10 +9,12 @@ import {
   applyProjectileHitState,
   buildAttackPlan,
   canProjectileHitEnemy,
+  collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
   getWeaponIdentityLabel,
   getWeaponSummary,
+  isAttackPlanActionable,
   isProjectileOutOfBounds,
   shouldWeaponFire,
   selectChainTargets,
@@ -114,6 +116,50 @@ test('mist vortex is a distinct spray hazard control branch', () => {
   assert.equal(center?.hazardOnHit?.durationMs, mistBehavior.hazardDurationMs)
   assert.equal(center?.hazardOnHit?.tickEveryMs, mistBehavior.hazardTickMs)
   assert.equal(center?.hazardOnHit?.damage, mistBehavior.hazardDamage)
+})
+
+test('melee weapon plans create actionable frontal cleave swings without projectiles', () => {
+  const glaive = WEAPON_DEFINITIONS['slime-glaive']
+  const cutter = WEAPON_DEFINITIONS['prism-cutter']
+  const plan = buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 })
+
+  assert.equal(glaive.attackBehavior.kind, 'melee-cleave')
+  assert.equal(cutter.attackBehavior.kind, 'melee-cleave')
+  assert.equal(plan.projectiles.length, 0)
+  assert.equal(plan.meleeSwings.length, 1)
+  assert.equal(isAttackPlanActionable(plan), true)
+  assert.equal(plan.cooldownMs, glaive.fireRateMs)
+  assert.equal(plan.meleeSwings[0]?.range, glaive.attackBehavior.range)
+  assert.equal(plan.meleeSwings[0]?.arcDegrees, glaive.attackBehavior.arcDegrees)
+  assert.deepEqual(plan.meleeSwings[0]?.direction, { x: 1, y: 0 })
+
+  assert.notEqual(glaive.attackBehavior.range, cutter.attackBehavior.range)
+  assert.notEqual(glaive.attackBehavior.arcDegrees, cutter.attackBehavior.arcDegrees)
+  assert.notEqual(glaive.fireRateMs, cutter.fireRateMs)
+  assert.match(getWeaponSummary(glaive), /범위/)
+})
+
+test('frontal cleave target selection respects range, arc, radius, and deterministic order', () => {
+  const selected = collectTargetsInCleave(
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    80,
+    90,
+    [
+      { id: 8, x: 70, y: 0, radius: 10 },
+      { id: 2, x: 30, y: 20, radius: 8 },
+      { id: 4, x: -20, y: 0, radius: 8 },
+      { id: 6, x: 70, y: 70, radius: 8 },
+      { id: 3, x: 87, y: 0, radius: 10 },
+    ],
+    3,
+  )
+
+  assert.deepEqual(selected, [2, 8, 3])
+  assert.deepEqual(
+    collectTargetsInCleave({ x: 0, y: 0 }, { x: 0, y: 0 }, 80, 90, [{ id: 1, x: 10, y: 0, radius: 5 }]),
+    [],
+  )
 })
 
 test('chain target selection is deterministic by distance then runtime id', () => {

@@ -49,3 +49,9 @@
 - Added `docs/wiki/enemy-boss-pressure.md` to preserve the 3x density extreme-experiment target, boss anti-sponge rule, and follow-up tuning boundaries.
 - Updated `docs/index.md` so future agents can find the enemy/boss pressure guidance.
 - Source artifacts: `.omx/specs/deep-interview-enemy-boss-pressure.md`, `.omx/interviews/enemy-boss-pressure-20260425T111248Z.md`, `.omx/context/post-interview-enemy-boss-pressure-20260425T112833Z.md`, and PR #31.
+
+## [2026-04-25] gameplay | Captured melee weapon line architecture lesson
+
+- Added `docs/wiki/melee-weapon-line.md` to synthesize the melee-first interview, PRD, test spec, and implementation verification.
+- Updated `docs/index.md` so future agents can find the melee architecture guidance.
+- Source artifacts: `.omx/specs/deep-interview-weapon-capsule-variety.md`, `.omx/plans/prd-melee-weapon-line.md`, `.omx/plans/test-spec-melee-weapon-line.md`, and `.omx/context/post-interview-melee-weapon-line-20260425T114954Z.md`.

@@ -148,6 +148,16 @@ test('mist vortex recipe resolves from existing frost and mist drops', () => {
   assert.deepEqual(combined?.nextInventory, {})
 })
 
+test('melee weapon recipes resolve from unused material pairings', () => {
+  const glaiveInventory = addItem(addItem({}, 'acid-core'), 'spark-knot')
+  const cutterInventory = addItem(addItem({}, 'acid-core'), 'mist-bead')
+
+  assert.ok(getAvailableRecipes(glaiveInventory).some(({ recipe }) => recipe.id === 'slime-glaive-recipe'))
+  assert.ok(getAvailableRecipes(cutterInventory).some(({ recipe }) => recipe.id === 'prism-cutter-recipe'))
+  assert.equal(resolveCombine(glaiveInventory, 'slime-glaive-recipe')?.weaponId, 'slime-glaive')
+  assert.equal(resolveCombine(cutterInventory, 'prism-cutter-recipe')?.weaponId, 'prism-cutter')
+})
+
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
@@ -583,6 +593,8 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'arc-loom-recipe',
     'spark-carbine-recipe',
     'mist-vortex-recipe',
+    'slime-glaive-recipe',
+    'prism-cutter-recipe',
   ])
   assert.deepEqual(WEAPON_IDS, [
     'starter-blaster',
@@ -592,6 +604,8 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'arc-loom',
     'spark-carbine',
     'mist-vortex',
+    'slime-glaive',
+    'prism-cutter',
   ])
   assert.deepEqual(ENEMY_IDS, [
     'slime',
@@ -684,7 +698,7 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
 
   assert.equal(codex.isOpen, true)
   assert.equal(codex.items.length, 6)
-  assert.equal(codex.recipes.length, 6)
+  assert.equal(codex.recipes.length, 8)
   assert.equal(codex.enemies.length, 6)
 
   const arcRecipe = codex.recipes.find((recipe) => recipe.id === 'arc-loom-recipe')
@@ -710,6 +724,22 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
     ['frost-mote', 'mist-bead'],
   )
   assert.equal(mistRecipe?.output.id, 'mist-vortex')
+
+  const glaiveRecipe = codex.recipes.find((recipe) => recipe.id === 'slime-glaive-recipe')
+  assert.equal(glaiveRecipe?.identityLabel, '광역 참격')
+  assert.deepEqual(
+    glaiveRecipe?.inputs.map((input) => input.id),
+    ['acid-core', 'spark-knot'],
+  )
+  assert.equal(glaiveRecipe?.output.id, 'slime-glaive')
+
+  const cutterRecipe = codex.recipes.find((recipe) => recipe.id === 'prism-cutter-recipe')
+  assert.equal(cutterRecipe?.identityLabel, '집중 절단')
+  assert.deepEqual(
+    cutterRecipe?.inputs.map((input) => input.id),
+    ['acid-core', 'mist-bead'],
+  )
+  assert.equal(cutterRecipe?.output.id, 'prism-cutter')
 
   const voltSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
   assert.ok(voltSlime)
@@ -750,6 +780,8 @@ test('recipe identity metadata stays aligned with known ids and weapon outputs',
 
   assert.ok(WEAPON_DEFINITIONS['spark-carbine'].identityLabel?.trim())
   assert.ok(WEAPON_DEFINITIONS['mist-vortex'].identityLabel?.trim())
+  assert.ok(WEAPON_DEFINITIONS['slime-glaive'].identityLabel?.trim())
+  assert.ok(WEAPON_DEFINITIONS['prism-cutter'].identityLabel?.trim())
 })
 
 test('codex controller preserves scroll across repeated open renders', () => {
@@ -924,6 +956,24 @@ test('effective weapon stats apply each tuning without mutating base definitions
   assert.deepEqual(WEAPON_DEFINITIONS['acid-sprayer'], baseWeapon)
 })
 
+test('effective melee weapon tuning updates nested behavior immutably', () => {
+  const baseWeapon = WEAPON_DEFINITIONS['slime-glaive']
+  const baseBehavior = baseWeapon.attackBehavior
+
+  assert.equal(baseBehavior.kind, 'melee-cleave')
+
+  const sharpened = deriveEffectiveWeaponStats('slime-glaive', { 'slime-glaive': 'sharpened-core' })
+  const quick = deriveEffectiveWeaponStats('slime-glaive', { 'slime-glaive': 'quick-loader' })
+  const stabilized = deriveEffectiveWeaponStats('slime-glaive', { 'slime-glaive': 'stabilized-bore' })
+
+  assert.equal(sharpened.damage, baseWeapon.damage + 4)
+  assert.equal(quick.fireRateMs, Math.round(baseWeapon.fireRateMs * 0.9))
+  assert.equal(stabilized.attackBehavior.kind, 'melee-cleave')
+  assert.equal(stabilized.attackBehavior.range, baseBehavior.range + 18)
+  assert.notEqual(stabilized.attackBehavior, baseBehavior)
+  assert.deepEqual(WEAPON_DEFINITIONS['slime-glaive'], baseWeapon)
+})
+
 test('visual asset manifest paths exist for all external art assets', () => {
   const missingAssets = VECTOR_ASSETS.filter((asset) => {
     const assetPath = resolve(TEST_DIR, '..', 'public', asset.path)
@@ -1096,6 +1146,14 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'mist-vortex': {
         projectileTextureKey: 'mist-projectile',
         hudIconKey: 'weapon-mist-vortex',
+      },
+      'slime-glaive': {
+        projectileTextureKey: 'arc-projectile',
+        hudIconKey: 'weapon-slime-glaive',
+      },
+      'prism-cutter': {
+        projectileTextureKey: 'frost-projectile',
+        hudIconKey: 'weapon-prism-cutter',
       },
     },
   )
