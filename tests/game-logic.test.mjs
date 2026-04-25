@@ -24,6 +24,7 @@ import {
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
 import {
   getLootAttractionStep,
+  getLootAttractionTravelDistance,
   getLootPickupPhase,
   LOOT_ATTRACTION_RADIUS,
   LOOT_COLLECT_RADIUS,
@@ -320,6 +321,11 @@ test('loot attraction step is bounded to the attraction phase', () => {
   assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, 16) > 0, true)
   assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, -16), 0)
   assert.equal(getLootAttractionStep(MAGNET_PICKUP_ATTRACTION_RADIUS - 1, 16, MAGNET_PICKUP_ATTRACTION_RADIUS) > 0, true)
+  assert.equal(
+    getLootAttractionTravelDistance(LOOT_COLLECT_RADIUS + 0.5, 16),
+    1.5,
+  )
+  assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS - 0.5), 'collect')
 })
 
 test('loot pickup workflow updates inventory and reports the pickup message', () => {

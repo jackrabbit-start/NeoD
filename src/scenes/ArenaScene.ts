@@ -48,7 +48,7 @@ import {
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import { getEnemyAttackMotionProfile, getEnemyHitMotionProfile } from '../systems/enemyMotion.js'
 import {
-  getLootAttractionStep,
+  getLootAttractionTravelDistance,
   getLootPickupPhase,
   LOOT_ATTRACTION_RADIUS,
   LOOT_COLLECT_RADIUS,
@@ -1572,9 +1572,7 @@ export class ArenaScene extends Phaser.Scene {
     this.setHealthPickupAttractionStyle(pickup, true)
 
     const pickupTuning = this.getLootPickupTuningAt(time)
-    const effectiveCollectRadius = pickupTuning.collectRadius
-    const attractionStep = getLootAttractionStep(distance, delta, pickupTuning)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
+    const travelDistance = getLootAttractionTravelDistance(distance, delta, pickupTuning)
     if (distance <= 0 || travelDistance <= 0) {
       this.syncHealthPickupAura(pickup)
       return
@@ -1685,8 +1683,7 @@ export class ArenaScene extends Phaser.Scene {
   private applyMagnetPickupAttraction(pickup: MagnetPickupEntity, distance: number, delta: number): void {
     this.setMagnetPickupAttractionStyle(pickup, true)
 
-    const attractionStep = getLootAttractionStep(distance, delta)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    const travelDistance = getLootAttractionTravelDistance(distance, delta)
     if (distance <= 0 || travelDistance <= 0) {
       this.syncMagnetPickupAura(pickup)
       return
@@ -1804,9 +1801,7 @@ export class ArenaScene extends Phaser.Scene {
     this.setPachinkoTokenAttractionStyle(pickup, true)
 
     const pickupTuning = this.getLootPickupTuningAt(time)
-    const effectiveCollectRadius = pickupTuning.collectRadius
-    const attractionStep = getLootAttractionStep(distance, delta, pickupTuning)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
+    const travelDistance = getLootAttractionTravelDistance(distance, delta, pickupTuning)
     if (distance <= 0 || travelDistance <= 0) {
       this.syncPachinkoTokenAura(pickup)
       return
