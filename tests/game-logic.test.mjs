@@ -11,6 +11,7 @@ import { WEAPON_DEFINITIONS } from '../.tmp-test/src/data/weapons.js'
 import { ENEMY_IDS, LOOT_IDS, RECIPE_IDS, WEAPON_IDS } from '../.tmp-test/src/data/contentIds.js'
 import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/combine.js'
 import { getCodexState } from '../.tmp-test/src/systems/codex.js'
+import { CodexController } from '../.tmp-test/src/ui/Codex.js'
 import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RADIUS, PROJECTILE_HIT_PADDING } from '../.tmp-test/src/game/combatGeometry.js'
 import { VECTOR_ASSETS } from '../.tmp-test/src/game/visualManifest.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
@@ -686,6 +687,52 @@ test('recipe identity metadata stays aligned with known ids and weapon outputs',
 
   assert.ok(WEAPON_DEFINITIONS['spark-carbine'].identityLabel?.trim())
   assert.ok(WEAPON_DEFINITIONS['mist-vortex'].identityLabel?.trim())
+})
+
+test('codex controller preserves scroll across repeated open renders', () => {
+  class FakeCodexElement {
+    hidden = true
+    scrollTop = 0
+    assignments = 0
+    #innerHTML = ''
+
+    get innerHTML() {
+      return this.#innerHTML
+    }
+
+    set innerHTML(value) {
+      this.assignments += 1
+      this.scrollTop = 0
+      this.#innerHTML = value
+    }
+  }
+
+  const element = new FakeCodexElement()
+  const controller = new CodexController(element)
+  const openState = getCodexState(true)
+
+  controller.update(openState)
+  assert.equal(element.hidden, false)
+  assert.match(element.innerHTML, /아이템/)
+  assert.match(element.innerHTML, /조합식/)
+  assert.match(element.innerHTML, /적/)
+  assert.equal(element.assignments, 1)
+
+  element.scrollTop = 48
+  controller.update(getCodexState(true))
+
+  assert.equal(element.scrollTop, 48)
+  assert.equal(element.assignments, 1)
+
+  controller.update(getCodexState(false))
+  assert.equal(element.hidden, true)
+  assert.equal(element.innerHTML, '')
+  assert.equal(element.assignments, 2)
+
+  controller.update(openState)
+  assert.equal(element.hidden, false)
+  assert.match(element.innerHTML, /아이템/)
+  assert.equal(element.assignments, 3)
 })
 
 test('elite drop table returns a tuning capsule', () => {
