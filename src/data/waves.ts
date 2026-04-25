@@ -28,7 +28,7 @@ export const WAVE_DEFINITIONS: WaveDefinition[] = [
   },
   {
     id: 'elite-wave',
-    label: 'Elite Wave',
+    label: '엘리트 웨이브',
     entries: [{ enemyId: 'prism-slime', count: 1 }],
     spawnIntervalMs: 0,
   },

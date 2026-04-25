@@ -3,8 +3,8 @@ import type { WeaponDefinition, WeaponId } from '../domain/types.js'
 export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   'starter-blaster': {
     id: 'starter-blaster',
-    name: 'Starter Blaster',
-    description: 'Steady low-power shots for the opening wave.',
+    name: '기본 블래스터',
+    description: '초반 웨이브를 버티는 안정적인 저위력 사격입니다.',
     identityLabel: '기본 사격',
     identityHint: '런 시작용 안정 단발 무기입니다.',
     damage: 12,
@@ -27,8 +27,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'acid-sprayer': {
     id: 'acid-sprayer',
-    name: 'Acid Sprayer',
-    description: 'Higher damage blasts fueled by unstable slime acid.',
+    name: '산성 분사기',
+    description: '불안정한 슬라임 산성을 연료로 더 강한 폭발을 뿜습니다.',
     identityLabel: '부식 압박',
     identityHint: '짧은 산성 분사와 잔류 피해로 가까운 적 무리를 압박합니다.',
     damage: 20,
@@ -57,8 +57,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'frost-lance': {
     id: 'frost-lance',
-    name: 'Frost Lance',
-    description: 'Fast piercing shots with high travel speed.',
+    name: '서리 랜스',
+    description: '빠른 탄속으로 적을 관통하는 사격입니다.',
     identityLabel: '정밀 관통',
     identityHint: '빠른 탄속과 관통으로 적 줄을 꿰뚫는 무기입니다.',
     damage: 18,
@@ -82,8 +82,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'storm-cannon': {
     id: 'storm-cannon',
-    name: 'Storm Cannon',
-    description: 'A heavier hybrid weapon formed from balanced energy.',
+    name: '폭풍 캐넌',
+    description: '균형 잡힌 에너지로 만든 묵직한 혼합 무기입니다.',
     identityLabel: '혼합 중화력',
     identityHint: '묵직한 단발 피해로 핵심 대상을 빠르게 압박합니다.',
     damage: 28,
@@ -106,8 +106,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'arc-loom': {
     id: 'arc-loom',
-    name: 'Arc Loom',
-    description: 'Weaves static pulses into quick chained bursts.',
+    name: '아크 룸',
+    description: '정전기 파동을 엮어 빠른 연쇄 폭발을 일으킵니다.',
     identityLabel: '연쇄 제압',
     identityHint: '전하가 근처 적에게 번지며 밀집한 무리를 정리합니다.',
     damage: 24,
@@ -133,8 +133,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'spark-carbine': {
     id: 'spark-carbine',
-    name: 'Spark Carbine',
-    description: 'Rapid electric shots that trade heavy impact for precise sustained pressure.',
+    name: '스파크 카빈',
+    description: '묵직한 충격 대신 정밀하고 지속적인 압박을 주는 고속 전격 사격입니다.',
     identityLabel: '고속 전격',
     identityHint: '가벼운 전격탄을 빠르게 쏘아 단일 대상을 꾸준히 압박합니다.',
     damage: 15,
@@ -157,8 +157,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'mist-vortex': {
     id: 'mist-vortex',
-    name: 'Mist Vortex',
-    description: 'A wide mist launcher that leaves long-lived control zones.',
+    name: '안개 소용돌이',
+    description: '오래 남는 제어 지대를 만드는 넓은 안개 발사기입니다.',
     identityLabel: '안개 제어',
     identityHint: '넓고 오래 남는 안개 지대로 적 이동 경로를 제어합니다.',
     damage: 14,

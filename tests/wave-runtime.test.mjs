@@ -37,7 +37,7 @@ test('wave runtime starts a regular wave with an immediate spawn and scheduled f
     currentWaveIndex: 0,
     activeWaveLabel: '1 웨이브',
     remainingSpawns: 6,
-    statusMessage: '1 웨이브 started.',
+    statusMessage: '1 웨이브 시작.',
     isBossActive: false,
   })
   assert.deepEqual(spawnedEnemies, ['slime'])
@@ -121,7 +121,7 @@ test('wave runtime starts a boss wave without scheduling follow-up spawns', () =
     currentWaveIndex: 4,
     activeWaveLabel: '보스 웨이브',
     remainingSpawns: 1,
-    statusMessage: '보스 웨이브 started.',
+    statusMessage: '보스 웨이브 시작.',
     isBossActive: true,
   })
   assert.deepEqual(spawnedEnemies, ['slime-boss'])
