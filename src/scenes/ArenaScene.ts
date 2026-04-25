@@ -15,17 +15,20 @@ import type {
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { CodexController } from '../ui/Codex.js'
 import type { HudController } from '../ui/Hud.js'
-import { getCodexState, describeAvailableRecipes, describeInventoryEntries } from '../systems/codex.js'
+import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
-import { addItem } from '../systems/inventory.js'
 import {
-  applyRecipeSelection,
   equipOwnedWeapon,
   getActionableRecipes,
   seedOwnedWeapons,
 } from '../systems/weaponOwnership.js'
 import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
+import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
+import {
+  applyLootPickup,
+  applyRecipeSelectionWorkflow,
+} from './arena/combineInventoryWorkflow.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
 
@@ -361,8 +364,9 @@ export class ArenaScene extends Phaser.Scene {
           this.player.y,
         ) <= pickupDistance
       ) {
-        this.inventory = addItem(this.inventory, loot.itemId)
-        this.statusMessage = `Collected ${ITEM_DEFINITIONS[loot.itemId].name}.`
+        const pickupResult = applyLootPickup(this.inventory, loot.itemId)
+        this.inventory = pickupResult.nextInventory
+        this.statusMessage = pickupResult.statusMessage
         loot.sprite.destroy()
       }
     }
@@ -577,22 +581,21 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    const result = applyRecipeSelection({
+    const result = applyRecipeSelectionWorkflow({
       inventory: this.inventory,
       ownedWeaponIds: this.ownedWeaponIds,
     }, recipeId)
 
-    if (!result) {
-      this.statusMessage = 'That combine is no longer actionable. Choose another option.'
+    if (result.kind !== 'success') {
+      this.statusMessage = result.statusMessage
       this.updateHud()
       return
     }
 
-    const weapon = WEAPON_DEFINITIONS[result.weaponId]
     this.inventory = result.nextInventory
     this.ownedWeaponIds = result.ownedWeaponIds
     this.activeWeaponId = result.activeWeaponId
-    this.statusMessage = `${weapon.name} crafted and equipped. Resume the run when ready.`
+    this.statusMessage = result.statusMessage
     this.updateHud()
   }
 

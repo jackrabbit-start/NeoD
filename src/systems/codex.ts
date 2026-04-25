@@ -2,7 +2,7 @@ import { ENEMY_DEFINITIONS } from '../data/enemies.js'
 import { ITEM_DEFINITIONS } from '../data/items.js'
 import { RECIPE_DEFINITIONS } from '../data/recipes.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
-import type { AvailableRecipe, CodexState, InventoryState, LootId } from '../domain/types.js'
+import type { CodexState } from '../domain/types.js'
 
 const formatWeaponSummary = (damage: number, fireRateMs: number) =>
   `${damage} dmg · ${Math.round(1000 / fireRateMs)} shots/s`
@@ -56,26 +56,4 @@ export function getCodexState(isOpen: boolean): CodexState {
       }),
     })),
   }
-}
-
-export function describeInventoryEntries(inventory: InventoryState): string[] {
-  const inventoryEntries = Object.entries(inventory) as [LootId, number][]
-
-  if (inventoryEntries.length === 0) {
-    return ['No drops collected yet.']
-  }
-
-  return inventoryEntries.map(
-    ([itemId, count]) => `${ITEM_DEFINITIONS[itemId].name} × ${count}`,
-  )
-}
-
-export function describeAvailableRecipes(recipes: AvailableRecipe[]): string[] {
-  if (recipes.length === 0) {
-    return ['No actionable combine yet.']
-  }
-
-  return recipes.map(
-    ({ recipe, weapon }) => `${recipe.name} → ${weapon.damage} dmg (${recipe.note})`,
-  )
 }
