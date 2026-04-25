@@ -9,6 +9,9 @@ export const MAX_ACTIVE_PACHINKO_TOKENS = 30 as const
 export const PACHINKO_SLOT_COUNT = 10 as const
 export const PACHINKO_TOKEN_LAUNCH_INTERVAL_MS = 110 as const
 export const PACHINKO_REWARD_TABLE_REFRESH_MS = 5000 as const
+export const PACHINKO_FEVER_CHARGE_MAX = 100 as const
+export const PACHINKO_FEVER_DURATION_TOKENS = 3 as const
+export const PACHINKO_PITY_THRESHOLD = 4 as const
 
 export const PACHINKO_XP_DISPLAY_SCALE = 100 as const
 
@@ -45,6 +48,29 @@ export interface PachinkoRewardResult {
   star: WeaponStar
 }
 
+export type PachinkoMomentumOutcome =
+  | 'idle'
+  | 'normal'
+  | 'near-miss'
+  | 'bonus'
+  | 'jackpot'
+  | 'fever-jackpot'
+
+export interface PachinkoMomentumState {
+  feverCharge: number
+  pityCounter: number
+  feverTokensRemaining: number
+  lastOutcome: PachinkoMomentumOutcome
+}
+
+export interface PachinkoMomentumUpdate {
+  state: PachinkoMomentumState
+  outcome: PachinkoMomentumOutcome
+  feverTriggered: boolean
+  wasFeverActive: boolean
+  isFeverActive: boolean
+}
+
 export interface PachinkoStarRange {
   minStar: WeaponStar
   maxStar: WeaponStar
@@ -77,6 +103,7 @@ export interface PachinkoSlotReward extends PachinkoRewardResult {
   ratioEnd: number
   sampleRatio: number
   iconKey: string
+  isNearJackpot?: boolean
   modifier?: PachinkoSlotModifier
 }
 
@@ -98,6 +125,15 @@ export interface PachinkoTokenProgressResult extends PachinkoTokenProgressState 
   rewardLevel: number
 }
 
+export interface PachinkoSpinProfile {
+  feverActive: boolean
+  activeWeaponWeightMultiplier: number
+  nonActiveWeaponWeightMultiplier: number
+  starBonus: number
+  extraJackpotSlots: number
+  extraBonusSlots: number
+}
+
 function createSeededRandomSource(seed: number): RandomSource {
   let state = Math.max(1, Math.floor(seed)) >>> 0
 
@@ -117,6 +153,113 @@ function getPachinkoSlotRewardSeed(totalTokenXp: number, slotIndex: number, tabl
     Math.imul(normalizedSlot + 1, 19349663) ^
     Math.imul(normalizedTableSeed + 1, 83492791)
   ) >>> 0
+}
+
+function clampPachinkoCharge(value: number): number {
+  return Math.max(0, Math.min(PACHINKO_FEVER_CHARGE_MAX, Math.round(value)))
+}
+
+function getPachinkoJackpotNeighborIndices(jackpotSlots: Iterable<number>, slotCount: number): Set<number> {
+  const neighbors = new Set<number>()
+  const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
+  for (const jackpotSlot of jackpotSlots) {
+    for (const offset of [-1, 1]) {
+      const candidate = jackpotSlot + offset
+      if (candidate >= 0 && candidate < normalizedSlotCount) {
+        neighbors.add(candidate)
+      }
+    }
+  }
+  return neighbors
+}
+
+function assignOpenModifierSlot(
+  modifiers: Map<number, PachinkoSlotModifierKind>,
+  preferredSlot: number,
+  kind: PachinkoSlotModifierKind,
+  slotCount: number,
+): void {
+  const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
+  for (let offset = 0; offset < normalizedSlotCount; offset += 1) {
+    const forwardSlot = (preferredSlot + offset) % normalizedSlotCount
+    if (!modifiers.has(forwardSlot)) {
+      modifiers.set(forwardSlot, kind)
+      return
+    }
+
+    const backwardSlot = (preferredSlot - offset + normalizedSlotCount) % normalizedSlotCount
+    if (!modifiers.has(backwardSlot)) {
+      modifiers.set(backwardSlot, kind)
+      return
+    }
+  }
+}
+
+function getPachinkoChargeGain(reward: Pick<PachinkoSlotReward, 'modifier' | 'isNearJackpot'>): number {
+  if (reward.isNearJackpot) {
+    return 34
+  }
+
+  if (reward.modifier?.kind === 'bonus') {
+    return 22
+  }
+
+  if (reward.modifier?.kind === 'family') {
+    return 16
+  }
+
+  return 14
+}
+
+export function createInitialPachinkoMomentumState(): PachinkoMomentumState {
+  return {
+    feverCharge: 0,
+    pityCounter: 0,
+    feverTokensRemaining: 0,
+    lastOutcome: 'idle',
+  }
+}
+
+export function isPachinkoFeverActive(state: PachinkoMomentumState): boolean {
+  return state.feverTokensRemaining > 0
+}
+
+export function getPachinkoFeverChargeRatio(state: PachinkoMomentumState): number {
+  return clampPachinkoCharge(state.feverCharge) / PACHINKO_FEVER_CHARGE_MAX
+}
+
+export function getPachinkoMomentumLabel(state: PachinkoMomentumState): string {
+  if (isPachinkoFeverActive(state)) {
+    return `FEVER ${state.feverTokensRemaining}연타`
+  }
+
+  if (state.feverCharge >= PACHINKO_FEVER_CHARGE_MAX * 0.8) {
+    return '잭팟 예열'
+  }
+
+  if (state.pityCounter >= PACHINKO_PITY_THRESHOLD) {
+    return '리치 누적'
+  }
+
+  if (state.lastOutcome === 'near-miss') {
+    return '근접 적립'
+  }
+
+  return '토큰 대기'
+}
+
+export function createPachinkoSpinProfile(state: PachinkoMomentumState): PachinkoSpinProfile {
+  const feverActive = isPachinkoFeverActive(state)
+  const pityReady = !feverActive && state.pityCounter >= PACHINKO_PITY_THRESHOLD
+
+  return {
+    feverActive,
+    activeWeaponWeightMultiplier: feverActive ? 1.75 : 1,
+    nonActiveWeaponWeightMultiplier: feverActive ? 0.7 : 1,
+    starBonus: feverActive ? 1 : 0,
+    extraJackpotSlots: feverActive ? 1 : 0,
+    extraBonusSlots: pityReady ? 1 : 0,
+  }
 }
 
 export function getPachinkoRewardTableSeed(
@@ -290,15 +433,19 @@ export function resolvePachinkoReward(
   activeWeaponId?: WeaponId,
   activeWeaponWeightMultiplier = 1,
   nonActiveWeaponWeightMultiplier = 1,
+  spinProfile: PachinkoSpinProfile = createPachinkoSpinProfile(createInitialPachinkoMomentumState()),
 ): PachinkoRewardResult {
   return {
     weaponId: resolveWeightedWeaponReward(
       random,
       activeWeaponId,
-      activeWeaponWeightMultiplier,
-      nonActiveWeaponWeightMultiplier,
+      activeWeaponWeightMultiplier * spinProfile.activeWeaponWeightMultiplier,
+      nonActiveWeaponWeightMultiplier * spinProfile.nonActiveWeaponWeightMultiplier,
     ),
-    star: resolveStarForLevel(level, random, starRange),
+    star: Math.min(
+      MAX_PACHINKO_REWARD_STAR,
+      resolveStarForLevel(level, random, starRange) + spinProfile.starBonus,
+    ) as WeaponStar,
   }
 }
 
@@ -319,13 +466,19 @@ export function buildPachinkoSlotRewards(
   activeWeaponId?: WeaponId,
   activeWeaponWeightMultiplier = 1,
   nonActiveWeaponWeightMultiplier = 1,
+  momentumState: PachinkoMomentumState = createInitialPachinkoMomentumState(),
 ): PachinkoSlotReward[] {
   const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
   const level = getPachinkoRewardLevel(totalTokenXp)
   const starRange = getPachinkoStarRangeForPlayerLevel(playerLevel)
+  const spinProfile = createPachinkoSpinProfile(momentumState)
   const modifiers = activeWeaponId
-    ? buildPachinkoSlotModifiers(activeWeaponId, level, normalizedSlotCount)
+    ? buildPachinkoSlotModifiers(activeWeaponId, level, normalizedSlotCount, spinProfile)
     : new Map<number, PachinkoSlotModifierKind>()
+  const jackpotNeighborIndices = getPachinkoJackpotNeighborIndices(
+    [...modifiers.entries()].filter(([, modifier]) => modifier === 'jackpot').map(([slotIndex]) => slotIndex),
+    normalizedSlotCount,
+  )
 
   return Array.from({ length: normalizedSlotCount }, (_, slotIndex) => {
     const ratioStart = slotIndex / normalizedSlotCount
@@ -338,6 +491,7 @@ export function buildPachinkoSlotRewards(
       activeWeaponId,
       activeWeaponWeightMultiplier,
       nonActiveWeaponWeightMultiplier,
+      spinProfile,
     )
     const modifierKind = modifiers.get(slotIndex)
     const modifier = modifierKind ? PACHINKO_SLOT_MODIFIERS[modifierKind] : undefined
@@ -353,6 +507,7 @@ export function buildPachinkoSlotRewards(
       ratioEnd,
       sampleRatio,
       iconKey: `weapon-${modifiedReward.weaponId}`,
+      ...(jackpotNeighborIndices.has(slotIndex) && !modifier ? { isNearJackpot: true } : {}),
       ...(modifier ? { modifier } : {}),
     }
   })
@@ -362,6 +517,7 @@ export function buildPachinkoSlotModifiers(
   activeWeaponId: WeaponId,
   level: number,
   slotCount: number = PACHINKO_SLOT_COUNT,
+  spinProfile: PachinkoSpinProfile = createPachinkoSpinProfile(createInitialPachinkoMomentumState()),
 ): Map<number, PachinkoSlotModifierKind> {
   const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
   const activeIndex = Math.max(0, WEAPON_IDS.indexOf(activeWeaponId))
@@ -376,11 +532,21 @@ export function buildPachinkoSlotModifiers(
     jackpotSlot = (jackpotSlot + 1) % normalizedSlotCount
   }
 
-  return new Map<number, PachinkoSlotModifierKind>([
+  const modifiers = new Map<number, PachinkoSlotModifierKind>([
     [familySlot, 'family'],
     [bonusSlot, 'bonus'],
     [jackpotSlot, 'jackpot'],
   ])
+
+  for (let index = 0; index < spinProfile.extraBonusSlots; index += 1) {
+    assignOpenModifierSlot(modifiers, bonusSlot + 1 + index, 'bonus', normalizedSlotCount)
+  }
+
+  for (let index = 0; index < spinProfile.extraJackpotSlots; index += 1) {
+    assignOpenModifierSlot(modifiers, jackpotSlot - 1 - index, 'jackpot', normalizedSlotCount)
+  }
+
+  return modifiers
 }
 
 export function applyPachinkoSlotModifier(
@@ -417,6 +583,7 @@ export function resolvePachinkoSlotReward(
   activeWeaponId?: WeaponId,
   activeWeaponWeightMultiplier = 1,
   nonActiveWeaponWeightMultiplier = 1,
+  momentumState: PachinkoMomentumState = createInitialPachinkoMomentumState(),
 ): PachinkoSlotReward {
   const slotRewards = buildPachinkoSlotRewards(
     totalTokenXp,
@@ -426,6 +593,7 @@ export function resolvePachinkoSlotReward(
     activeWeaponId,
     activeWeaponWeightMultiplier,
     nonActiveWeaponWeightMultiplier,
+    momentumState,
   )
   return slotRewards[resolvePachinkoSlotIndex(landingRatio, slotRewards.length)] ?? slotRewards[0]
 }
@@ -438,14 +606,16 @@ export function getPachinkoWeaponOddsRows(
   activeWeaponId?: WeaponId,
   activeWeaponWeightMultiplier = 1,
   nonActiveWeaponWeightMultiplier = 1,
+  momentumState: PachinkoMomentumState = createInitialPachinkoMomentumState(),
 ): PachinkoWeaponOddsRow[] {
   const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
   const level = getPachinkoRewardLevel(totalTokenXp)
+  const spinProfile = createPachinkoSpinProfile(momentumState)
   const modifiers = activeWeaponId
-    ? buildPachinkoSlotModifiers(activeWeaponId, level, normalizedSlotCount)
+    ? buildPachinkoSlotModifiers(activeWeaponId, level, normalizedSlotCount, spinProfile)
     : new Map<number, PachinkoSlotModifierKind>()
-  const activeWeight = Math.max(1, activeWeaponWeightMultiplier)
-  const otherWeight = Math.max(0.2, nonActiveWeaponWeightMultiplier)
+  const activeWeight = Math.max(1, activeWeaponWeightMultiplier * spinProfile.activeWeaponWeightMultiplier)
+  const otherWeight = Math.max(0.2, nonActiveWeaponWeightMultiplier * spinProfile.nonActiveWeaponWeightMultiplier)
   const totalWeight = activeWeaponId
     ? activeWeight + otherWeight * Math.max(0, WEAPON_IDS.length - 1)
     : WEAPON_IDS.length
@@ -483,6 +653,56 @@ export function getPachinkoWeaponOddsRows(
       percentLabel: `${Math.round(probability * 100)}%`,
     }
   })
+}
+
+export function applyPachinkoMomentumState(
+  state: PachinkoMomentumState,
+  reward: Pick<PachinkoSlotReward, 'modifier' | 'isNearJackpot'>,
+): PachinkoMomentumUpdate {
+  const wasFeverActive = isPachinkoFeverActive(state)
+  let feverTokensRemaining = wasFeverActive ? Math.max(0, state.feverTokensRemaining - 1) : 0
+  let feverCharge = wasFeverActive ? 0 : clampPachinkoCharge(state.feverCharge)
+  let pityCounter = wasFeverActive ? 0 : Math.max(0, state.pityCounter)
+  let outcome: PachinkoMomentumOutcome = 'normal'
+  let feverTriggered = false
+
+  if (reward.modifier?.kind === 'jackpot') {
+    outcome = wasFeverActive ? 'fever-jackpot' : 'jackpot'
+    pityCounter = 0
+    if (wasFeverActive) {
+      feverTokensRemaining = Math.min(PACHINKO_FEVER_DURATION_TOKENS, feverTokensRemaining + 1)
+    } else {
+      feverCharge = Math.max(0, feverCharge - 18)
+    }
+  } else if (!wasFeverActive) {
+    pityCounter += 1
+    if (reward.isNearJackpot) {
+      outcome = 'near-miss'
+    } else if (reward.modifier?.kind === 'bonus' || reward.modifier?.kind === 'family') {
+      outcome = 'bonus'
+    }
+
+    feverCharge = clampPachinkoCharge(feverCharge + getPachinkoChargeGain(reward))
+    if (feverCharge >= PACHINKO_FEVER_CHARGE_MAX) {
+      feverTriggered = true
+      feverTokensRemaining = PACHINKO_FEVER_DURATION_TOKENS
+      feverCharge = 0
+      pityCounter = 0
+    }
+  }
+
+  return {
+    state: {
+      feverCharge,
+      pityCounter,
+      feverTokensRemaining,
+      lastOutcome: outcome,
+    },
+    outcome,
+    feverTriggered,
+    wasFeverActive,
+    isFeverActive: feverTokensRemaining > 0,
+  }
 }
 
 export function canLaunchPachinkoToken({
@@ -556,6 +776,7 @@ export function resolvePachinkoLandingReward(
   tableSeed = 0,
   playerLevel = 1,
   activeWeaponId?: WeaponId,
+  momentumState: PachinkoMomentumState = createInitialPachinkoMomentumState(),
 ): PachinkoRewardResult {
   const { weaponId, star } = resolvePachinkoSlotReward(
     totalTokenXp,
@@ -564,6 +785,9 @@ export function resolvePachinkoLandingReward(
     tableSeed,
     playerLevel,
     activeWeaponId,
+    1,
+    1,
+    momentumState,
   )
   return { weaponId, star }
 }

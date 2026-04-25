@@ -31,6 +31,11 @@ export interface PachinkoHudState {
   queuedTokens: number
   isTokenInFlight: boolean
   latestReward: string | null
+  feverChargePercent?: number
+  feverLabel?: string
+  pityCounter?: number
+  feverTokensRemaining?: number
+  isFeverActive?: boolean
   synergy?: string
   enemyOdds?: HudEnemyOddsState
 }

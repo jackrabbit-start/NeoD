@@ -153,6 +153,9 @@ import {
   createRunResultPresentation,
 } from '../.tmp-test/src/systems/runResult.js'
 import {
+  PACHINKO_FEVER_CHARGE_MAX,
+  PACHINKO_FEVER_DURATION_TOKENS,
+  PACHINKO_PITY_THRESHOLD,
   MAX_ACTIVE_PACHINKO_TOKENS,
   PACHINKO_SLOT_COUNT,
   PACHINKO_LEVEL_THRESHOLDS,
@@ -160,17 +163,21 @@ import {
   PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
   STAR_ODDS_BY_LEVEL,
   applyEnemyPachinkoTokenProgress,
+  applyPachinkoMomentumState,
   applyPachinkoSlotModifier,
   buildPachinkoSlotModifiers,
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
+  createInitialPachinkoMomentumState,
   getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
   getPachinkoStarRangeForPlayerLevel,
+  getPachinkoMomentumLabel,
   getPachinkoWeaponFamily,
   getPachinkoWeaponFamilyLabel,
   getPachinkoWeaponSynergySummary,
   getTokenXpForEnemy,
+  isPachinkoFeverActive,
   resolvePachinkoLandingReward,
   resolvePachinkoReward,
   resolvePachinkoSlotIndex,
@@ -692,6 +699,72 @@ test('pachinko slot modifiers never punish the base reward', () => {
     weaponId: 'slime-glaive',
     star: 1,
   })
+})
+
+test('pachinko momentum turns misses into fever without minting extra tokens', () => {
+  let momentum = createInitialPachinkoMomentumState()
+  assert.equal(momentum.feverCharge, 0)
+  assert.equal(isPachinkoFeverActive(momentum), false)
+  assert.equal(getPachinkoMomentumLabel(momentum), '토큰 대기')
+
+  for (let index = 0; index < PACHINKO_PITY_THRESHOLD; index += 1) {
+    const update = applyPachinkoMomentumState(momentum, { modifier: undefined, isNearJackpot: false })
+    momentum = update.state
+  }
+
+  assert.equal(momentum.pityCounter, PACHINKO_PITY_THRESHOLD)
+  assert.equal(momentum.feverCharge, 56)
+  assert.equal(getPachinkoMomentumLabel(momentum), '리치 누적')
+
+  const nearMiss = applyPachinkoMomentumState(momentum, { modifier: undefined, isNearJackpot: true })
+  assert.equal(nearMiss.feverTriggered, false)
+  assert.equal(nearMiss.state.feverCharge, 90)
+  assert.equal(nearMiss.state.lastOutcome, 'near-miss')
+
+  const feverTrigger = applyPachinkoMomentumState(nearMiss.state, { modifier: undefined, isNearJackpot: true })
+  assert.equal(feverTrigger.feverTriggered, true)
+  assert.equal(feverTrigger.state.feverCharge, 0)
+  assert.equal(feverTrigger.state.pityCounter, 0)
+  assert.equal(feverTrigger.state.feverTokensRemaining, PACHINKO_FEVER_DURATION_TOKENS)
+  assert.equal(isPachinkoFeverActive(feverTrigger.state), true)
+  assert.equal(getPachinkoMomentumLabel(feverTrigger.state), `FEVER ${PACHINKO_FEVER_DURATION_TOKENS}연타`)
+})
+
+test('pachinko fever expands upside slots and consumes a short burst window', () => {
+  const feverState = {
+    feverCharge: 0,
+    pityCounter: 0,
+    feverTokensRemaining: PACHINKO_FEVER_DURATION_TOKENS,
+    lastOutcome: 'bonus',
+  }
+
+  const neutralModifiers = buildPachinkoSlotModifiers('slime-glaive', 3)
+  const feverModifiers = buildPachinkoSlotModifiers('slime-glaive', 3, PACHINKO_SLOT_COUNT, {
+    feverActive: true,
+    activeWeaponWeightMultiplier: 1.75,
+    nonActiveWeaponWeightMultiplier: 0.7,
+    starBonus: 1,
+    extraJackpotSlots: 1,
+    extraBonusSlots: 0,
+  })
+  assert.equal([...neutralModifiers.values()].filter((modifier) => modifier === 'jackpot').length, 1)
+  assert.equal([...feverModifiers.values()].filter((modifier) => modifier === 'jackpot').length, 2)
+
+  const feverSlots = buildPachinkoSlotRewards(3000, PACHINKO_SLOT_COUNT, 0, 1, 'slime-glaive', 1, 1, feverState)
+  assert.ok(feverSlots.some((slot) => slot.modifier?.kind === 'jackpot'))
+  assert.ok(feverSlots.some((slot) => slot.isNearJackpot))
+  assert.ok(feverSlots.every((slot) => slot.star >= 2), 'fever should add a modest global star uplift at level 3')
+
+  const nonJackpotDuringFever = applyPachinkoMomentumState(feverState, { modifier: undefined, isNearJackpot: false })
+  assert.equal(nonJackpotDuringFever.wasFeverActive, true)
+  assert.equal(nonJackpotDuringFever.state.feverTokensRemaining, PACHINKO_FEVER_DURATION_TOKENS - 1)
+
+  const jackpotDuringFever = applyPachinkoMomentumState(nonJackpotDuringFever.state, { modifier: { kind: 'jackpot' }, isNearJackpot: false })
+  assert.equal(jackpotDuringFever.outcome, 'fever-jackpot')
+  assert.ok(jackpotDuringFever.state.feverTokensRemaining >= PACHINKO_FEVER_DURATION_TOKENS - 2)
+  assert.ok(jackpotDuringFever.state.feverTokensRemaining <= PACHINKO_FEVER_DURATION_TOKENS)
+  assert.equal(jackpotDuringFever.state.feverCharge, 0)
+  assert.ok(PACHINKO_FEVER_CHARGE_MAX >= 100)
 })
 
 test('pachinko slot index clamps boundaries and live table timing', () => {
@@ -1278,6 +1351,8 @@ test('hud places enemy spawn odds beside the game title for visibility', () => {
   assert.ok(hudSource.includes('적 출현 확률 ·'))
   assert.ok(styleSource.includes('.hud-summary__enemy-odds'))
   assert.ok(styleSource.includes('.hud-summary__enemy-odds-chip img'))
+  assert.ok(hudSource.includes('피버 게이지:'))
+  assert.ok(hudSource.includes('FEVER'))
 })
 
 test('arena hud injects enemy spawn odds into the visible stats list', () => {
@@ -1303,6 +1378,17 @@ test('arena hud injects enemy spawn odds into the visible stats list', () => {
   assert.ok(hudSource.includes('state.currentTimeLabel'))
   assert.ok(hudSource.includes('hud-summary__status-line--time'))
   assert.ok(styleSource.includes('.hud-summary__status-line--time'))
+})
+
+test('arena snapshots pachinko reward inputs per launched token before fever state mutates', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+
+  assert.ok(arenaSceneSource.includes('const resolutionSnapshot = {'))
+  assert.ok(arenaSceneSource.includes('totalTokenXp: this.pachinkoTokenXp'))
+  assert.ok(arenaSceneSource.includes('momentumState: { ...this.pachinkoMomentumState }'))
+  assert.ok(arenaSceneSource.includes('const snapshot = token.resolutionSnapshot'))
+  assert.ok(arenaSceneSource.includes('snapshot.totalTokenXp'))
+  assert.ok(arenaSceneSource.includes('snapshot.tableSeed'))
 })
 
 test('nearest auto-attack target returns null when no active enemies are available', () => {

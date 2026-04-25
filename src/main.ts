@@ -92,6 +92,11 @@ hud.update({
     queuedTokens: 0,
     isTokenInFlight: false,
     latestReward: null,
+    feverChargePercent: 0,
+    feverLabel: '토큰 대기',
+    pityCounter: 0,
+    feverTokensRemaining: 0,
+    isFeverActive: false,
   },
   modal: {
     isOpen: false,

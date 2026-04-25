@@ -357,6 +357,8 @@ export class HudController {
             `보상 레벨: Lv.${state.pachinko.level} · 누적 토큰 XP ${state.pachinko.totalTokenXp}`,
             `바닥 토큰: ${state.pachinko.droppedTokens}개 · 투입 중: ${state.pachinko.activeTokens}/${30}개 · 대기: ${state.pachinko.queuedTokens}개`,
             ...(state.pachinko.synergy ? [`시너지: ${state.pachinko.synergy}`] : []),
+            `피버 게이지: ${Math.round(state.pachinko.feverChargePercent ?? 0)}% · ${state.pachinko.feverLabel ?? '토큰 대기'}`,
+            `리치 누적: ${state.pachinko.pityCounter ?? 0}${state.pachinko.isFeverActive ? ` · FEVER ${state.pachinko.feverTokensRemaining ?? 0}회 남음` : ''}`,
             `${state.pachinko.isTokenInFlight ? '파친코 토큰 다중 낙하 중' : '파친코 투입 대기 중'}`,
             `최근 보상: ${state.pachinko.latestReward ?? '아직 없음'}`,
           ]), 'hud-summary__section--pachinko') : ''}
