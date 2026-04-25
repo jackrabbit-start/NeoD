@@ -62,6 +62,27 @@ export interface WeaponSingleBehavior {
   projectileLifetimeMs: number
 }
 
+export interface WeaponSplitShotBehavior {
+  kind: 'split-shot'
+  projectileCount: number
+  spreadDegrees: number
+  projectileLifetimeMs: number
+  shotDelayMs?: number
+  damageMultiplier?: number
+  speedMultiplier?: number
+  maxHits?: number
+}
+
+export interface WeaponBurstFireBehavior {
+  kind: 'burst-fire'
+  shotsPerBurst: number
+  shotIntervalMs: number
+  projectileLifetimeMs: number
+  spreadDegrees?: number
+  damageMultiplier?: number
+  speedMultiplier?: number
+}
+
 export interface WeaponSprayHazardBehavior {
   kind: 'spray-hazard'
   projectileCount: number
@@ -87,6 +108,23 @@ export interface WeaponChainBehavior {
   chainFalloff: number
 }
 
+export interface WeaponImpactAoeBehavior {
+  kind: 'impact-aoe'
+  projectileLifetimeMs: number
+  explosionRadius: number
+  explosionDamage: number
+}
+
+export interface WeaponZoneControlBehavior {
+  kind: 'zone-control'
+  projectileLifetimeMs: number
+  zoneRadius: number
+  zoneDurationMs: number
+  zoneTickMs: number
+  zoneDamage: number
+  speedMultiplier?: number
+}
+
 export interface WeaponMeleeCleaveBehavior {
   kind: 'melee-cleave'
   range: number
@@ -97,9 +135,13 @@ export interface WeaponMeleeCleaveBehavior {
 
 export type WeaponAttackBehavior =
   | WeaponSingleBehavior
+  | WeaponSplitShotBehavior
+  | WeaponBurstFireBehavior
   | WeaponSprayHazardBehavior
   | WeaponPierceBehavior
   | WeaponChainBehavior
+  | WeaponImpactAoeBehavior
+  | WeaponZoneControlBehavior
   | WeaponMeleeCleaveBehavior
 
 export interface WeaponDefinition {
@@ -321,6 +363,7 @@ export interface HudOwnedWeaponView {
   stackKey?: WeaponStackKey
   name: string
   description: string
+  summary: string
   star?: WeaponStar
   count?: number
   damage: number

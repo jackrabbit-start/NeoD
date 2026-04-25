@@ -164,6 +164,7 @@ import {
 import { deriveEffectiveWeaponStats } from '../systems/tuning.js'
 import {
   addWeaponStackWithAutoFusion,
+  canFuseWeaponStack,
   equipWeaponStack,
   formatWeaponStarLabel,
   getStackKey,
@@ -326,6 +327,8 @@ interface ProjectileEntity {
   maxTravelDistance: number
   knockback: ProjectileSpawnSpec['knockback']
   chain?: ChainSpec
+  explosionOnHit?: HazardSpawnSpec
+  explosionOnExpire?: HazardSpawnSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
   visualPowerTier: number
@@ -912,11 +915,11 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const projectileSpec of attackPlan.projectiles) {
-      this.spawnProjectile(projectileSpec, weapon.projectileTextureKey)
+      this.dispatchProjectileSpec(projectileSpec, weapon.projectileTextureKey)
     }
 
     for (const meleeSwing of attackPlan.meleeSwings) {
-      this.applyMeleeSwing(meleeSwing)
+      this.dispatchMeleeSwing(meleeSwing)
     }
 
     this.nextFireAt = time + attackPlan.cooldownMs
@@ -1209,7 +1212,7 @@ export class ArenaScene extends Phaser.Scene {
 
       projectile.remainingLifetimeMs -= delta
       if (projectile.remainingLifetimeMs <= 0) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
         continue
       }
 
@@ -1219,7 +1222,7 @@ export class ArenaScene extends Phaser.Scene {
           this.mapLayout.worldBounds,
         )
       ) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
         continue
       }
 
@@ -1263,6 +1266,10 @@ export class ArenaScene extends Phaser.Scene {
             this.applyChainDamage(enemy, projectile.chain, projectile.damage)
           }
 
+          if (projectile.explosionOnHit) {
+            this.applyImpactExplosion(projectile.sprite.x, projectile.sprite.y, projectile.explosionOnHit)
+          }
+
           if (projectile.hazardOnHit) {
             this.spawnHazardZone(projectile.sprite.x, projectile.sprite.y, projectile.hazardOnHit)
           }
@@ -1286,7 +1293,7 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       if (didExpireAtRange && projectile.sprite.active) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
       }
     }
   }
@@ -2855,7 +2862,7 @@ export class ArenaScene extends Phaser.Scene {
         `파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`,
         `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`,
       ],
-      recipes: ['같은 무기·같은 별 3개는 자동으로 다음 별 등급이 됩니다.'],
+      recipes: this.getFusionSummaryLines(),
       objective: this.isFinaleActive
         ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
         : '30분 생존 압박을 버티며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
@@ -2927,6 +2934,7 @@ export class ArenaScene extends Phaser.Scene {
         stackKey,
         name: ownedWeapon.name,
         description: ownedWeapon.description,
+        summary: getWeaponSummary(effectiveWeapon),
         star: stack.star,
         count: stack.count,
         damage: effectiveWeapon.damage,
@@ -2961,6 +2969,20 @@ export class ArenaScene extends Phaser.Scene {
       { label: '사거리 배율', value: `×${playerStats.weaponRangeMultiplier.toFixed(2)}` },
       { label: '특수 강화 단계', value: `${playerStats.weaponSpecialTier}` },
     ]
+  }
+
+  private getFusionSummaryLines(): string[] {
+    const eligible = sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).filter((stack) =>
+      canFuseWeaponStack(this.weaponStacks, getStackKey(stack)),
+    )
+    if (eligible.length === 0) {
+      return ['같은 무기와 같은 별 2개를 모으면 합성 가능']
+    }
+
+    return eligible.map((stack) => {
+      const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
+      return `${WEAPON_DEFINITIONS[stack.weaponId].name} ${'★'.repeat(stack.star)} 합성 가능 · ${getWeaponSummary(effectiveWeapon)}`
+    })
   }
 
 
@@ -3424,7 +3446,8 @@ export class ArenaScene extends Phaser.Scene {
 
 
   private spawnProjectile(projectileSpec: ProjectileSpawnSpec, textureKey: string): void {
-    const projectile = this.physics.add.image(this.player.x, this.player.y, textureKey)
+    const projectileOrigin = projectileSpec.origin ?? { x: this.player.x, y: this.player.y }
+    const projectile = this.physics.add.image(projectileOrigin.x, projectileOrigin.y, textureKey)
     const visualTier = Math.max(0, projectileSpec.visualPowerTier ?? 0)
     projectile.setTint(projectileSpec.tint)
     projectile.setCircle(projectileSpec.radius)
@@ -3445,11 +3468,13 @@ export class ArenaScene extends Phaser.Scene {
       remainingLifetimeMs: projectileSpec.lifetimeMs,
       remainingHits: projectileSpec.maxHits,
       hitEnemyIds: new Set<number>(),
-      origin: { x: this.player.x, y: this.player.y },
+      origin: projectileOrigin,
       direction: projectileSpec.direction,
       maxTravelDistance: projectileSpec.maxTravelDistance,
       knockback: projectileSpec.knockback,
       chain: projectileSpec.chain,
+      explosionOnHit: projectileSpec.explosionOnHit,
+      explosionOnExpire: projectileSpec.explosionOnExpire,
       hazardOnHit: projectileSpec.hazardOnHit,
       hazardOnExpire: projectileSpec.hazardOnExpire,
       visualPowerTier: visualTier,
@@ -3457,10 +3482,24 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
+  private dispatchProjectileSpec(projectileSpec: ProjectileSpawnSpec, textureKey: string): void {
+    if ((projectileSpec.delayMs ?? 0) > 0) {
+      this.time.delayedCall(projectileSpec.delayMs ?? 0, () => {
+        if (!this.player.active || this.isRunEnding || this.isInteractionBlocked()) {
+          return
+        }
+        this.spawnProjectile(projectileSpec, textureKey)
+      })
+      return
+    }
+
+    this.spawnProjectile(projectileSpec, textureKey)
+  }
+
   private applyMeleeSwing(swing: MeleeSwingSpec): void {
     const affectedEnemyIds = new Set(
       collectTargetsInCleave(
-        { x: this.player.x, y: this.player.y },
+        swing.origin ?? { x: this.player.x, y: this.player.y },
         swing.direction,
         swing.range,
         swing.arcDegrees,
@@ -3497,8 +3536,23 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private dispatchMeleeSwing(swing: MeleeSwingSpec): void {
+    if ((swing.delayMs ?? 0) > 0) {
+      this.time.delayedCall(swing.delayMs ?? 0, () => {
+        if (!this.player.active || this.isRunEnding || this.isInteractionBlocked()) {
+          return
+        }
+        this.applyMeleeSwing(swing)
+      })
+      return
+    }
+
+    this.applyMeleeSwing(swing)
+  }
+
   private spawnMeleeSwingVisual(swing: MeleeSwingSpec): void {
-    spawnMeleeSwingEffect(this, { x: this.player.x, y: this.player.y }, swing)
+    const swingOrigin = swing.origin ?? { x: this.player.x, y: this.player.y }
+    spawnMeleeSwingEffect(this, swingOrigin, swing)
   }
 
   private applyDirectProjectileKnockback(enemy: EnemyEntity, projectile: ProjectileEntity): void {
@@ -3519,8 +3573,8 @@ export class ArenaScene extends Phaser.Scene {
     const result = resolveKnockbackHit({
       source: 'melee-swing',
       direction: {
-        x: enemy.sprite.x - this.player.x,
-        y: enemy.sprite.y - this.player.y,
+        x: enemy.sprite.x - (swing.origin?.x ?? this.player.x),
+        y: enemy.sprite.y - (swing.origin?.y ?? this.player.y),
       },
       fallbackDirection: swing.direction,
       weapon: swing.knockback,
@@ -3533,9 +3587,17 @@ export class ArenaScene extends Phaser.Scene {
     enemy.knockback = result.state
   }
 
-  private destroyProjectile(projectile: ProjectileEntity, hazard?: HazardSpawnSpec): void {
+  private destroyProjectile(
+    projectile: ProjectileEntity,
+    hazard?: HazardSpawnSpec,
+    explosion?: HazardSpawnSpec,
+  ): void {
     if (!projectile.sprite.active) {
       return
+    }
+
+    if (explosion) {
+      this.applyImpactExplosion(projectile.sprite.x, projectile.sprite.y, explosion)
     }
 
     if (hazard) {
@@ -3563,6 +3625,44 @@ export class ArenaScene extends Phaser.Scene {
       tint: hazard.tint,
       visualPowerTier: hazard.visualPowerTier,
     })
+  }
+
+  private applyImpactExplosion(x: number, y: number, explosion: HazardSpawnSpec): void {
+    const impactedIds = new Set(
+      collectTargetsInRadius(
+        { x, y },
+        explosion.radius,
+        this.enemies
+          .filter((enemy) => enemy.sprite.active)
+          .map((enemy) => ({
+            id: enemy.runtimeId,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            radius: enemy.config.size / 2,
+          })),
+      ),
+    )
+
+    const visual = this.add.circle(x, y, explosion.radius, explosion.tint, 0.22).setDepth(0.62)
+    this.tweens.add({
+      targets: visual,
+      alpha: 0,
+      scaleX: 1.22,
+      scaleY: 1.22,
+      duration: 110,
+      onComplete: () => visual.destroy(),
+    })
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active || !impactedIds.has(enemy.runtimeId)) {
+        continue
+      }
+
+      this.damageEnemy(enemy, explosion.damage)
+      if (this.isRunEnding) {
+        return
+      }
+    }
   }
 
   private applyChainDamage(

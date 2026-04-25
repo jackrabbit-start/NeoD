@@ -532,7 +532,7 @@ export class HudController {
     const stats = document.createElement('small')
     stats.className = `hud-modal__weapon-meta hud-modal__weapon-stats hud-modal__weapon-stats--${variant}`
     const upgradeText = weapon.levelUpgradeLabel ? ` · ${weapon.levelUpgradeLabel}` : ''
-    stats.textContent = `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · 탄속 ${weapon.projectileSpeed}${upgradeText}`
+    stats.textContent = `${weapon.summary}${upgradeText}`
     if (weapon.accentColor != null) {
       stats.style.color = `#${weapon.accentColor.toString(16).padStart(6, '0')}`
     }
