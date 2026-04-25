@@ -11,6 +11,7 @@
     "src/data/**/*.ts",
     "src/game/**/*.ts",
     "src/systems/**/*.ts",
-    "src/scenes/arena/**/*.ts"
+    "src/scenes/arena/**/*.ts",
+    "src/ui/**/*.ts"
   ]
 }

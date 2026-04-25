@@ -66,18 +66,7 @@ const renderEnemies = (enemies: CodexEnemyEntry[]) => `
   </div>
 `
 
-export class CodexController {
-  constructor(private readonly element: HTMLElement) {}
-
-  update(state: CodexState): void {
-    this.element.hidden = !state.isOpen
-
-    if (!state.isOpen) {
-      this.element.innerHTML = ''
-      return
-    }
-
-    this.element.innerHTML = `
+const renderCodex = (state: CodexState) => `
       <div class="codex-shell">
         <header class="codex-header">
           <div>
@@ -100,9 +89,34 @@ export class CodexController {
         </section>
       </div>
     `
+
+export class CodexController {
+  private renderedMarkup: string | null = null
+
+  constructor(private readonly element: HTMLElement) {}
+
+  update(state: CodexState): void {
+    this.element.hidden = !state.isOpen
+
+    if (!state.isOpen) {
+      if (this.renderedMarkup !== null || this.element.innerHTML !== '') {
+        this.element.innerHTML = ''
+      }
+      this.renderedMarkup = null
+      return
+    }
+
+    const nextMarkup = renderCodex(state)
+    if (nextMarkup === this.renderedMarkup) {
+      return
+    }
+
+    this.element.innerHTML = nextMarkup
+    this.renderedMarkup = nextMarkup
   }
 
   destroy(): void {
+    this.renderedMarkup = null
     this.element.innerHTML = ''
     this.element.hidden = true
   }
