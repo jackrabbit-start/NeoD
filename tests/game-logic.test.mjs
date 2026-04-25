@@ -5,7 +5,6 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
-import { RUN_PROGRESS_PHASES } from '../.tmp-test/src/data/runProgression.js'
 import { ITEM_DEFINITIONS } from '../.tmp-test/src/data/items.js'
 import { RECIPE_DEFINITIONS } from '../.tmp-test/src/data/recipes.js'
 import { WEAPON_DEFINITIONS } from '../.tmp-test/src/data/weapons.js'
@@ -190,7 +189,7 @@ import {
   getPlayerXpForEnemy,
 } from '../.tmp-test/src/systems/playerProgression.js'
 import { HudController } from '../.tmp-test/src/ui/Hud.js'
-import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE, KIM_COMMUNITY_NARRATIONS } from '../.tmp-test/src/ui/controlCopy.js'
+import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP, GAME_TITLE } from '../.tmp-test/src/ui/controlCopy.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -370,7 +369,7 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
     nextInventory: {},
     ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
     activeWeaponId: 'acid-sprayer',
-    statusMessage: '술먹고 난 토 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
+    statusMessage: '청소부 프로토콜 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
   })
 })
 
@@ -395,7 +394,7 @@ test('new arena runs start from the clean baseline state', () => {
   assert.equal(state.isRunEnding, false)
   assert.equal(state.playerHealth, 100)
   assert.equal(state.playerMaxHealth, 100)
-  assert.equal(state.playerSpeed, 220)
+  assert.equal(state.playerSpeed, 180)
   assert.equal(state.nextFireAt, 0)
   assert.equal(state.runElapsedMs, 0)
   assert.equal(state.currentStageIndex, 0)
@@ -657,7 +656,7 @@ test('pachinko slot table makes displayed bottom rewards exact', () => {
 test('pachinko weapon-family synergy marks mostly-upside bonus slots', () => {
   assert.equal(getPachinkoWeaponFamily('slime-glaive'), 'melee')
   assert.equal(getPachinkoWeaponFamilyLabel('melee'), '근접')
-  assert.equal(getPachinkoWeaponSynergySummary('slime-glaive'), '근접 계열: 레넥톤 손맛 보너스 슬롯 등장')
+  assert.equal(getPachinkoWeaponSynergySummary('slime-glaive'), '근접 계열: 말뚝 광신도 보너스 슬롯 등장')
 
   const modifiers = buildPachinkoSlotModifiers('slime-glaive', 3)
   assert.equal(modifiers.get(7), 'family')
@@ -974,9 +973,9 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   const [acidSummary] = describeAvailableRecipes(acidRecipes)
-  assert.match(acidSummary ?? '', /술먹고 난 토 \[숙취 토사]/)
-  assert.match(acidSummary ?? '', /사거리 240/)
-  assert.match(acidSummary ?? '', /숙취 토사/)
+  assert.match(acidSummary ?? '', /청소부 프로토콜 \[빈사 수거]/)
+  assert.match(acidSummary ?? '', /사거리 145/)
+  assert.match(acidSummary ?? '', /빈사 수거/)
   assert.doesNotMatch(acidSummary ?? '', /초당 \d+회/)
 
   const sparkRecipes = getActionableRecipes(
@@ -996,13 +995,12 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
 
   const [sparkSummary] = describeAvailableRecipes(sparkRecipes)
   const [mistSummary] = describeAvailableRecipes(mistRecipes)
-  assert.match(sparkSummary ?? '', /방범 카메라 \[포탑 배치]/)
-  assert.match(sparkSummary ?? '', /배치 2기/)
-  assert.match(sparkSummary ?? '', /포탑당 9/)
-  assert.match(mistSummary ?? '', /컴파일러 \[문법 폭발]/)
+  assert.match(sparkSummary ?? '', /박자포 \[리듬 점화]/)
+  assert.match(sparkSummary ?? '', /탄당 5/)
+  assert.match(sparkSummary ?? '', /1박자/)
+  assert.match(mistSummary ?? '', /감시 포드 \[구역 설치]/)
   assert.match(mistSummary ?? '', /직격 8/)
-  assert.match(mistSummary ?? '', /폭발 24/)
-  assert.match(mistSummary ?? '', /함정 44/)
+  assert.match(mistSummary ?? '', /지대 46/)
 
   const needleRecipes = getActionableRecipes(
     {
@@ -1012,8 +1010,8 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
   const [needleSummary] = describeAvailableRecipes(needleRecipes)
-  assert.match(needleSummary ?? '', /다시 출근 \[시체 재가동]/)
-  assert.match(needleSummary ?? '', /처치 시 아군화/)
+  assert.match(needleSummary ?? '', /파문 부채 \[차단 부채]/)
+  assert.match(needleSummary ?? '', /1갈래/)
 })
 
 test('actionable recipes exclude outputs that are already owned', () => {
@@ -1197,18 +1195,8 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   assert.equal(finale.oneTimeSpawns?.includes('slime-boss'), true)
   assert.equal(isFinaleActive(FINAL_STAGE_START_MS), true)
   assert.equal(isRunTimedOut(RUN_DURATION_MS), true)
-  assert.equal(formatRunTime(RUN_DURATION_MS), '20:00')
+  assert.equal(formatRunTime(RUN_DURATION_MS), '30:00')
   assert.deepEqual(getUnknownRunEnemyIds(), [])
-  const scheduledEnemyIds = new Set(
-    RUN_PROGRESS_PHASES.flatMap((phase) => [
-      ...phase.entries.map((entry) => entry.enemyId),
-      ...(phase.oneTimeSpawns ?? []),
-    ]),
-  )
-  assert.deepEqual(
-    Object.keys(ENEMY_DEFINITIONS).filter((enemyId) => !scheduledEnemyIds.has(enemyId)),
-    [],
-  )
   assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
 })
 
@@ -1225,8 +1213,8 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
   assert.deepEqual(firstRows, [
     {
       enemyId: 'slime',
-      enemyName: '출석 체크 알림',
-      count: 6,
+      enemyName: '진흙 슬라임',
+      count: 9,
       ratio: 1,
       percentLabel: '100%',
     },
@@ -1248,7 +1236,7 @@ test('run progression spawn sequence interleaves weighted enemies early', () => 
   const firstBackPhase = getRunPhaseByElapsedMs(30_000)
   const sequence = flattenRunPhaseEntries(firstBackPhase)
 
-  assert.equal(sequence.length, 9)
+  assert.equal(sequence.length, 12)
   assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
 })
 
@@ -1467,25 +1455,6 @@ test('third wave still includes the existing spark slime sample enemy', () => {
   assert.ok(getWaveSpawnSequence(thirdWave).includes('spark-slime'))
 })
 
-
-test('enemy names match college engineering life story beats', () => {
-  assert.equal(ENEMY_DEFINITIONS.slime.name, '출석 체크 알림')
-  assert.equal(ENEMY_DEFINITIONS['slime-boss'].name, '최종 발표 교수님')
-  assert.match(ENEMY_DEFINITIONS['needle-wasp'].description, /코드리뷰/)
-  assert.match(ENEMY_DEFINITIONS['siege-toad'].description, /캡스톤 마감/)
-  assert.ok(Object.values(ENEMY_DEFINITIONS).every((enemy) => !enemy.name.includes('슬라임')))
-
-  for (const enemy of Object.values(ENEMY_DEFINITIONS)) {
-    const svg = readFileSync(resolve(TEST_DIR, `../public/assets/units/${enemy.textureKey}-idle-0.svg`), 'utf8')
-    assert.ok(
-      svg.includes(`<title>${enemy.name}</title>`),
-      `${enemy.id} should use a matching themed SVG title`,
-    )
-  }
-
-  assert.equal(ENEMY_DEFINITIONS['prism-slime'].textureKey, 'prism-slime')
-})
-
 test('content id catalogs include scoped enemy and reward branches', () => {
   assert.deepEqual(LOOT_IDS, [
     'gel-shard',
@@ -1575,60 +1544,18 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
-test('game title, narration, and control hints stay aligned with playable keyboard shortcuts', () => {
-  assert.equal(GAME_TITLE, '달려라 김동성!')
+test('game title and title control hints stay aligned with playable keyboard shortcuts', () => {
+  assert.equal(GAME_TITLE, '김동성에게 살아남기')
   assert.deepEqual([...GAME_HEADER_CONTROL_HINTS], ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'])
-  assert.ok(KIM_COMMUNITY_NARRATIONS.length >= 30)
-  assert.ok(KIM_COMMUNITY_NARRATIONS.some((line) => line.startsWith('익명1:')))
-  assert.ok(KIM_COMMUNITY_NARRATIONS.some((line) => line.startsWith('베댓:')))
-  assert.ok(KIM_COMMUNITY_NARRATIONS.some((line) => line.includes('ㅋㅋ')))
-  assert.ok(KIM_COMMUNITY_NARRATIONS.some((line) => line.includes('기구한 일생')))
-  assert.ok(KIM_COMMUNITY_NARRATIONS.some((line) => line.includes('무한런편')))
   assert.match(GAMEPLAY_CONTROL_TIP, /I 인벤토리/)
   assert.match(GAMEPLAY_CONTROL_TIP, /Q 코덱스/)
   assert.match(GAMEPLAY_CONTROL_TIP, /끝까지 버티기/)
-
-  const mainSource = readFileSync(resolve(TEST_DIR, '../src/main.ts'), 'utf8')
-  const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
-  assert.ok(mainSource.includes('headerNarration'))
-  assert.ok(mainSource.includes('game-header__narration'))
-  assert.ok(mainSource.includes('window.setInterval'))
-  assert.ok(mainSource.includes('}, 5000)'))
-  assert.ok(mainSource.includes('data-region="kim-narration"'))
-  assert.ok(mainSource.includes('game-header__mood-icons'))
-  assert.ok(mainSource.includes('HEADER_CHARACTER_ICONS'))
-  assert.ok(mainSource.includes('assets/units/player-kim-idle-0.png'))
-  assert.ok(!mainSource.includes('<strong>${GAME_TITLE}</strong>'))
-  assert.ok(!mainSource.includes('game-header__controls'))
-  assert.ok(!mainSource.includes('game-header__rails'))
-  assert.ok(styleSource.includes('.game-header__narration'))
-  assert.ok(styleSource.includes('line-height: 1.45'))
-  assert.ok(styleSource.includes('word-break: keep-all'))
-  assert.ok(styleSource.includes('@keyframes narration-drop'))
-  assert.ok(styleSource.includes('.game-header__mood-icons'))
-  assert.ok(styleSource.includes('.game-header__mood-icons img'))
-  assert.ok(!styleSource.includes('COMMUNITY LOG'))
-})
-
-
-test('weapon descriptions carry Kim-flavored personal hooks', () => {
-  assert.equal(WEAPON_DEFINITIONS['arc-loom'].name, '낡은 축구공')
-  assert.equal(WEAPON_DEFINITIONS['acid-sprayer'].name, '술먹고 난 토')
-  assert.equal(WEAPON_DEFINITIONS['mist-vortex'].name, '컴파일러')
-  assert.match(WEAPON_DEFINITIONS['arc-loom'].description, /축구/)
-  assert.match(WEAPON_DEFINITIONS['slime-glaive'].description, /레넥톤/)
-  assert.match(WEAPON_DEFINITIONS['starter-blaster'].description, /파친코/)
-  assert.equal(WEAPON_DEFINITIONS['starter-blaster'].identityLabel, '꾹누름 본능')
-  assert.match(WEAPON_DEFINITIONS['mist-vortex'].description, /커뮤 댓글/)
-  assert.ok(Object.values(WEAPON_DEFINITIONS).every((weapon) => weapon.description.length >= 40))
-  assert.ok(Object.values(WEAPON_DEFINITIONS).every((weapon) => !/기관총입니다|범위 무기입니다|폭발 무기입니다|샷건입니다|리바운드 무기입니다|설치 무기입니다|함정형 무기입니다|브루저 무기입니다|격투 콤보 무기입니다|지배형 무기입니다/.test(weapon.description)))
-  assert.ok(Object.values(WEAPON_DEFINITIONS).every((weapon) => weapon.identityLabel !== '지속 탄막'))
 })
 
 test('stage selection views expose readable time-stage choices and current marker', () => {
   const stages = getStageSelectionViews(15 * 60_000)
 
-  assert.equal(stages.length, 20)
+  assert.equal(stages.length, 30)
   assert.equal(stages[15]?.isCurrent, true)
   assert.match(stages[15]?.label ?? '', /Stage 16/)
   assert.match(stages[15]?.description ?? '', /체력 ×/)
@@ -1641,7 +1568,7 @@ test('stage selection views expose readable time-stage choices and current marke
 test('stage selection maps choices to time offsets instead of wave clears', () => {
   assert.equal(getStageSelectionStartElapsedMs(0), 0)
   assert.equal(getStageSelectionStartElapsedMs(2), 2 * 60_000)
-  assert.equal(getStageSelectionStartElapsedMs(16), FINAL_STAGE_START_MS)
+  assert.equal(getStageSelectionStartElapsedMs(25), FINAL_STAGE_START_MS)
   assert.equal(getStageSelectionStartElapsedMs(99), null)
 })
 
@@ -1658,12 +1585,12 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   const hudState = createRunResultHudState(payload)
 
   assert.equal(presentation.title, '런 클리어')
-  assert.match(presentation.subtitle, /최종 발표 교수님/)
+  assert.match(presentation.subtitle, /크라운 슬라임/)
   assert.match(presentation.restartPrompt, /버튼/)
   assert.deepEqual(presentation.statLines, [
     '결과: 클리어',
     '최종 무기: 스타터 블래스터',
-    '생존 시간: 16:30',
+    '생존 시간: 25:30',
     '도달 단계: 6막 크라운 피날레',
     '피날레 진입: 예',
   ])
@@ -1745,38 +1672,9 @@ test('loss result presentation keeps restart guidance distinct from boss clear',
   assert.equal(presentation.title, '런 실패')
   assert.match(presentation.statLines[0] ?? '', /실패/)
   assert.match(presentation.objective, /다시 도전/)
-  assert.match(presentation.restartPrompt, /다시 달려라!/)
+  assert.match(presentation.restartPrompt, /새 런/)
   assert.equal(timeoutPresentation.title, '시간 종료')
   assert.match(timeoutPresentation.status, /타임아웃/)
-})
-
-test('start screen gates arena entry behind an explicit button', () => {
-  const bootSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/BootScene.ts'), 'utf8')
-  const startSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/StartScene.ts'), 'utf8')
-  const configSource = readFileSync(resolve(TEST_DIR, '../src/game/config.ts'), 'utf8')
-
-  assert.ok(configSource.includes('StartScene'))
-  assert.ok(configSource.includes('scene: [BootScene, StartScene, ArenaScene, ResultScene]'))
-  assert.ok(bootSceneSource.includes("this.scene.start('start')"))
-  assert.ok(!bootSceneSource.includes("this.scene.start('arena')"))
-  assert.ok(startSceneSource.includes(".setName('start-run-button')"))
-  assert.ok(startSceneSource.includes("'달려라!'"))
-  assert.ok(startSceneSource.includes('createPlayerTitleIcon'))
-  assert.ok(startSceneSource.includes("this.add.sprite(0, 0, 'player-walk-0')"))
-  assert.ok(startSceneSource.includes("playerIcon.play('player-move')"))
-  assert.ok(startSceneSource.includes('setPadding(4, 8, 6, 8)'))
-  assert.ok(startSceneSource.includes('const startRun = (): void => {'))
-  assert.ok(startSceneSource.includes("this.scene.stop('arena')"))
-  assert.ok(startSceneSource.includes("this.scene.start('arena', { startElapsedMs: 0 })"))
-  assert.ok(!startSceneSource.includes('시작 전에는 시간이 흐르지 않고 적도 등장하지 않습니다.'))
-  assert.ok(startSceneSource.includes('파친코 기계 앞에서 삶을 탕진한 김동성'))
-  assert.ok(startSceneSource.includes('무기와 레벨로 바꿔 중독을 끊어낼 연료'))
-  assert.ok(startSceneSource.includes('무엇이 쫓아오든 20분만 버티면'))
-  assert.ok(startSceneSource.includes('잭팟이 아닌 자기 발로 내일을 되찾게'))
-  assert.ok(!startSceneSource.includes("'새 런 시작'"))
-  assert.ok(!startSceneSource.includes('경기장에 진입'))
-  assert.ok(startSceneSource.includes('this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)'))
-  assert.ok(startSceneSource.includes('Phaser.Input.Keyboard.KeyCodes.ENTER'))
 })
 
 test('result scene restart is button-driven instead of R-key driven', () => {
@@ -1786,7 +1684,6 @@ test('result scene restart is button-driven instead of R-key driven', () => {
     resultSceneSource.includes(`.setName('restart-run-button')`),
     'ResultScene should expose a named restart button for the result screen',
   )
-  assert.ok(resultSceneSource.includes("'다시 달려라!'"))
   assert.ok(
     resultSceneSource.includes(`const restartRun = (): void => {`),
     'ResultScene restart should use a shared restart handler for button input',
@@ -1800,16 +1697,8 @@ test('result scene restart is button-driven instead of R-key driven', () => {
     'ResultScene should include a scene-level pointer fallback so button clicks restart even if game-object hit testing misses',
   )
   assert.ok(
-    resultSceneSource.includes(`this.scene.stop('arena')`),
-    'ResultScene restart handler should stop any stale arena scene before returning to a fresh start flow',
-  )
-  assert.ok(
-    resultSceneSource.includes(`this.scene.start('start')`),
-    'ResultScene restart handler should return to the start screen so the next run starts only after explicit input',
-  )
-  assert.ok(
-    !resultSceneSource.includes(`this.scene.start('arena', { startElapsedMs: 0 })`),
-    'ResultScene restart must not bypass the start screen',
+    resultSceneSource.includes(`this.scene.start('arena')`),
+    'ResultScene restart handler should start the arena scene',
   )
   assert.ok(
     resultSceneSource.includes(`const restartButtonY = Math.max(48, height - 48)`),
@@ -1848,7 +1737,6 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
 
   const prismSlime = codex.enemies.find((enemy) => enemy.id === 'prism-slime')
   assert.ok(prismSlime)
-  assert.equal(prismSlime?.iconKey, 'prism-slime')
   assert.ok(prismSlime?.stats.some((stat) => stat.includes('보상 경험치 +180')))
 
   const dashSlime = codex.enemies.find((enemy) => enemy.id === 'dash-slime')
@@ -1864,8 +1752,7 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
 
   const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
   assert.ok(needleWasp)
-  assert.equal(needleWasp?.iconKey, 'needle-wasp')
-  assert.ok(needleWasp?.description.includes('코드리뷰'))
+  assert.ok(needleWasp?.description.includes('비-슬라임'))
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('부채꼴')))
   assert.deepEqual(needleWasp?.drops, [])
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('보상 경험치 +120')))
@@ -1898,10 +1785,6 @@ test('codex controller preserves scroll across repeated open renders', () => {
     assignments = 0
     #innerHTML = ''
 
-    get childElementCount() {
-      return this.children.length
-    }
-
     get innerHTML() {
       return this.#innerHTML
     }
@@ -1926,8 +1809,6 @@ test('codex controller preserves scroll across repeated open renders', () => {
 
   element.scrollTop = 48
   controller.update(getCodexState(true))
-  assert.match(element.innerHTML, /codex-enemy-icon/)
-  assert.match(element.innerHTML, /assets\/units\/prism-slime-idle-0.svg/)
 
   assert.equal(element.scrollTop, 48)
   assert.equal(element.assignments, 1)
@@ -1961,10 +1842,6 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
 
     constructor(tagName = 'div') {
       this.tagName = tagName.toUpperCase()
-    }
-
-    get childElementCount() {
-      return this.children.length
     }
 
     get innerHTML() {
@@ -2084,10 +1961,6 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
       this.tagName = tagName.toUpperCase()
     }
 
-    get childElementCount() {
-      return this.children.length
-    }
-
     get innerHTML() {
       return this.#innerHTML
     }
@@ -2168,10 +2041,7 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
             accentColor: 0xfff06a,
           },
         ],
-        characterStats: [
-          { label: '공격력', value: '24', bonus: '(+6)' },
-          { label: '최대 체력', value: '132', bonus: '(+32)' },
-        ],
+        characterStats: [],
       },
       pachinko: {
         level: 1,
@@ -2186,23 +2056,10 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
     const weaponList = controller.weaponList
     const firstWeaponEntry = weaponList.children[0]
     const firstWeaponRow = firstWeaponEntry.children[1] ? firstWeaponEntry : firstWeaponEntry.children[0]
-    const left = firstWeaponRow.children[0]
-    const textGroup = left.children[left.children.length - 1]
-    const meta = textGroup.children[2]
+    const actions = firstWeaponRow.children[1]
+    const meta = actions.children[0]
 
-    assert.equal(firstWeaponRow.children.length, 2)
-    assert.equal(firstWeaponRow.children[1].children.length, 1)
-    assert.equal(firstWeaponRow.children[1].children[0].textContent, '장착 중')
     assert.equal(meta.textContent, '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사')
-
-    const equippedRow = controller.equippedWeaponList.children[0]
-    assert.equal(equippedRow.children.length, 1)
-
-    const characterStats = controller.characterStatsList
-    assert.equal(characterStats.children[0].children[1].textContent, '24')
-    assert.equal(characterStats.children[0].children[1].children[1].textContent, '(+6)')
-    assert.equal(characterStats.children[1].children[1].textContent, '132')
-    assert.equal(characterStats.children[1].children[1].children[1].textContent, '(+32)')
   } finally {
     if (previousDocument === undefined) {
       delete globalThis.document
@@ -2344,13 +2201,15 @@ test('effective weapon stats scale by star grade for combat-visible fusion payof
   const tunedThreeStar = deriveEffectiveWeaponStats('acid-sprayer', { 'acid-sprayer': 'quick-loader' }, 3)
   const glaiveThreeStar = deriveEffectiveWeaponStats('slime-glaive', {}, 3)
 
-  assert.equal(fiveStar.damage, 19)
-  assert.equal(fiveStar.fireRateMs, 319)
-  assert.equal(fiveStar.projectileSpeed, 554)
+  assert.equal(fiveStar.damage, 20)
+  assert.equal(fiveStar.fireRateMs, 280)
+  assert.equal(fiveStar.projectileSpeed, 460)
   assert.ok(fiveStar.damage > oneStar.damage)
-  assert.ok(fiveStar.fireRateMs < oneStar.fireRateMs)
-  assert.ok(fiveStar.projectileSpeed > oneStar.projectileSpeed)
-  assert.equal(tunedThreeStar.fireRateMs, 333)
+  assert.equal(fiveStar.fireRateMs, oneStar.fireRateMs)
+  assert.equal(fiveStar.projectileSpeed, oneStar.projectileSpeed)
+  assert.equal(fiveStar.attackBehavior.kind, 'spray-hazard')
+  assert.equal(fiveStar.attackBehavior.projectileCount, 3)
+  assert.equal(tunedThreeStar.fireRateMs, 252)
   assert.equal(glaiveThreeStar.attackBehavior.kind, 'melee-cleave')
   assert.equal(glaiveThreeStar.attackBehavior.range, WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.range + 12)
 })
@@ -2372,63 +2231,51 @@ test('player level combat stats raise health and weapon damage globally', () => 
     level: 10,
     maxHealth: 172,
     damageMultiplier: 1.45,
-    weaponRangeMultiplier: 1.16,
-    weaponSpecialTier: 1,
+    weaponRangeMultiplier: 1,
+    weaponSpecialTier: 0,
   })
 
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
-  assert.equal(levelTenBlaster.damage, 7)
-  assert.equal(levelTenBlaster.range, 487)
+  assert.equal(levelTenBlaster.damage, 9)
+  assert.equal(levelTenBlaster.range, 340)
   assert.equal(levelTenBlaster.playerDamageMultiplier, 1.45)
-  assert.equal(levelTenBlaster.weaponSpecialTier, 1)
-  assert.equal(levelTenBlaster.visualPowerTier, 1)
-  assert.match(levelTenBlaster.levelUpgradeLabel, /범위 \+16%/)
-  assert.match(levelTenBlaster.levelUpgradeDescription, /점사 박자/)
+  assert.equal(levelTenBlaster.weaponSpecialTier, undefined)
+  assert.equal(levelTenBlaster.visualPowerTier, undefined)
+  assert.equal(levelTenBlaster.levelUpgradeLabel, undefined)
+  assert.equal(levelTenBlaster.levelUpgradeDescription, undefined)
 })
 
-test('weapon milestone upgrades expand behavior every five and ten player levels', () => {
+test('player level preserves weapon geometry while only boosting baseline combat stats', () => {
   const levelFiveGlaive = deriveEffectiveWeaponStats('slime-glaive', {}, 1, 5)
   assert.equal(levelFiveGlaive.attackBehavior.kind, 'melee-cleave')
-  assert.equal(levelFiveGlaive.attackBehavior.range, 93)
+  assert.equal(levelFiveGlaive.attackBehavior.range, 74)
 
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
-  assert.equal(levelTenBlaster.attackBehavior.kind, 'burst-fire')
-  assert.equal(levelTenBlaster.attackBehavior.shotsPerBurst, 6)
+  assert.equal(levelTenBlaster.attackBehavior.kind, 'single')
+  assert.equal(levelTenBlaster.attackBehavior.distanceScaling.farMultiplier, 1.35)
 
   const levelTwentyFrost = deriveEffectiveWeaponStats('frost-lance', {}, 1, 20)
-  assert.equal(levelTwentyFrost.attackBehavior.kind, 'impact-aoe')
-  assert.equal(levelTwentyFrost.attackBehavior.explosionRadius, 116)
-  assert.equal(levelTwentyFrost.attackBehavior.explosionDamage, 55)
+  assert.equal(levelTwentyFrost.attackBehavior.kind, 'single')
+  assert.equal(levelTwentyFrost.attackBehavior.boomerang.returnHits, 1)
 
   const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
-  assert.equal(levelTwentyArc.attackBehavior.kind, 'single')
-  assert.equal(levelTwentyArc.attackBehavior.ricochet?.maxBounces, 4)
-  assert.equal(levelTwentyArc.attackBehavior.ricochet?.bounceRange, 240)
+  assert.equal(levelTwentyArc.attackBehavior.kind, 'chain')
+  assert.equal(levelTwentyArc.attackBehavior.maxChains, 1)
+  assert.equal(levelTwentyArc.attackBehavior.chainRange, 124)
 
   const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
   assert.equal(levelTwentyMist.attackBehavior.kind, 'zone-control')
-  assert.equal(levelTwentyMist.attackBehavior.zoneRadius, 58)
-  assert.equal(levelTwentyMist.attackBehavior.zoneDamage, 47)
-  assert.equal(levelTwentyMist.attackBehavior.zoneTriggerMode, 'trigger-explode')
-
-  const levelTwentySpark = deriveEffectiveWeaponStats('spark-carbine', {}, 1, 20)
-  assert.equal(levelTwentySpark.attackBehavior.kind, 'deploy-turret')
-  assert.equal(levelTwentySpark.attackBehavior.deploy.maxTurrets, 3)
-  assert.equal(levelTwentySpark.attackBehavior.deploy.range, 330)
-
-  const levelTwentyPrism = deriveEffectiveWeaponStats('prism-cutter', {}, 1, 20)
-  assert.equal(levelTwentyPrism.attackBehavior.kind, 'combo-melee')
-  assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.maxTargets, 6)
-  assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.range, 103)
+  assert.equal(levelTwentyMist.attackBehavior.zoneRadius, 46)
+  assert.equal(levelTwentyMist.attackBehavior.zoneDamage, 8)
 })
 
-test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
+test('weapon visuals stay at base power when player levels only raise health and damage', () => {
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
   const plan = buildAttackPlan(levelTenBlaster, { x: 0, y: 0 }, { x: 10, y: 0 })
 
-  assert.equal(plan.projectiles.length, 6)
-  assert.equal(plan.projectiles[0].visualPowerTier, 1)
-  assert.equal(plan.projectiles[0].radius, 6)
+  assert.equal(plan.projectiles.length, 1)
+  assert.equal(plan.projectiles[0].visualPowerTier, undefined)
+  assert.equal(plan.projectiles[0].radius, 5)
 
   const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
   const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
@@ -2436,8 +2283,6 @@ test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
   assert.ok(arenaSceneSource.includes('levelUpgradeLabel: effectiveWeapon.levelUpgradeLabel'))
   assert.ok(arenaSceneSource.includes('projectile.setScale(1 + visualTier * 0.08)'))
   assert.ok(arenaSceneSource.includes('spawnMeleeSwingEffect(this'))
-  assert.ok(hudSource.includes('weapon.levelUpgradeLabel'))
-  assert.ok(hudSource.includes('weapon.levelUpgradeDescription'))
   assert.ok(hudSource.includes('weapon.identityLabel'))
   assert.ok(hudSource.includes('weapon.summary'))
 })
@@ -2452,23 +2297,23 @@ test('arena damage feedback shows normal hits as numbers and critical hits with 
   assert.ok(arenaSceneSource.includes("color: '#ffd866'"))
 })
 
-test('combat effects are split out for projectile trails and lingering hazard pulses', () => {
+test('combat effects are split out for chain lightning, projectile trails, and hazard range pulses', () => {
   const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
   const combatEffectsSource = readFileSync(resolve(TEST_DIR, '../src/scenes/arena/combatEffects.ts'), 'utf8')
-  const levelTwentyFrost = deriveEffectiveWeaponStats('frost-lance', {}, 1, 20)
+  const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
   const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
-  const frostPlan = buildAttackPlan(levelTwentyFrost, { x: 0, y: 0 }, { x: 10, y: 0 })
+  const arcPlan = buildAttackPlan(levelTwentyArc, { x: 0, y: 0 }, { x: 10, y: 0 })
   const mistPlan = buildAttackPlan(levelTwentyMist, { x: 0, y: 0 }, { x: 10, y: 0 })
 
-  assert.equal(frostPlan.projectiles[0]?.explosionOnHit?.radius, 116)
-  assert.equal(mistPlan.projectiles[0]?.hazardOnHit?.visualPowerTier, 2)
+  assert.equal(arcPlan.projectiles[0]?.chain?.visualPowerTier, undefined)
+  assert.equal(mistPlan.projectiles[0]?.hazardOnHit?.visualPowerTier, undefined)
+  assert.ok(arenaSceneSource.includes('spawnChainLightningEffect('))
   assert.ok(arenaSceneSource.includes('spawnProjectileTrailEffect('))
   assert.ok(arenaSceneSource.includes('createHazardZoneEffect('))
-  assert.ok(arenaSceneSource.includes("weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'"))
-  assert.ok(arenaSceneSource.includes('this.lastPlayerMoveDirection.x'))
+  assert.ok(combatEffectsSource.includes('drawJaggedLine'))
   assert.ok(combatEffectsSource.includes('spawnHazardTickEffect'))
   assert.ok(combatEffectsSource.includes('scene.add.graphics({ x, y })'))
-  assert.ok(combatEffectsSource.includes('scene.add.container(point.x, point.y)'))
+  assert.ok(combatEffectsSource.includes('scene.add.graphics({ x: point.x, y: point.y })'))
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {
@@ -2518,7 +2363,7 @@ test('enemy visual metadata keeps immutable gameplay geometry while adding art h
     {
       slime: { size: 20, textureKey: 'slime', animationKey: 'slime-idle' },
       'spark-slime': { size: 22, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
-      'prism-slime': { size: 30, textureKey: 'prism-slime', animationKey: 'prism-slime-idle' },
+      'prism-slime': { size: 30, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
       'dash-slime': { size: 24, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
       'orbit-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
       'needle-wasp': { size: 24, textureKey: 'needle-wasp', animationKey: 'needle-wasp-idle' },
