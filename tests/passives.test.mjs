@@ -58,7 +58,7 @@ test('active weapon always gets its own specialization card until the cap is rea
   const specialized = choices.find((choice) => choice.kind === 'weapon-specialized')
   assert.ok(specialized)
   assert.equal(specialized?.id, 'slime-glaive-special')
-  assert.match(specialized?.description ?? '', /최대 2회/)
+  assert.match(specialized?.description ?? '', /최대 1회/)
   assert.equal(specialized?.iconKey, 'weapon-slime-glaive')
 
   let cappedState = {}
@@ -69,7 +69,7 @@ test('active weapon always gets its own specialization card until the cap is rea
   cappedState = addPassiveCard(cappedState, second)
   cappedState = addPassiveCard(cappedState, third)
 
-  assert.equal(cappedState['slime-glaive-special']?.count, 2)
+  assert.equal(cappedState['slime-glaive-special']?.count, 1)
 
   const cappedChoices = getPassiveCardChoices(
     9,
@@ -229,6 +229,21 @@ test('card categories keep loot utility in general and combat scaling in passive
   assert.equal(critMass.kind, 'passive')
   assert.equal(linger.kind, 'passive')
   assert.equal(status.kind, 'passive')
+})
+
+test('base cards also stop stacking after the lowered shared cap', () => {
+  let state = {}
+  const first = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
+  const second = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
+  const third = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
+  const fourth = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
+
+  state = addPassiveCard(state, first)
+  state = addPassiveCard(state, second)
+  state = addPassiveCard(state, third)
+  state = addPassiveCard(state, fourth)
+
+  assert.equal(state['runner-instinct']?.count, 3)
 })
 
 test('new pachinko and enemy cards expose varied utility modifiers', () => {

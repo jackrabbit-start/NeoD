@@ -148,6 +148,9 @@ const PASSIVE_KIND_LABELS: Record<PassiveCardKind, string> = {
   'weapon-specialized': '무기 특화',
 }
 
+const DEFAULT_CARD_MAX_COUNT = 3
+const DEFAULT_WEAPON_SPECIALIZATION_MAX_COUNT = 1
+
 const PASSIVE_CARD_TEMPLATES = [
   {
     id: 'rapid-trigger',
@@ -849,10 +852,10 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '꾹누름 과열',
     description: '탄막 기관총이 더 오래 이어지며 연사 리듬과 탄막 수가 함께 올라갑니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.1, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
-      const [fireMin, fireMax] = createLevelScaledPercentRange(0.05, 0.1, level, 0.004, 0.18)
+      const [fireMin, fireMax] = createLevelScaledPercentRange(0.08, 0.14, level, 0.005, 0.24)
       const [countMin, countMax] = [1, getLevelTier(level) >= 2 ? 2 : 1]
       const fire = rollNumber(random, fireMin, fireMax, 2)
       const burst = rollNumber(random, countMin, countMax)
@@ -872,7 +875,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '구토 역류',
     description: '산성 분사기가 더 넓게 퍼지고 오염 지대가 더 오래 남습니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.1, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
       const [radiusMin, radiusMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
@@ -894,10 +897,10 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '불안정 탄두',
     description: '로켓포의 비행 거리와 폭발 압력이 함께 커집니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.06, levelScale: 0.022, repeatPenalty: 0.8 },
     roll(level, random) {
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.06, 0.12, level, 0.005, 0.2)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.1, 0.16, level, 0.006, 0.26)
       const rangeTier = getLevelTier(level)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       const range = rollNumber(random, 12 + rangeTier * 3, 22 + rangeTier * 4)
@@ -917,10 +920,10 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '골목 쓸기',
     description: '산탄포가 한 번에 더 넓게 퍼지고 근접 제압력이 올라갑니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.14)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.08, 0.13, level, 0.005, 0.2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       const extra = rollNumber(random, 1, getLevelTier(level) >= 2 ? 2 : 1)
       return {
@@ -938,7 +941,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '강슛 반사',
     description: '축구공이 더 멀리 튕기고 더 많이 반사되며 오래 남습니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.04, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
       const [speedMin, speedMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.14)
@@ -961,7 +964,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '노드 확장',
     description: '감시 포탑의 배치 수, 유지 시간, 사거리를 한 번에 밀어 올립니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.06, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
       const range = rollNumber(random, 16 + getLevelTier(level) * 3, 28 + getLevelTier(level) * 4)
@@ -970,8 +973,9 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
         effects: {
           rangeDelta: range.value,
           projectileCountDelta: extra.value,
-          turretDurationMultiplier: 1.18,
-          turretFireRateMultiplier: 0.92,
+          damageMultiplier: 1.12,
+          turretDurationMultiplier: 1.22,
+          turretFireRateMultiplier: 0.86,
         },
         quality: averageQuality(range.quality, extra.quality),
       }
@@ -983,11 +987,11 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '문장 증폭',
     description: '컴파일러 함정의 폭발 범위와 유지 시간이 함께 올라갑니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
       const [radiusMin, radiusMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.24)
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.14)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.08, 0.14, level, 0.005, 0.22)
       const radius = rollNumber(random, radiusMin, radiusMax, 2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       return {
@@ -1006,10 +1010,10 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '사막의 포식',
     description: '레넥톤 손맛의 회전 반경, 난전 화력, 흡혈량을 동시에 올려줍니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.04, levelScale: 0.022, repeatPenalty: 0.8 },
     roll(level, random) {
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.05, 0.1, level, 0.004, 0.16)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.09, 0.15, level, 0.005, 0.24)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       const range = rollNumber(random, 10 + getLevelTier(level) * 2, 18 + getLevelTier(level) * 3)
       return {
@@ -1028,11 +1032,11 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '골목 연장전',
     description: '주먹 콤보의 마지막 휩쓸기가 더 세지고 연속기 간격이 빨라집니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
-      const [fireMin, fireMax] = createLevelScaledPercentRange(0.05, 0.1, level, 0.004, 0.16)
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.12)
+      const [fireMin, fireMax] = createLevelScaledPercentRange(0.08, 0.14, level, 0.005, 0.22)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.07, 0.12, level, 0.004, 0.18)
       const fire = rollNumber(random, fireMin, fireMax, 2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       return {
@@ -1050,11 +1054,11 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     name: '야근 충원',
     description: '재생술사의 마무리 각과 되살린 병력 유지 시간이 함께 늘어납니다.',
     kind: 'weapon-specialized',
-    maxCount: 2,
+    maxCount: 1,
     weight: { base: 1.06, levelScale: 0.02, repeatPenalty: 0.8 },
     roll(level, random) {
-      const [speedMin, speedMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.14)
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.03, 0.06, level, 0.003, 0.1)
+      const [speedMin, speedMax] = createLevelScaledPercentRange(0.06, 0.1, level, 0.004, 0.18)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.06, 0.1, level, 0.004, 0.16)
       const speed = rollNumber(random, speedMin, speedMax, 2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       return {
@@ -1136,12 +1140,17 @@ function getPassiveTemplate(id: PassiveCardId): PassiveCardTemplate {
   return definition
 }
 
-function isTemplateCapped(template: PassiveCardTemplate, state: PassiveState = {}): boolean {
-  if (!template.maxCount) {
-    return false
+function getTemplateMaxCount(template: PassiveCardTemplate): number {
+  if (template.maxCount) {
+    return template.maxCount
   }
+  return template.kind === 'weapon-specialized'
+    ? DEFAULT_WEAPON_SPECIALIZATION_MAX_COUNT
+    : DEFAULT_CARD_MAX_COUNT
+}
 
-  return (state[template.id as PassiveCardId]?.count ?? 0) >= template.maxCount
+function isTemplateCapped(template: PassiveCardTemplate, state: PassiveState = {}): boolean {
+  return (state[template.id as PassiveCardId]?.count ?? 0) >= getTemplateMaxCount(template)
 }
 
 export function getPassiveGradeLabel(grade: PassiveCardGrade): string {
@@ -1315,7 +1324,7 @@ export function createPassiveCardChoice(
   const kind = template.kind ?? 'passive'
   const activeFamily = activeWeaponId ? getPachinkoWeaponFamily(activeWeaponId) : null
   const specializationWeaponId = template.weaponId ?? activeWeaponId
-  const limitLabel = template.maxCount ? ` · 최대 ${template.maxCount}회` : ''
+  const limitLabel = ` · 최대 ${getTemplateMaxCount(template)}회`
   const iconKey =
     kind === 'weapon-specialized' && specializationWeaponId
       ? `weapon-${specializationWeaponId}`
@@ -1385,7 +1394,7 @@ function pickWeightedTemplate(
 
 export function addPassiveCard(state: PassiveState, choice: PassiveCardChoice): PassiveState {
   const template = getPassiveTemplate(choice.id)
-  if (template.maxCount && (state[choice.id]?.count ?? 0) >= template.maxCount) {
+  if ((state[choice.id]?.count ?? 0) >= getTemplateMaxCount(template)) {
     return state
   }
   const previous = state[choice.id]
