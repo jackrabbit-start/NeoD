@@ -24,14 +24,28 @@ export const getHudEnemyAssetPath = (iconKey: string) => `assets/units/${iconKey
 export const VECTOR_ASSETS: VectorAssetDefinition[] = [
   {
     key: 'player',
-    path: 'assets/units/player-bunny-idle-0.svg',
+    path: 'assets/units/player-kim-idle-0.png',
     width: 32,
     height: 32,
     fallback: { radius: 14, color: 0x66d9ef },
   },
   {
     key: 'player-idle-1',
-    path: 'assets/units/player-bunny-idle-1.svg',
+    path: 'assets/units/player-kim-idle-1.png',
+    width: 32,
+    height: 32,
+    fallback: { radius: 14, color: 0x66d9ef },
+  },
+  {
+    key: 'player-walk-0',
+    path: 'assets/units/player-kim-walk-0.png',
+    width: 32,
+    height: 32,
+    fallback: { radius: 14, color: 0x66d9ef },
+  },
+  {
+    key: 'player-walk-1',
+    path: 'assets/units/player-kim-walk-1.png',
     width: 32,
     height: 32,
     fallback: { radius: 14, color: 0x66d9ef },
@@ -416,7 +430,7 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
 
 export const IDLE_ANIMATIONS: AnimationDefinition[] = [
   { key: 'player-idle', frames: ['player', 'player-idle-1'], frameRate: 4 },
-  { key: 'player-move', frames: ['player', 'player-idle-1'], frameRate: 8 },
+  { key: 'player-move', frames: ['player-walk-0', 'player-walk-1'], frameRate: 8 },
   { key: 'slime-idle', frames: ['slime', 'slime-idle-1'], frameRate: 3 },
   { key: 'spark-slime-idle', frames: ['spark-slime', 'spark-slime-idle-1'], frameRate: 4 },
   { key: 'dash-slime-idle', frames: ['dash-slime', 'dash-slime-idle-1'], frameRate: 7 },

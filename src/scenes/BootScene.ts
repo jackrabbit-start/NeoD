@@ -19,15 +19,20 @@ function generateCircleTexture(
   graphics.destroy()
 }
 
-function queueSvgTexture(scene: Phaser.Scene, asset: VectorAssetDefinition): void {
+function queueTexture(scene: Phaser.Scene, asset: VectorAssetDefinition): void {
   if (scene.textures.exists(asset.key)) {
     return
   }
 
-  scene.load.svg(asset.key, asset.path, {
-    width: asset.width,
-    height: asset.height,
-  })
+  if (asset.path.endsWith('.svg')) {
+    scene.load.svg(asset.key, asset.path, {
+      width: asset.width,
+      height: asset.height,
+    })
+    return
+  }
+
+  scene.load.image(asset.key, asset.path)
 }
 
 function ensureFallbackTexture(scene: Phaser.Scene, asset: VectorAssetDefinition): void {
@@ -63,7 +68,7 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     for (const asset of VECTOR_ASSETS) {
-      queueSvgTexture(this, asset)
+      queueTexture(this, asset)
     }
   }
 
