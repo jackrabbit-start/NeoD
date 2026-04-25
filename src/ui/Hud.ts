@@ -333,6 +333,13 @@ export class HudController {
         <div class="hud-summary__grid">
           ${renderSummarySection('능력치', renderList(state.stats), 'hud-summary__section--stats')}
           ${renderSummarySection('패시브', renderList(state.passives ?? []), 'hud-summary__section--stats')}
+          ${(state.pachinko?.enemyOdds ?? []).length > 0
+            ? renderSummarySection(
+                `적 출현 확률 · ${state.pachinko?.enemyOdds?.[0] ?? '현재'}`,
+                renderList(state.pachinko?.enemyOdds?.slice(1) ?? []),
+                'hud-summary__section--enemy-odds',
+              )
+            : ''}
           ${state.pachinko ? renderSummarySection('파친코', renderList([
             `보상 레벨: Lv.${state.pachinko.level} · 누적 토큰 XP ${state.pachinko.totalTokenXp}`,
             `바닥 토큰: ${state.pachinko.droppedTokens}개 · 투입 중: ${state.pachinko.activeTokens}/${30}개 · 대기: ${state.pachinko.queuedTokens}개`,

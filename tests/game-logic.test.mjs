@@ -1153,6 +1153,7 @@ test('hud places enemy spawn odds beside the game title for visibility', () => {
   const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
 
   assert.ok(hudSource.includes('renderTitleEnemyOdds(state.pachinko?.enemyOdds)'))
+  assert.ok(hudSource.includes("hud-summary__section--enemy-odds"))
   assert.ok(hudSource.includes('hud-summary__enemy-odds'))
   assert.ok(hudSource.includes('적 출현 확률 ·'))
   assert.ok(styleSource.includes('.hud-summary__enemy-odds'))
