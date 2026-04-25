@@ -1171,6 +1171,7 @@ test('hud places enemy spawn odds beside the game title for visibility', () => {
 test('arena hud injects enemy spawn odds into the visible stats list', () => {
   const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
   const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
+  const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
 
   assert.ok(arenaSceneSource.includes('const visibleEnemyChanceLines = enemyChanceLines.slice(0, 5)'))
   assert.ok(arenaSceneSource.includes('`적 출현 확률 (${currentPhase.minuteIndex + 1}분차)`'))
@@ -1181,6 +1182,8 @@ test('arena hud injects enemy spawn odds into the visible stats list', () => {
   assert.ok(arenaSceneSource.includes('적 출현 확률 · ${phase.minuteIndex + 1}분차'))
   assert.ok(hudSource.includes('<span>현재 시간</span>'))
   assert.ok(hudSource.includes('state.currentTimeLabel'))
+  assert.ok(hudSource.includes('hud-summary__status-line--time'))
+  assert.ok(styleSource.includes('.hud-summary__status-line--time'))
 })
 
 test('nearest auto-attack target returns null when no active enemies are available', () => {
