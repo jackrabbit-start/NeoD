@@ -97,11 +97,11 @@ test('passives modify hazard, burst, impact, and melee behavior safely with roll
   assert.ok(modifiedSprayer.attackBehavior.projectileCount > baseSprayer.attackBehavior.projectileCount)
   assert.ok(modifiedSprayer.attackBehavior.hazardRadius > baseSprayer.attackBehavior.hazardRadius)
 
-  const baseBurst = WEAPON_DEFINITIONS['spark-carbine']
-  const modifiedBurst = applyPassiveWeaponEffects(baseBurst, state)
-  assert.equal(modifiedBurst.attackBehavior.kind, 'burst-fire')
-  assert.ok(modifiedBurst.attackBehavior.shotsPerBurst > baseBurst.attackBehavior.shotsPerBurst)
-  assert.ok(modifiedBurst.fireRateMs < baseBurst.fireRateMs)
+  const baseTurret = WEAPON_DEFINITIONS['spark-carbine']
+  const modifiedTurret = applyPassiveWeaponEffects(baseTurret, state)
+  assert.equal(modifiedTurret.attackBehavior.kind, 'deploy-turret')
+  assert.ok(modifiedTurret.attackBehavior.deploy.maxTurrets > baseTurret.attackBehavior.deploy.maxTurrets)
+  assert.ok(modifiedTurret.attackBehavior.deploy.range > baseTurret.attackBehavior.deploy.range)
 
   const glaiveState = addPassiveCard({}, createPassiveCardChoice('wide-zone', 6, createSequenceRandom([0.4, 0.9])))
   const baseGlaive = WEAPON_DEFINITIONS['slime-glaive']
