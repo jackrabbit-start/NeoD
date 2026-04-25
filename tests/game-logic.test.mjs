@@ -792,7 +792,9 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   const finale = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
 
   assert.equal(firstPhase.minuteIndex, 0)
+  assert.equal(firstPhase.healthMultiplier, 1.15)
   assert.equal(secondMinute.minuteIndex, 1)
+  assert.equal(secondMinute.stageIndex, 1)
   assert.equal(finale.isFinale, true)
   assert.equal(finale.oneTimeSpawns?.includes('slime-boss'), true)
   assert.equal(isFinaleActive(FINAL_STAGE_START_MS), true)
@@ -1063,18 +1065,19 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
 test('stage selection views expose readable time-stage choices and current marker', () => {
   const stages = getStageSelectionViews(15 * 60_000)
 
-  assert.equal(stages.length, 6)
-  assert.equal(stages[3]?.isCurrent, true)
-  assert.match(stages[3]?.description ?? '', /침날개 벌레/)
-  assert.equal(stages.at(-1)?.isBoss, true)
-  assert.match(stages.at(-1)?.description ?? '', /보스 결전/)
-  assert.equal(stages.at(-1)?.startElapsedMs, FINAL_STAGE_START_MS)
+  assert.equal(stages.length, 30)
+  assert.equal(stages[15]?.isCurrent, true)
+  assert.match(stages[15]?.description ?? '', /체력 ×/)
+  const bossStage = stages.find((stage) => stage.isBoss)
+  assert.ok(bossStage)
+  assert.match(bossStage.description, /보스 결전/)
+  assert.equal(bossStage.startElapsedMs, FINAL_STAGE_START_MS)
 })
 
 test('stage selection maps choices to time offsets instead of wave clears', () => {
   assert.equal(getStageSelectionStartElapsedMs(0), 0)
-  assert.equal(getStageSelectionStartElapsedMs(2), 10 * 60_000)
-  assert.equal(getStageSelectionStartElapsedMs(5), FINAL_STAGE_START_MS)
+  assert.equal(getStageSelectionStartElapsedMs(2), 2 * 60_000)
+  assert.equal(getStageSelectionStartElapsedMs(25), FINAL_STAGE_START_MS)
   assert.equal(getStageSelectionStartElapsedMs(99), null)
 })
 

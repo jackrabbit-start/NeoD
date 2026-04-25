@@ -347,6 +347,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private activeEnemySoftCap = 0
 
+  private activeEnemyHealthMultiplier = 1
+
   private runProgressionState: RunProgressionRuntimeState = createRunProgressionRuntime()
 
   private isFinaleActive = false
@@ -1553,12 +1555,18 @@ export class ArenaScene extends Phaser.Scene {
     sprite.play(config.animationKey)
     this.enemySprites.add(sprite)
 
+    const scaledMaxHealth = Math.max(1, Math.round(config.maxHealth * this.activeEnemyHealthMultiplier))
+    const scaledConfig: EnemyDefinition = {
+      ...config,
+      maxHealth: scaledMaxHealth,
+    }
+
     const enemy: EnemyEntity = {
       runtimeId: this.nextEnemyRuntimeId,
       sprite,
-      config,
+      config: scaledConfig,
       runtimeState: createEnemyRuntimeState(config.movementBehavior),
-      currentHealth: config.maxHealth,
+      currentHealth: scaledMaxHealth,
       healthBar: this.createEnemyHealthBar(sprite, config),
       lastHitAt: 0,
       attackCooldownMs: 'cooldownMs' in config.attackBehavior
@@ -2036,6 +2044,7 @@ export class ArenaScene extends Phaser.Scene {
     this.activeRunLabel = initialState.activeRunLabel
     this.activeEnemySoftCap = initialState.activeEnemySoftCap
     this.runProgressionState = createRunProgressionRuntime(initialState.runElapsedMs)
+    this.activeEnemyHealthMultiplier = 1
     this.isFinaleActive = initialState.isFinaleActive
     this.statusMessage = initialState.statusMessage
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
@@ -2162,6 +2171,7 @@ export class ArenaScene extends Phaser.Scene {
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
+        `적 체력 배율: ×${this.activeEnemyHealthMultiplier.toFixed(2)}`,
       ],
       inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`],
       recipes: this.getFusionSummaryLines(),
@@ -2203,6 +2213,7 @@ export class ArenaScene extends Phaser.Scene {
     this.currentStageIndex = getRunStageIndex(this.runElapsedMs)
     this.activeRunLabel = phase.label
     this.activeEnemySoftCap = phase.softEnemyCap
+    this.activeEnemyHealthMultiplier = phase.healthMultiplier
     this.isFinaleActive = phase.isFinale === true
   }
 
