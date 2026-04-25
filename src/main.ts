@@ -14,8 +14,8 @@ app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
       <div class="game-header__brand">
-        <strong>NeoD · 브라우저 우선 V1 프로토타입</strong>
-        <span>안전한 가상 슬라임 런 · 드롭 + 조합 루프</span>
+        <strong>NeoD</strong>
+        <span>슬라임 아레나 · 드롭과 조합으로 완성하는 생존 런</span>
       </div>
       <div class="game-header__rails" aria-hidden="true">
         <span></span>
@@ -46,14 +46,14 @@ const hud = new HudController(hudElement)
 const codex = new CodexController(codexElement)
 
 hud.update({
-  title: 'NeoD 프로토타입',
-  subtitle: '아레나 불러오는 중…',
+  title: 'NeoD',
+  subtitle: '슬라임 아레나 진입 준비…',
   stats: ['게임 런타임 시작 중'],
   inventory: ['드롭 대기 중'],
   recipes: ['조합 상태 대기 중'],
-  objective: '런을 시작하고 슬라임 보스를 쓰러뜨리세요.',
+  objective: '드롭을 모아 무기를 완성하고 크라운 슬라임에게 도전하세요.',
   tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합 · Q 코덱스',
-  status: '시작 중',
+  status: '아레나 연결 중',
   inventoryButtonLabel: '인벤토리 열기',
   inventoryButtonDisabled: false,
   modal: {

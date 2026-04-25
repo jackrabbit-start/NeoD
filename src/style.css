@@ -12,6 +12,8 @@
   --ui-bg: rgba(5, 13, 27, 0.86);
   --ui-surface: rgba(10, 20, 39, 0.88);
   --ui-surface-strong: rgba(12, 24, 47, 0.96);
+  --ui-gold: #ffd36f;
+  --ui-danger: #ff7ba5;
   --ui-border: rgba(151, 191, 255, 0.26);
   --ui-border-strong: rgba(151, 191, 255, 0.4);
   --ui-accent: #8fe4ff;
@@ -30,9 +32,10 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, rgba(39, 78, 132, 0.45) 0%, rgba(6, 17, 31, 0) 42%),
+    radial-gradient(circle at top, rgba(52, 112, 185, 0.52) 0%, rgba(6, 17, 31, 0) 42%),
     radial-gradient(circle at 18% 18%, rgba(143, 228, 255, 0.12) 0%, rgba(143, 228, 255, 0) 24%),
-    linear-gradient(180deg, #0c1c32 0%, #06111f 54%, #050b14 100%);
+    radial-gradient(circle at 82% 8%, rgba(255, 211, 111, 0.12) 0%, rgba(255, 211, 111, 0) 22%),
+    linear-gradient(180deg, #0f213b 0%, #06111f 54%, #050b14 100%);
 }
 
 button {
@@ -41,14 +44,14 @@ button {
 
 #app {
   min-height: 100vh;
-  padding: 6px 12px 8px;
+  padding: 12px 12px 10px;
 }
 
 .game-shell {
   width: min(960px, calc(100vw - 32px));
   margin: 0 auto;
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .game-stage-shell {
@@ -57,38 +60,67 @@ button {
 }
 
 .game-header {
+  position: relative;
+  overflow: hidden;
   display: flex;
   justify-content: space-between;
   gap: 20px;
   align-items: center;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border: 1px solid var(--ui-border);
   border-radius: 20px;
   background:
+    radial-gradient(circle at 8% 16%, rgba(255, 211, 111, 0.18), rgba(255, 211, 111, 0) 24%),
     linear-gradient(135deg, rgba(143, 228, 255, 0.08), rgba(166, 255, 208, 0.03)),
     rgba(5, 13, 27, 0.74);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(14px);
   color: var(--ui-text-soft);
   font-size: 14px;
 }
 
+.game-header::before {
+  content: "SLIME ARENA";
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  color: rgba(248, 251, 255, 0.08);
+  font-size: clamp(32px, 8vw, 68px);
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .game-header__brand {
+  position: relative;
+  z-index: 1;
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .game-header__brand strong {
+  width: max-content;
   color: #f8fbff;
-  font-size: 15px;
-  letter-spacing: 0.02em;
+  font-size: clamp(26px, 4vw, 42px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 0.95;
+  text-shadow:
+    0 0 24px rgba(143, 228, 255, 0.42),
+    0 2px 0 rgba(0, 0, 0, 0.35);
 }
 
 .game-header__brand span {
   color: var(--ui-text-soft);
+  letter-spacing: 0.04em;
 }
 
 .game-header__rails {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex: 1;
   justify-content: flex-end;
@@ -117,14 +149,16 @@ button {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border: 1px solid rgba(151, 191, 255, 0.32);
+  border: 1px solid rgba(151, 191, 255, 0.42);
   border-radius: 24px;
   overflow: hidden;
   background:
+    radial-gradient(circle at 50% -10%, rgba(255, 211, 111, 0.12), rgba(255, 211, 111, 0) 26%),
     radial-gradient(circle at top, rgba(143, 228, 255, 0.1), rgba(143, 228, 255, 0) 32%),
     linear-gradient(180deg, rgba(9, 20, 39, 0.96), rgba(5, 12, 22, 0.98));
   box-shadow:
-    var(--ui-shadow),
+    0 32px 90px rgba(0, 0, 0, 0.5),
+    0 0 34px rgba(143, 228, 255, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -157,10 +191,12 @@ button {
 
 .hud-panel {
   position: relative;
-  padding: 6px 8px;
+  padding: 7px 8px;
   border: 1px solid rgba(156, 181, 255, 0.2);
-  border-radius: 14px;
-  background: rgba(5, 8, 22, 0.78);
+  border-radius: 18px;
+  background:
+    linear-gradient(90deg, rgba(143, 228, 255, 0.08), rgba(255, 211, 111, 0.04), rgba(166, 255, 208, 0.05)),
+    rgba(5, 8, 22, 0.82);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
   color: #ecf2ff;
 }
@@ -185,10 +221,11 @@ button {
 
 .hud-summary {
   width: 100%;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--ui-border);
   border-radius: 24px;
   background:
+    radial-gradient(circle at 12% 0%, rgba(255, 211, 111, 0.11), rgba(255, 211, 111, 0) 30%),
     linear-gradient(180deg, rgba(143, 228, 255, 0.08), rgba(143, 228, 255, 0) 28%),
     rgba(5, 13, 27, 0.78);
   box-shadow:
@@ -218,18 +255,43 @@ button {
 
 .hud-summary__hero {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.55fr);
   gap: 10px;
+  align-items: stretch;
 }
 
 .hud-summary__title-block {
+  position: relative;
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  min-height: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(143, 228, 255, 0.12);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.12), rgba(143, 228, 255, 0) 66%),
+    rgba(9, 19, 37, 0.76);
+}
+
+.hud-summary__title-block::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  width: 52px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ui-accent), var(--ui-gold));
+  box-shadow: 0 0 18px rgba(255, 211, 111, 0.32);
 }
 
 .hud-summary h1 {
-  font-size: 20px;
+  color: #ffffff;
+  font-size: 24px;
   line-height: 1.1;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(143, 228, 255, 0.28);
 }
 
 .hud-summary__title-block > p {
@@ -239,10 +301,11 @@ button {
 .hud-summary__status {
   display: grid;
   gap: 4px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid rgba(151, 191, 255, 0.14);
   border-radius: 16px;
   background:
+    radial-gradient(circle at 100% 0%, rgba(166, 255, 208, 0.12), rgba(166, 255, 208, 0) 42%),
     linear-gradient(135deg, rgba(143, 228, 255, 0.14), rgba(143, 228, 255, 0) 68%),
     rgba(9, 19, 37, 0.92);
 }
@@ -276,7 +339,7 @@ button {
 .hud-summary__section {
   display: grid;
   gap: 8px;
-  padding: 12px;
+  padding: 11px 12px;
   border: 1px solid rgba(151, 191, 255, 0.12);
   border-radius: 16px;
   background:
@@ -311,10 +374,12 @@ button {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: 1px solid rgba(151, 191, 255, 0.08);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background:
+    linear-gradient(90deg, rgba(143, 228, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
   color: #e9f0ff;
 }
 
@@ -678,6 +743,7 @@ button {
   }
 
   .hud-summary__grid,
+  .hud-summary__hero,
   .hud-modal__grid {
     grid-template-columns: 1fr;
   }
