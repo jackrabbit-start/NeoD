@@ -176,6 +176,27 @@ test('duration, ricochet, summon, turret, and lifesteal card stats all feed weap
   assert.ok(fists.attackBehavior.steps[0].range > WEAPON_DEFINITIONS['prism-cutter'].attackBehavior.steps[0].range)
 })
 
+test('melee-only lifesteal passive applies to melee weapons without leaking to ranged weapons', () => {
+  let state = {}
+  state = addPassiveCard(state, createPassiveCardChoice('close-quarters-drill', 12, createSequenceRandom([0.9, 0.7])))
+
+  const fists = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['prism-cutter'], state)
+  assert.equal(fists.attackBehavior.kind, 'combo-melee')
+  assert.ok((fists.attackBehavior.steps[0].healOnHit ?? 0) > 0)
+  assert.ok((fists.attackBehavior.steps[1].healOnHit ?? 0) > 0)
+
+  const reaver = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['slime-glaive'], state)
+  assert.equal(reaver.attackBehavior.kind, 'melee-cleave')
+  assert.ok(reaver.attackBehavior.healOnHit > WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.healOnHit)
+
+  const gun = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['starter-blaster'], state)
+  assert.equal(gun.attackBehavior.kind, 'burst-fire')
+  assert.equal('healOnHit' in gun.attackBehavior, false)
+
+  const lines = getPassiveSummaryLines(state)
+  assert.ok(lines.some((line) => /근접 흡혈/.test(line)))
+})
+
 test('critical-hit resolution stays deterministic from rolled passive state', () => {
   let critState = {}
   critState = addPassiveCard(critState, createPassiveCardChoice('keen-sense', 10, createSequenceRandom([0.95])))

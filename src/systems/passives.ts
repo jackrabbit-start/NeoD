@@ -20,6 +20,7 @@ interface PassiveEffects {
   ricochetBouncesDelta?: number
   ricochetRangeMultiplier?: number
   healOnHitDelta?: number
+  meleeHealOnHitDelta?: number
   statusDurationMultiplier?: number
   statusDamageMultiplier?: number
   statusSlowMultiplier?: number
@@ -271,6 +272,26 @@ const PASSIVE_CARD_TEMPLATES = [
           hazardRadiusMultiplier: 1 + radius.value,
         },
         quality: averageQuality(radius.quality, range.quality),
+      }
+    },
+  },
+  {
+    id: 'close-quarters-drill',
+    name: '난전 갈증',
+    description: '근접 무기만 적중 시 체력을 더 빨아들이며 난전 유지력이 올라갑니다.',
+    kind: 'passive',
+    preferredFamilies: ['melee', 'heavy'],
+    weight: { base: 0.86, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.58 },
+    roll(level, random) {
+      const tier = getLevelTier(level)
+      const heal = rollNumber(random, 1, Math.min(3, 2 + Math.floor(tier / 2)))
+      const damage = rollNumber(random, 0.03, 0.07 + tier * 0.005, 2)
+      return {
+        effects: {
+          meleeHealOnHitDelta: heal.value,
+          damageMultiplier: 1 + damage.value,
+        },
+        quality: averageQuality(heal.quality, damage.quality),
       }
     },
   },
@@ -1112,6 +1133,7 @@ export interface PassiveTotals {
   ricochetBouncesDelta: number
   ricochetRangeMultiplier: number
   healOnHitDelta: number
+  meleeHealOnHitDelta: number
   statusDurationMultiplier: number
   statusDamageMultiplier: number
   statusSlowMultiplier: number
@@ -1241,6 +1263,9 @@ function formatEffectSummary(effects: PassiveEffects): string {
   if (effects.healOnHitDelta) {
     lines.push(`흡혈 +${Math.round(effects.healOnHitDelta)}`)
   }
+  if (effects.meleeHealOnHitDelta) {
+    lines.push(`근접 흡혈 +${Math.round(effects.meleeHealOnHitDelta)}`)
+  }
   if (effects.statusDurationMultiplier !== undefined && effects.statusDurationMultiplier > 1) {
     lines.push(`상태시간 +${roundPercent(effects.statusDurationMultiplier - 1)}%`)
   }
@@ -1309,6 +1334,7 @@ function mergeEffects(existing: PassiveEffects = {}, next: PassiveEffects): Pass
     ricochetBouncesDelta: (existing.ricochetBouncesDelta ?? 0) + (next.ricochetBouncesDelta ?? 0),
     ricochetRangeMultiplier: (existing.ricochetRangeMultiplier ?? 1) * (next.ricochetRangeMultiplier ?? 1),
     healOnHitDelta: (existing.healOnHitDelta ?? 0) + (next.healOnHitDelta ?? 0),
+    meleeHealOnHitDelta: (existing.meleeHealOnHitDelta ?? 0) + (next.meleeHealOnHitDelta ?? 0),
     critChanceDelta: (existing.critChanceDelta ?? 0) + (next.critChanceDelta ?? 0),
     critDamageMultiplierDelta: (existing.critDamageMultiplierDelta ?? 0) + (next.critDamageMultiplierDelta ?? 0),
     playerSpeedMultiplier: (existing.playerSpeedMultiplier ?? 1) * (next.playerSpeedMultiplier ?? 1),
@@ -1477,6 +1503,7 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     ricochetBouncesDelta: 0,
     ricochetRangeMultiplier: 1,
     healOnHitDelta: 0,
+    meleeHealOnHitDelta: 0,
     statusDurationMultiplier: 1,
     statusDamageMultiplier: 1,
     statusSlowMultiplier: 1,
@@ -1519,6 +1546,7 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     totals.ricochetBouncesDelta += effects.ricochetBouncesDelta ?? 0
     totals.ricochetRangeMultiplier *= effects.ricochetRangeMultiplier ?? 1
     totals.healOnHitDelta += effects.healOnHitDelta ?? 0
+    totals.meleeHealOnHitDelta += effects.meleeHealOnHitDelta ?? 0
     totals.statusDurationMultiplier *= effects.statusDurationMultiplier ?? 1
     totals.statusDamageMultiplier *= effects.statusDamageMultiplier ?? 1
     totals.statusSlowMultiplier *= effects.statusSlowMultiplier ?? 1
@@ -1548,20 +1576,30 @@ function applyAttackBehaviorPassives(
 ): WeaponAttackBehavior {
   switch (behavior.kind) {
     case 'melee-cleave':
-      return {
-        ...behavior,
-        range: Math.max(1, Math.round(behavior.range + totals.rangeDelta)),
-        healOnHit: behavior.healOnHit ? behavior.healOnHit + totals.healOnHitDelta : behavior.healOnHit,
+      {
+        const meleeHealOnHit = totals.healOnHitDelta + totals.meleeHealOnHitDelta
+        return {
+          ...behavior,
+          range: Math.max(1, Math.round(behavior.range + totals.rangeDelta)),
+          healOnHit: meleeHealOnHit > 0
+            ? Math.max(1, (behavior.healOnHit ?? 0) + meleeHealOnHit)
+            : behavior.healOnHit,
+        }
       }
     case 'combo-melee':
-      return {
-        ...behavior,
-        steps: behavior.steps.map((step, index) => ({
-          ...step,
-          range: Math.max(1, Math.round(step.range + totals.rangeDelta)),
-          maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? Math.max(0, totals.projectileCountDelta) : 0),
-          healOnHit: step.healOnHit ? step.healOnHit + totals.healOnHitDelta : step.healOnHit,
-        })),
+      {
+        const meleeHealOnHit = totals.healOnHitDelta + totals.meleeHealOnHitDelta
+        return {
+          ...behavior,
+          steps: behavior.steps.map((step, index) => ({
+            ...step,
+            range: Math.max(1, Math.round(step.range + totals.rangeDelta)),
+            maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? Math.max(0, totals.projectileCountDelta) : 0),
+            healOnHit: meleeHealOnHit > 0
+              ? Math.max(1, (step.healOnHit ?? 0) + meleeHealOnHit)
+              : step.healOnHit,
+          })),
+        }
       }
     case 'spray-hazard':
       return {
