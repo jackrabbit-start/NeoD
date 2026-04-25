@@ -211,6 +211,29 @@ export interface EnemyDefinition {
   drops?: WeightedDropEntry[]
 }
 
+export interface RunSpawnEntryDefinition {
+  enemyId: EnemyId
+  count: number
+}
+
+export type RunEndReason = 'boss-defeated' | 'timeout' | 'player-defeated'
+
+export interface RunProgressionPhaseDefinition {
+  id: string
+  label: string
+  stageIndex: number
+  stageLabel: string
+  minuteIndex: number
+  startMs: number
+  durationMs: number
+  entries: RunSpawnEntryDefinition[]
+  spawnIntervalMs: number
+  burstSize: number
+  softEnemyCap: number
+  oneTimeSpawns?: EnemyId[]
+  isFinale?: boolean
+}
+
 export interface WaveEntryDefinition {
   enemyId: EnemyId
   count: number
@@ -285,6 +308,7 @@ export interface HudStageView {
   description: string
   isCurrent: boolean
   isBoss: boolean
+  startElapsedMs?: number
 }
 
 export interface HudStageSelectionState {

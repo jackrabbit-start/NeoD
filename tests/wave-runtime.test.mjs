@@ -1,153 +1,68 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import { RUN_PROGRESS_PHASES } from '../.tmp-test/src/data/runProgression.js'
 import {
-  createWaveAdvancePlan,
-  setSpawnLoopPaused,
-  startWaveRuntime,
-} from '../.tmp-test/src/scenes/arena/waveRuntime.js'
+  advanceRunProgressionRuntime,
+  createRunProgressionRuntime,
+} from '../.tmp-test/src/scenes/arena/runProgressionRuntime.js'
+import {
+  FINAL_STAGE_START_MS,
+  RUN_DURATION_MS,
+  getRunPhaseByElapsedMs,
+} from '../.tmp-test/src/systems/runProgression.js'
+import { setSpawnLoopPaused } from '../.tmp-test/src/scenes/arena/waveRuntime.js'
 
-test('wave runtime starts a regular wave with an immediate spawn and scheduled follow-ups', () => {
-  const appliedState = []
-  const scheduledLoops = []
-  const spawnedEnemies = []
-  let clearedLoops = 0
+test('run progression runtime starts with immediate recurring pressure', () => {
+  const state = createRunProgressionRuntime(0)
+  const step = advanceRunProgressionRuntime(state, 0, 0)
 
-  const started = startWaveRuntime(0, {
-    applyState: (patch) => {
-      appliedState.push(patch)
-    },
-    clearSpawnLoop: () => {
-      clearedLoops += 1
-    },
-    scheduleSpawnLoop: (config) => {
-      scheduledLoops.push(config)
-    },
-    spawnEnemy: (enemyId) => {
-      spawnedEnemies.push(enemyId)
-    },
-  })
-
-  assert.equal(started, true)
-  assert.equal(clearedLoops, 1)
-  assert.equal(scheduledLoops.length, 1)
-  assert.equal(scheduledLoops[0]?.delayMs, 700)
-  assert.equal(scheduledLoops[0]?.repeat, 8)
-  assert.deepEqual(appliedState[0], {
-    currentWaveIndex: 0,
-    activeWaveLabel: '1 웨이브',
-    remainingSpawns: 18,
-    statusMessage: '1 웨이브 시작.',
-    isBossActive: false,
-  })
-  assert.deepEqual(spawnedEnemies, ['slime', 'slime'])
-  assert.deepEqual(appliedState[1], {
-    remainingSpawns: 16,
-  })
-
-  scheduledLoops[0]?.onTick()
-
-  assert.deepEqual(spawnedEnemies, ['slime', 'slime', 'slime', 'slime'])
-  assert.deepEqual(appliedState[2], {
-    remainingSpawns: 14,
-  })
+  assert.equal(step.state.elapsedMs, 0)
+  assert.equal(step.activePhase.id, 'minute-01')
+  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime'])
+  assert.equal(step.timedOut, false)
 })
 
-test('wave runtime locks burst-spawn near-miss pressure cadence', () => {
-  const starts = [0, 1, 2].map((index) => {
-    const appliedState = []
-    const scheduledLoops = []
-    const spawnedEnemies = []
+test('run progression advances by elapsed time even while enemies carry over', () => {
+  const start = createRunProgressionRuntime(59_900)
+  const step = advanceRunProgressionRuntime(start, 200, 12)
 
-    startWaveRuntime(index, {
-      applyState: (patch) => {
-        appliedState.push(patch)
-      },
-      clearSpawnLoop: () => {},
-      scheduleSpawnLoop: (config) => {
-        scheduledLoops.push(config)
-      },
-      spawnEnemy: (enemyId) => {
-        spawnedEnemies.push(enemyId)
-      },
-    })
-
-    return { appliedState, scheduledLoops, spawnedEnemies }
-  })
-
-  assert.deepEqual(
-    starts.map(({ appliedState }) => appliedState[0]?.remainingSpawns),
-    [18, 24, 27],
-  )
-  assert.deepEqual(
-    starts.map(({ scheduledLoops }) => scheduledLoops[0]?.delayMs),
-    [700, 620, 560],
-  )
-  assert.deepEqual(
-    starts.map(({ scheduledLoops }) => scheduledLoops[0]?.repeat),
-    [8, 7, 6],
-  )
-  assert.deepEqual(
-    starts.map(({ spawnedEnemies }) => spawnedEnemies),
-    [
-      ['slime', 'slime'],
-      ['slime', 'slime', 'slime'],
-      ['spark-slime', 'spark-slime', 'spark-slime', 'spark-slime'],
-    ],
-  )
+  assert.equal(step.activePhase.id, 'minute-02')
+  assert.equal(step.phaseChanged, true)
+  assert.equal(step.state.elapsedMs, 60_100)
+  assert.ok(step.spawnedEnemyIds.length > 0)
 })
 
-test('wave runtime starts a boss wave without scheduling follow-up spawns', () => {
-  const appliedState = []
-  const scheduledLoops = []
-  const spawnedEnemies = []
-  let clearedLoops = 0
+test('run progression enforces deterministic soft caps for refill pressure', () => {
+  const phase = getRunPhaseByElapsedMs(0)
+  const capped = advanceRunProgressionRuntime(createRunProgressionRuntime(0), 0, phase.softEnemyCap)
+  const nearCap = advanceRunProgressionRuntime(createRunProgressionRuntime(0), 0, phase.softEnemyCap - 1)
 
-  const started = startWaveRuntime(4, {
-    applyState: (patch) => {
-      appliedState.push(patch)
-    },
-    clearSpawnLoop: () => {
-      clearedLoops += 1
-    },
-    scheduleSpawnLoop: (config) => {
-      scheduledLoops.push(config)
-    },
-    spawnEnemy: (enemyId) => {
-      spawnedEnemies.push(enemyId)
-    },
-  })
-
-  assert.equal(started, true)
-  assert.equal(clearedLoops, 0)
-  assert.deepEqual(scheduledLoops, [])
-  assert.deepEqual(appliedState[0], {
-    currentWaveIndex: 4,
-    activeWaveLabel: '보스 웨이브',
-    remainingSpawns: 1,
-    statusMessage: '보스 웨이브 시작.',
-    isBossActive: true,
-  })
-  assert.deepEqual(spawnedEnemies, ['slime-boss'])
-  assert.deepEqual(appliedState[1], {
-    remainingSpawns: 0,
-  })
+  assert.deepEqual(capped.spawnedEnemyIds, [])
+  assert.equal(nearCap.spawnedEnemyIds.length, 1)
 })
 
-test('wave advance plan keeps regular-wave clear counts and stops after the boss wave', () => {
-  assert.deepEqual(createWaveAdvancePlan(0), {
-    nextWaveIndex: 1,
-    shouldIncrementWavesCleared: true,
-  })
-  assert.deepEqual(createWaveAdvancePlan(2), {
-    nextWaveIndex: 3,
-    shouldIncrementWavesCleared: true,
-  })
-  assert.deepEqual(createWaveAdvancePlan(3), {
-    nextWaveIndex: 4,
-    shouldIncrementWavesCleared: true,
-  })
-  assert.equal(createWaveAdvancePlan(4), null)
+test('run progression emits the boss exactly at the 25 minute finale boundary', () => {
+  const beforeFinale = createRunProgressionRuntime(FINAL_STAGE_START_MS - 100)
+  const step = advanceRunProgressionRuntime(beforeFinale, 100, 99)
+
+  assert.equal(step.activePhase.startMs, FINAL_STAGE_START_MS)
+  assert.equal(step.activePhase.isFinale, true)
+  assert.ok(step.spawnedEnemyIds.includes('slime-boss'))
+})
+
+test('run progression hard-caps at 30 minutes for timeout handling', () => {
+  const step = advanceRunProgressionRuntime(createRunProgressionRuntime(RUN_DURATION_MS - 50), 100, 0)
+
+  assert.equal(step.state.elapsedMs, RUN_DURATION_MS)
+  assert.equal(step.timedOut, true)
+})
+
+test('run progression table covers all 30 one-minute phases with escalating pressure', () => {
+  assert.equal(RUN_PROGRESS_PHASES.length, 30)
+  assert.equal(RUN_PROGRESS_PHASES[0]?.startMs, 0)
+  assert.equal(RUN_PROGRESS_PHASES.at(-1)?.startMs, 29 * 60_000)
+  assert.ok((RUN_PROGRESS_PHASES.at(-1)?.softEnemyCap ?? 0) > (RUN_PROGRESS_PHASES[0]?.softEnemyCap ?? 0))
 })
 
 test('spawn loop pause helper toggles timer-like handles without crashing on missing loops', () => {
