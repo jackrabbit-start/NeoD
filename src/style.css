@@ -669,7 +669,7 @@ button {
 }
 
 .hud-modal__grid--inventory {
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
+  grid-template-columns: 1fr;
   align-items: start;
 }
 
