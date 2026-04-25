@@ -117,6 +117,7 @@ import {
   FINAL_STAGE_START_MS,
   RUN_DURATION_MS,
   formatRunTime,
+  getRunEnemySpawnChanceRows,
   getRunPhaseByElapsedMs,
   getRunSpawnCapacity,
   getUnknownRunEnemyIds,
@@ -1066,6 +1067,28 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   assert.equal(formatRunTime(RUN_DURATION_MS), '30:00')
   assert.deepEqual(getUnknownRunEnemyIds(), [])
   assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
+})
+
+test('run progression exposes per-enemy spawn chance rows for the current minute', () => {
+  const firstPhase = getRunPhaseByElapsedMs(0)
+  const latePhase = getRunPhaseByElapsedMs(24 * 60_000)
+  const firstRows = getRunEnemySpawnChanceRows(firstPhase)
+  const lateRows = getRunEnemySpawnChanceRows(latePhase)
+
+  assert.deepEqual(firstRows, [
+    {
+      enemyId: 'slime',
+      enemyName: '진흙 슬라임',
+      count: 16,
+      ratio: 1,
+      percentLabel: '100%',
+    },
+  ])
+  assert.ok(lateRows.length > 4)
+  assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
+  assert.ok(lateRows.some((row) => row.enemyId === 'void-orb'))
+  assert.equal(lateRows.reduce((sum, row) => sum + row.count, 0) > 0, true)
+  assert.equal(lateRows.reduce((sum, row) => sum + row.ratio, 0).toFixed(4), '1.0000')
 })
 
 test('nearest auto-attack target returns null when no active enemies are available', () => {

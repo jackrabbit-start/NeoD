@@ -149,6 +149,7 @@ import { getStageSelectionStartElapsedMs, getStageSelectionViews } from '../syst
 import { getDefeatedEnemyRunOutcome } from '../systems/waves.js'
 import {
   formatRunTime,
+  getRunEnemySpawnChanceRows,
   getRunPhaseByElapsedMs,
   getRunStageIndex,
   getRunStageReachedLabel,
@@ -2563,6 +2564,10 @@ export class ArenaScene extends Phaser.Scene {
     const activeStar = activeStack?.star ?? 1
     const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar)
     const playerProgression = getPlayerProgressionView(this.playerProgression.totalXp)
+    const currentPhase = getRunPhaseByElapsedMs(this.runElapsedMs)
+    const enemyChanceLines = getRunEnemySpawnChanceRows(currentPhase).map(
+      (row) => `${row.enemyName} ${row.percentLabel}`,
+    )
 
     this.hud.update({
       title: GAME_TITLE,
@@ -2571,12 +2576,18 @@ export class ArenaScene extends Phaser.Scene {
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel}`,
         `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
+        `현재 시간: ${formatRunTime(this.runElapsedMs)}`,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
         `적 체력 배율: ×${this.activeEnemyHealthMultiplier.toFixed(2)}`,
       ],
-      inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`],
+      inventory: [
+        `파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`,
+        `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`,
+        `현재 적 출현 확률 (${currentPhase.minuteIndex + 1}분차)`,
+        ...enemyChanceLines,
+      ],
       recipes: ['같은 무기·같은 별 3개는 자동으로 다음 별 등급이 됩니다.'],
       objective: this.isFinaleActive
         ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
