@@ -1582,8 +1582,11 @@ test('weapon descriptions carry Kim-flavored personal hooks', () => {
   assert.match(WEAPON_DEFINITIONS['arc-loom'].description, /축구/)
   assert.match(WEAPON_DEFINITIONS['slime-glaive'].description, /레넥톤/)
   assert.match(WEAPON_DEFINITIONS['starter-blaster'].description, /파친코/)
+  assert.equal(WEAPON_DEFINITIONS['starter-blaster'].identityLabel, '꾹누름 본능')
   assert.match(WEAPON_DEFINITIONS['mist-vortex'].description, /커뮤 댓글/)
   assert.ok(Object.values(WEAPON_DEFINITIONS).every((weapon) => weapon.description.length >= 40))
+  assert.ok(Object.values(WEAPON_DEFINITIONS).every((weapon) => !/기관총입니다|범위 무기입니다|폭발 무기입니다|샷건입니다|리바운드 무기입니다|설치 무기입니다|함정형 무기입니다|브루저 무기입니다|격투 콤보 무기입니다|지배형 무기입니다/.test(weapon.description)))
+  assert.ok(Object.values(WEAPON_DEFINITIONS).every((weapon) => weapon.identityLabel !== '지속 탄막'))
 })
 
 test('stage selection views expose readable time-stage choices and current marker', () => {
