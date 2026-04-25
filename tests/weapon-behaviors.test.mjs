@@ -38,6 +38,7 @@ test('frost lance plan preserves a piercing projectile', () => {
 
   assert.equal(plan.projectiles.length, 1)
   assert.equal(plan.projectiles[0]?.maxHits, 3)
+  assert.deepEqual(plan.projectiles[0]?.knockback, WEAPON_DEFINITIONS['frost-lance'].knockback)
   assert.equal(plan.projectiles[0]?.hazardOnHit, undefined)
   assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['frost-lance']), '관통 사격')
 })

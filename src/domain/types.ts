@@ -17,6 +17,11 @@ export interface WeaponVisualDefinition {
   accentColor: number
 }
 
+export interface WeaponKnockbackDefinition {
+  force: number
+  durationMs: number
+}
+
 export interface WeaponSingleBehavior {
   kind: 'single'
   projectileLifetimeMs: number
@@ -62,6 +67,7 @@ export interface WeaponDefinition {
   projectileSpeed: number
   projectileTint: number
   projectileTextureKey: string
+  knockback: WeaponKnockbackDefinition
   attackBehavior: WeaponAttackBehavior
   visual: WeaponVisualDefinition
 }
@@ -115,6 +121,11 @@ export interface EnemyVisualDefinition {
   portraitKey?: string
 }
 
+export interface EnemyKnockbackDefinition {
+  resistance: number
+  weight: number
+}
+
 export interface EnemyDefinition {
   id: EnemyId
   name: string
@@ -127,6 +138,7 @@ export interface EnemyDefinition {
   size: number
   textureKey: string
   animationKey: EnemyAnimationKey
+  knockback: EnemyKnockbackDefinition
   movementBehavior: EnemyMovementBehavior
   attackBehavior: EnemyAttackBehavior
   behaviorSummary: string

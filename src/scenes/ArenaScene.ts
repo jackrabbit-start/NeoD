@@ -33,6 +33,13 @@ import {
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
 import {
+  advanceKnockbackState,
+  clearKnockbackForTelegraph,
+  combineMovementWithKnockback,
+  resolveKnockbackHit,
+  type KnockbackState,
+} from '../systems/knockback.js'
+import {
   advanceHazardState,
   applyProjectileHitState,
   buildAttackPlan,
@@ -97,6 +104,7 @@ interface EnemyEntity {
   healthBar: EnemyHealthBar
   lastHitAt: number
   attackCooldownMs: number
+  knockback?: KnockbackState
   telegraph?: EnemyTelegraph
 }
 
@@ -113,6 +121,8 @@ interface ProjectileEntity {
   remainingLifetimeMs: number
   remainingHits: number
   hitEnemyIds: Set<number>
+  direction: ProjectileSpawnSpec['direction']
+  knockback: ProjectileSpawnSpec['knockback']
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
@@ -381,6 +391,7 @@ export class ArenaScene extends Phaser.Scene {
       enemy.attackCooldownMs = advanceEnemyCooldown(enemy.attackCooldownMs, delta)
 
       if (enemy.telegraph) {
+        enemy.knockback = clearKnockbackForTelegraph()
         enemy.telegraph.remainingMs -= delta
         enemy.telegraph.visual.setFillStyle(
           enemy.telegraph.visual.fillColor,
@@ -443,6 +454,7 @@ export class ArenaScene extends Phaser.Scene {
             remainingMs: telegraphSpec.durationMs,
             totalMs: telegraphSpec.durationMs,
           }
+          enemy.knockback = clearKnockbackForTelegraph()
           enemy.sprite.setVelocity(0, 0)
           this.syncEnemyHealthBar(enemy)
           continue
@@ -455,7 +467,10 @@ export class ArenaScene extends Phaser.Scene {
         enemy.config.speed,
         enemy.config.movementBehavior,
       )
-      enemy.sprite.setVelocity(velocity.x, velocity.y)
+      const knockbackStep = advanceKnockbackState(enemy.knockback, delta)
+      enemy.knockback = knockbackStep.state
+      const nextVelocity = combineMovementWithKnockback(velocity, knockbackStep.velocity)
+      enemy.sprite.setVelocity(nextVelocity.x, nextVelocity.y)
       enemy.sprite.play(enemy.config.animationKey, true)
 
       const touchingPlayer = distanceToPlayer < enemy.config.size / 2 + ENEMY_CONTACT_PADDING
@@ -519,7 +534,10 @@ export class ArenaScene extends Phaser.Scene {
 
           projectile.hitEnemyIds = hitStep.hitEnemyIds
           projectile.remainingHits = hitStep.remainingHits
-          this.damageEnemy(enemy, projectile.damage)
+          const didDamage = this.damageEnemy(enemy, projectile.damage)
+          if (didDamage && enemy.sprite.active) {
+            this.applyDirectProjectileKnockback(enemy, projectile)
+          }
 
           if (projectile.chain) {
             this.applyChainDamage(enemy, projectile.chain, projectile.damage)
@@ -707,10 +725,10 @@ export class ArenaScene extends Phaser.Scene {
     options?: {
       ignoreRecentHit?: boolean
     },
-  ): void {
+  ): boolean {
     const now = this.time.now
     if (!options?.ignoreRecentHit && now - enemy.lastHitAt < 50) {
-      return
+      return false
     }
 
     enemy.lastHitAt = now
@@ -724,7 +742,7 @@ export class ArenaScene extends Phaser.Scene {
         scale: 1,
         duration: 100,
       })
-      return
+      return true
     }
 
     if (enemy.config.drops) {
@@ -745,15 +763,17 @@ export class ArenaScene extends Phaser.Scene {
       enemy.telegraph.visual.destroy()
       enemy.telegraph = undefined
     }
+    enemy.knockback = undefined
     this.destroyEnemyHealthBar(enemy)
     enemy.sprite.destroy()
 
     if (wasBoss) {
       this.endRun('win')
-      return
+      return true
     }
 
     this.statusMessage = `${enemy.config.name} defeated. Keep collecting drops.`
+    return true
   }
 
   private damagePlayer(damage: number): void {
@@ -1220,10 +1240,26 @@ export class ArenaScene extends Phaser.Scene {
       remainingLifetimeMs: projectileSpec.lifetimeMs,
       remainingHits: projectileSpec.maxHits,
       hitEnemyIds: new Set<number>(),
+      direction: projectileSpec.direction,
+      knockback: projectileSpec.knockback,
       chain: projectileSpec.chain,
       hazardOnHit: projectileSpec.hazardOnHit,
       hazardOnExpire: projectileSpec.hazardOnExpire,
     })
+  }
+
+  private applyDirectProjectileKnockback(enemy: EnemyEntity, projectile: ProjectileEntity): void {
+    const result = resolveKnockbackHit({
+      source: 'direct-projectile',
+      direction: projectile.direction,
+      weapon: projectile.knockback,
+      enemy: enemy.config.knockback,
+      activeState: enemy.knockback,
+      targetIsTelegraphing: Boolean(enemy.telegraph),
+      hitTimeMs: this.time.now,
+    })
+
+    enemy.knockback = result.state
   }
 
   private destroyProjectile(projectile: ProjectileEntity, hazard?: HazardSpawnSpec): void {
