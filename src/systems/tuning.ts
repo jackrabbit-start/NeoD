@@ -47,6 +47,32 @@ export const STAR_FIRE_RATE_MULTIPLIER_STEP = 0
 export const STAR_PROJECTILE_SPEED_MULTIPLIER_STEP = 0
 export const STAR_MELEE_RANGE_STEP = 0
 
+const MAX_COMBO_MELEE_STEPS = 6
+
+type ComboMeleeSteps = Extract<WeaponDefinition['attackBehavior'], { kind: 'combo-melee' }>['steps']
+
+function extendComboMeleeSteps(steps: ComboMeleeSteps, extraSteps: number): ComboMeleeSteps {
+  const normalizedExtraSteps = Math.max(0, Math.floor(extraSteps))
+  if (normalizedExtraSteps <= 0 || steps.length >= MAX_COMBO_MELEE_STEPS) {
+    return steps
+  }
+
+  const nextSteps = [...steps]
+  while (nextSteps.length < Math.min(MAX_COMBO_MELEE_STEPS, steps.length + normalizedExtraSteps)) {
+    const previous = nextSteps.at(-1)!
+    const addedStepIndex = nextSteps.length - steps.length + 1
+    nextSteps.push({
+      ...previous,
+      damageMultiplier: Math.min(2.2, previous.damageMultiplier + 0.08 * addedStepIndex),
+      maxTargets: Math.min(4, previous.maxTargets + 1),
+      knockbackMultiplier: Math.min(2.2, (previous.knockbackMultiplier ?? 1) + 0.1),
+    })
+  }
+
+  return nextSteps
+}
+
+
 export interface EffectiveWeaponStats extends WeaponDefinition {
   tuningEffectId?: TuningEffectId
   tuningLabel?: string
@@ -322,12 +348,15 @@ function applyStarWeaponScaling(
       return {
         ...behavior,
         stepIntervalMs: Math.max(52, behavior.stepIntervalMs - 6 * milestoneBonus - 10 * overdriveBonus),
-        steps: behavior.steps.map((step, index) => ({
-          ...step,
-          range: step.range + (index === behavior.steps.length - 1 ? 8 : 3) * milestoneBonus + (index === behavior.steps.length - 1 ? 10 : 4) * overdriveBonus,
-          maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? milestoneBonus : 0),
-          damageMultiplier: step.damageMultiplier + (index === behavior.steps.length - 1 ? 0.08 * overdriveBonus : 0.03 * overdriveBonus),
-        })),
+        steps: extendComboMeleeSteps(
+          behavior.steps.map((step, index) => ({
+            ...step,
+            range: step.range + (index === behavior.steps.length - 1 ? 8 : 3) * milestoneBonus + (index === behavior.steps.length - 1 ? 10 : 4) * overdriveBonus,
+            maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? milestoneBonus : 0),
+            damageMultiplier: step.damageMultiplier + (index === behavior.steps.length - 1 ? 0.08 * overdriveBonus : 0.03 * overdriveBonus),
+          })),
+          milestoneBonus + overdriveBonus,
+        ),
       }
     default:
       return behavior
@@ -525,12 +554,15 @@ function applyPlayerLevelWeaponMilestones(
     case 'combo-melee':
       return {
         ...behavior,
-        steps: behavior.steps.map((step, index) => ({
-          ...step,
-          range: Math.round(step.range * playerStats.weaponRangeMultiplier),
-          maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? specialTier : 0),
-          damageMultiplier: step.damageMultiplier + (index === behavior.steps.length - 1 ? 0.08 * specialTier : 0.03 * specialTier),
-        })),
+        steps: extendComboMeleeSteps(
+          behavior.steps.map((step, index) => ({
+            ...step,
+            range: Math.round(step.range * playerStats.weaponRangeMultiplier),
+            maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? specialTier : 0),
+            damageMultiplier: step.damageMultiplier + (index === behavior.steps.length - 1 ? 0.08 * specialTier : 0.03 * specialTier),
+          })),
+          specialTier,
+        ),
       }
     default:
       return behavior

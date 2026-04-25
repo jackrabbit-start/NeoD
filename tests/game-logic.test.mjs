@@ -2567,8 +2567,13 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
   assert.equal(levelTwentySpark.attackBehavior.deploy.maxTurrets, 2)
   assert.equal(levelTwentySpark.attackBehavior.deploy.range, 238)
 
+  const levelOnePrism = deriveEffectiveWeaponStats('prism-cutter', {}, 1, 1)
+  assert.equal(levelOnePrism.attackBehavior.kind, 'combo-melee')
+  assert.equal(levelOnePrism.attackBehavior.steps.length, 2)
+
   const levelTwentyPrism = deriveEffectiveWeaponStats('prism-cutter', {}, 1, 20)
   assert.equal(levelTwentyPrism.attackBehavior.kind, 'combo-melee')
+  assert.equal(levelTwentyPrism.attackBehavior.steps.length, 4)
   assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.maxTargets, 4)
   assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.range, 84)
 })

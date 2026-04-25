@@ -219,10 +219,8 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
           kind: 'combo-melee',
           stepIntervalMs: 110,
           steps: [
-            { damageMultiplier: 0.75, range: 46, arcDegrees: 20, hitShape: 'box', boxWidth: 22, visualDurationMs: 82, maxTargets: 1 },
-            { damageMultiplier: 0.82, range: 48, arcDegrees: 20, hitShape: 'box', boxWidth: 24, visualDurationMs: 86, maxTargets: 1 },
-            { damageMultiplier: 0.92, range: 54, arcDegrees: 24, hitShape: 'box', boxWidth: 28, visualDurationMs: 94, maxTargets: 1, knockbackMultiplier: 1.1 },
-            { damageMultiplier: 1.55, range: 64, arcDegrees: 70, visualDurationMs: 118, maxTargets: 2, knockbackMultiplier: 1.6 },
+            { damageMultiplier: 0.78, range: 46, arcDegrees: 20, hitShape: 'box', boxWidth: 22, visualDurationMs: 82, maxTargets: 1 },
+            { damageMultiplier: 1.18, range: 64, arcDegrees: 64, hitShape: 'arc', visualDurationMs: 118, maxTargets: 2, knockbackMultiplier: 1.45 },
           ],
         },
       },
@@ -326,7 +324,7 @@ test('melee cleave and combo weapons remain actionable and identifiable', () => 
 
   assert.equal(buildAttackPlan(arc, { x: 0, y: 0 }, { x: 0, y: 10 }).projectiles[0].ricochet.maxBounces, 1)
   assert.equal(buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 0)
-  assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 4)
+  assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 2)
   assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings[0]?.hitShape, 'box')
   assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.at(-1)?.hitShape, 'arc')
   assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.at(-1).maxTargets, 2)
@@ -347,7 +345,7 @@ test('weapon identity labels prefer metadata and summaries expose role text', ()
   assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['arc-loom']), '연쇄 킥')
   assert.match(getWeaponSummary(WEAPON_DEFINITIONS['starter-blaster']), /1박자/)
   assert.match(getWeaponSummary(WEAPON_DEFINITIONS['spark-carbine']), /배치 1기/)
-  assert.match(getWeaponSummary(WEAPON_DEFINITIONS['prism-cutter']), /4연 콤보/)
+  assert.match(getWeaponSummary(WEAPON_DEFINITIONS['prism-cutter']), /2연 콤보/)
 
   const fallbackFrost = {
     ...WEAPON_DEFINITIONS['frost-lance'],
