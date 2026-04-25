@@ -31,4 +31,10 @@ export const ITEM_DEFINITIONS = {
     description: 'A cool droplet that stabilizes volatile reactions.',
     color: 0xc4f1ff,
   },
+  'tuning-capsule': {
+    id: 'tuning-capsule',
+    name: 'Tuning Capsule',
+    description: 'A run-local capsule that tunes a crafted weapon once.',
+    color: 0xff9df3,
+  },
 } as const satisfies Record<LootId, ItemDefinition>

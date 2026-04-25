@@ -4,6 +4,7 @@ export const LOOT_IDS = [
   'frost-mote',
   'spark-knot',
   'mist-bead',
+  'tuning-capsule',
 ] as const
 
 export type LootId = (typeof LOOT_IDS)[number]
@@ -27,6 +28,6 @@ export const RECIPE_IDS = [
 
 export type RecipeId = (typeof RECIPE_IDS)[number]
 
-export const ENEMY_IDS = ['slime', 'spark-slime', 'slime-boss'] as const
+export const ENEMY_IDS = ['slime', 'spark-slime', 'prism-slime', 'slime-boss'] as const
 
 export type EnemyId = (typeof ENEMY_IDS)[number]

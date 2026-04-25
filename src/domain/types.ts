@@ -83,7 +83,12 @@ export interface HudOwnedWeaponView {
   name: string
   description: string
   damage: number
+  fireRateMs: number
+  projectileSpeed: number
   isEquipped: boolean
+  tuningLabel: string | null
+  canTune: boolean
+  tuneDisabledReason: string | null
 }
 
 export interface HudModalState {

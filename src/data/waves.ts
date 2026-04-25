@@ -23,6 +23,13 @@ export const WAVE_DEFINITIONS: WaveDefinition[] = [
     spawnIntervalMs: 560,
   },
   {
+    id: 'elite-wave',
+    label: 'Elite Wave',
+    enemyId: 'prism-slime',
+    count: 1,
+    spawnIntervalMs: 0,
+  },
+  {
     id: 'boss-wave',
     label: 'Boss Wave',
     enemyId: 'slime-boss',
