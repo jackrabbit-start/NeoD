@@ -1,21 +1,31 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="playerCoreB" x1="8" y1="5" x2="23" y2="26" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F8FDFF"/>
-      <stop offset="1" stop-color="#76DAFF"/>
+    <linearGradient id="courierSuitB" x1="9" y1="4" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.5" stop-color="#8AF2FF"/>
+      <stop offset="1" stop-color="#345DFF"/>
     </linearGradient>
-    <linearGradient id="playerWingB" x1="10" y1="10" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#DAF8FF"/>
-      <stop offset="1" stop-color="#28A9D9"/>
+    <linearGradient id="courierCapeB" x1="5" y1="10" x2="19" y2="26" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF07A"/>
+      <stop offset="1" stop-color="#FF5AD8"/>
+    </linearGradient>
+    <linearGradient id="courierVisorB" x1="15" y1="9" x2="24" y2="13" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#A8FFFF"/>
     </linearGradient>
   </defs>
-  <ellipse cx="16" cy="17.3" rx="13" ry="12.7" fill="#06111E" fill-opacity="0.18"/>
-  <path d="M16 4.6L22.4 10.7L27.4 16L22.4 21.3L16 27.4L9.6 21.3L4.6 16L9.6 10.7L16 4.6Z" fill="url(#playerCoreB)"/>
-  <path d="M16 7.9L20.9 12L23.8 16L20.9 20L16 24.1L11.1 20L8.2 16L11.1 12L16 7.9Z" fill="#0D263A" fill-opacity="0.9"/>
-  <path d="M16 9.9L18.6 12.6L21 16L18.6 19.4L16 22.1L13.4 19.4L11 16L13.4 12.6L16 9.9Z" fill="url(#playerWingB)"/>
-  <circle cx="16" cy="16" r="2.2" fill="#F8FDFF"/>
-  <path d="M16 2.5L18.4 5.4L16 7.3L13.6 5.4L16 2.5Z" fill="#F8FDFF" fill-opacity="0.86"/>
-  <path d="M29.5 16L26.6 18.4L24.7 16L26.6 13.6L29.5 16Z" fill="#F8FDFF" fill-opacity="0.86"/>
-  <path d="M16 29.5L13.6 26.6L16 24.7L18.4 26.6L16 29.5Z" fill="#F8FDFF" fill-opacity="0.86"/>
-  <path d="M2.5 16L5.4 13.6L7.3 16L5.4 18.4L2.5 16Z" fill="#F8FDFF" fill-opacity="0.86"/>
+  <ellipse cx="16" cy="27.4" rx="9.4" ry="2.4" fill="#020713" fill-opacity="0.3"/>
+  <path d="M14.1 13.1C9.8 11.4 7.1 10.8 3.2 11.2L8.4 15.9L3.4 19.3C7.9 20.1 11.3 18.6 15.5 16.2L14.1 13.1Z" fill="url(#courierCapeB)"/>
+  <path d="M15.3 4.4L21.2 7.9L24.5 14.1L23.1 21.4L16 26.9L8.9 21.4L7.5 14.1L10.8 7.9L15.3 4.4Z" fill="#071526"/>
+  <path d="M15.9 5.3L20.4 8.5L23.1 14.1L21.3 20.5L16 24.7L10.7 20.5L8.9 14.1L11.6 8.5L15.9 5.3Z" fill="url(#courierSuitB)"/>
+  <path d="M11.3 15.6C13.3 14.1 18.7 14.1 20.7 15.6L19.5 20.9L16 23.3L12.5 20.9L11.3 15.6Z" fill="#09233E" fill-opacity="0.87"/>
+  <path d="M12 9C14.4 7.4 18.4 7.4 20.6 9L22.5 12.9C19 14 14.1 14 10.5 12.9L12 9Z" fill="#0B1A2B"/>
+  <path d="M14.2 10H22.5L24 12.1L21.9 13.9H14.8L13 12.3L14.2 10Z" fill="url(#courierVisorB)"/>
+  <path d="M18.7 10.5L22.3 12L18.6 13.3" stroke="#163B61" stroke-width="0.9" stroke-linecap="round"/>
+  <path d="M16 1.9L17.8 5.4L16 6.8L14.2 5.4L16 1.9Z" fill="#FFE66D"/>
+  <circle cx="16" cy="2.2" r="1.1" fill="#FFFFFF"/>
+  <path d="M10.7 21L8.4 24.7H12.4L14.1 22.8L10.7 21Z" fill="#B8F7FF"/>
+  <path d="M21.3 21L23.6 24.7H19.6L17.9 22.8L21.3 21Z" fill="#B8F7FF"/>
+  <path d="M5.8 15.9H2.1" stroke="#FFE66D" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M16 16.1L18.3 18.3L16 20.5L13.7 18.3L16 16.1Z" fill="#FFFFFF"/>
 </svg>

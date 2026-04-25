@@ -68,6 +68,7 @@ import {
   type MiniMapBounds,
 } from '../systems/minimap.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
+import { resolvePlayerMovementStep, type MovementVector } from '../systems/playerMovement.js'
 import {
   canStartPlayerDash,
   createReadyPlayerDashState,
@@ -394,7 +395,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.handleInventoryToggle()
     this.handleCodexToggle()
-    this.handlePlayerMovement(time)
+    this.handlePlayerMovement(time, delta)
     this.handleFiring(time)
     this.updateEnemies(delta)
     if (this.isRunEnding) {
@@ -577,49 +578,57 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handlePlayerMovement(time: number): void {
+  private handlePlayerMovement(time: number, delta: number): void {
     if (this.isInteractionBlocked()) {
       this.player.setVelocity(0, 0)
       this.setPlayerAnimation(false)
+      this.syncPlayerMotionPose({ x: 0, y: 0 }, false)
       return
     }
 
-    const inputVelocity = new Phaser.Math.Vector2(
-      Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
-      Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
+    const rawInput = {
+      x: Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
+      y: Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
+    }
+    const currentVelocity = this.getPlayerBodyVelocity()
+    const movementStep = resolvePlayerMovementStep(
+      rawInput,
+      currentVelocity,
+      this.playerSpeed,
+      delta,
     )
 
-    const isMoving = inputVelocity.lengthSq() > 0
-    if (isMoving) {
-      inputVelocity.normalize()
-      this.lastPlayerMoveDirection.set(inputVelocity.x, inputVelocity.y)
+    if (movementStep.isInputActive) {
+      this.lastPlayerMoveDirection.set(movementStep.normalizedInput.x, movementStep.normalizedInput.y)
     }
 
     if (
       Phaser.Input.Keyboard.JustDown(this.dashKey) &&
       canStartPlayerDash(time, this.playerDashState, false)
     ) {
-      const dashDirection = resolvePlayerDashDirection(inputVelocity, this.lastPlayerMoveDirection)
+      const dashDirection = resolvePlayerDashDirection(
+        movementStep.normalizedInput,
+        this.lastPlayerMoveDirection,
+      )
       this.playerDashDirection.set(dashDirection.x, dashDirection.y)
       this.playerDashState = startPlayerDash(time)
       this.statusMessage = 'J 대시! 짧은 무적 시간으로 보스 예고 공격을 피하세요.'
     }
 
     if (isPlayerDashActive(time, this.playerDashState)) {
-      this.player.setVelocity(
-        this.playerDashDirection.x * PLAYER_DASH_SPEED,
-        this.playerDashDirection.y * PLAYER_DASH_SPEED,
-      )
+      const dashVelocity = {
+        x: this.playerDashDirection.x * PLAYER_DASH_SPEED,
+        y: this.playerDashDirection.y * PLAYER_DASH_SPEED,
+      }
+      this.player.setVelocity(dashVelocity.x, dashVelocity.y)
       this.setPlayerAnimation(true)
+      this.syncPlayerMotionPose(dashVelocity, true)
       return
     }
 
-    if (isMoving) {
-      inputVelocity.scale(this.playerSpeed)
-    }
-
-    this.player.setVelocity(inputVelocity.x, inputVelocity.y)
-    this.setPlayerAnimation(isMoving)
+    this.player.setVelocity(movementStep.velocity.x, movementStep.velocity.y)
+    this.setPlayerAnimation(movementStep.isMoving)
+    this.syncPlayerMotionPose(movementStep.velocity, movementStep.isMoving)
   }
 
   private handleFiring(time: number): void {
@@ -1664,6 +1673,34 @@ export class ArenaScene extends Phaser.Scene {
         enemy.sprite.setVelocity(0, 0)
       }
     }
+  }
+
+  private getPlayerBodyVelocity(): MovementVector {
+    const body = this.player.body as Phaser.Physics.Arcade.Body | null
+    if (!body) {
+      return { x: 0, y: 0 }
+    }
+
+    return { x: body.velocity.x, y: body.velocity.y }
+  }
+
+  private syncPlayerMotionPose(velocity: MovementVector, isMoving: boolean): void {
+    if (isMoving && Math.abs(velocity.x) > 1) {
+      this.player.setFlipX(velocity.x < 0)
+    }
+
+    const speedRatio = Math.min(Math.hypot(velocity.x, velocity.y) / Math.max(this.playerSpeed, 1), 1)
+    const targetAngle = isMoving
+      ? Phaser.Math.Clamp(velocity.x / Math.max(this.playerSpeed, 1), -1, 1) * 5
+      : 0
+    const targetScaleX = isMoving ? 1 + speedRatio * 0.04 : 1
+    const targetScaleY = isMoving ? 1 - speedRatio * 0.03 : 1
+
+    this.player.setAngle(Phaser.Math.Linear(this.player.angle, targetAngle, 0.24))
+    this.player.setScale(
+      Phaser.Math.Linear(this.player.scaleX, targetScaleX, 0.18),
+      Phaser.Math.Linear(this.player.scaleY, targetScaleY, 0.18),
+    )
   }
 
   private setPlayerAnimation(isMoving: boolean): void {
