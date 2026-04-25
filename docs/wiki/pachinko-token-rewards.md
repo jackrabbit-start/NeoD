@@ -12,6 +12,7 @@ This page captures the durable decisions from the token/pachinko interview and t
 - PRD/test spec: `../../.omx/plans/prd-pachinko-token-weapons.md`, `../../.omx/plans/test-spec-pachinko-token-weapons.md`
 - Post-interview context: `../../.omx/context/post-interview-pachinko-token-rewards-20260425T143344Z.md`
 - Implementation/fix PRs: GitHub PR #42 and PR #46
+- Capacity/visual follow-up: `../../.omx/specs/deep-interview-pachinko-machine-capacity-visuals.md`, `../../.omx/interviews/pachinko-machine-capacity-visuals-20260425T152330Z.md`, `../../.omx/context/post-interview-pachinko-machine-capacity-visuals-20260425T161614Z.md`, commits `362618b` and `bba27bc`
 
 ## Locked reward loop
 
@@ -27,6 +28,19 @@ Preserve this first-pass sequence unless a later interview/plan explicitly reope
 
 Do **not** enqueue pachinko rewards directly on enemy death. The field token pickup is part of the intended feedback loop.
 
+## Machine capacity and exact slot visuals
+
+The capacity/visual follow-up made the board intentionally busier while preserving the token pickup gate:
+
+- Up to 15 pachinko tokens may be active/falling inside the machine at once.
+- Additional collected tokens remain queued instead of disappearing or resolving instantly.
+- The queue count must be visible beside/adjacent to the pachinko machine; when the viewport is too narrow for an outside badge, keep the badge visibly inside the board area.
+- Bottom lanes are live reward slots. Each slot displays the weapon icon and star grade that the slot will grant at resolution time.
+- The displayed slot table and landing resolver must share one helper/model. Do not implement visual-only previews that can diverge from awarded rewards.
+- Slot dividers, reward frames, trims, lights, and badges are Phaser-owned board chrome and must be kept synchronized with camera/viewport updates.
+
+The accepted V1 implementation uses 10 compact reward slots because the current weapon catalog has 10 weapons. If the weapon catalog or slot count changes, update deterministic slot tests and keep display/resolution parity.
+
 ## Reward-level semantics
 
 Token rewards increase the pachinko reward level only. Other level systems are future scope.
@@ -36,7 +50,8 @@ Current durable model:
 - Enemy types grant differentiated token XP through `src/systems/pachinkoRewards.ts`.
 - `PACHINKO_LEVEL_THRESHOLDS` controls reward-level breakpoints.
 - `STAR_ODDS_BY_LEVEL` controls star odds by reward level.
-- `resolvePachinkoLandingReward()` turns the pachinko landing ratio into deterministic reward selection for tests.
+- `buildPachinkoSlotRewards()` creates the live bottom-slot table used by both visuals and tests.
+- `resolvePachinkoLandingReward()` must continue to resolve through the same slot reward semantics so displayed lanes and grants stay aligned.
 
 Future changes to token pacing, thresholds, or odds should update deterministic tests in `tests/game-logic.test.mjs`.
 
@@ -83,7 +98,7 @@ Preserve these implementation lessons:
 The implementation and pickup-flow fix were verified with:
 
 - `pnpm typecheck`
-- `pnpm test` — 137 passing tests
+- `pnpm test` — 148 passing tests after the capacity/visual follow-up was merged into current `ai-dev`
 - `pnpm build`
 
 Known local warnings at capture time:
@@ -100,4 +115,6 @@ Run a fresh interview/plan before changing any of these materially:
 - adding true direct weapon floor drops
 - changing star maximum or fusion inputs
 - replacing the Phaser physics board with a DOM/animation-only resolver
+- making bottom slot icons loose previews instead of exact lane rewards
+- changing active-token capacity or queue badge behavior without checking narrow viewport visibility
 - adding real-money, betting, or casino-like language
