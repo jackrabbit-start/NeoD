@@ -36,6 +36,16 @@ pnpm build
 Documentation follows the `raw sources / wiki / schema` layout with `docs/index.md` as the entrypoint.
 Parallel AI worktree setup is documented in `docs/wiki/parallel-ai-worktrees.md`.
 
+## Vercel Deployment
+
+Pushes merged into `ai-dev` trigger `.github/workflows/vercel-ai-dev-deploy.yml`, which installs dependencies, runs `pnpm typecheck`, `pnpm test`, and `pnpm build`, then publishes a Vercel preview deployment through the Vercel CLI.
+
+Configure these GitHub repository secrets before enabling the workflow:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
 ## Layout
 
 - `src/main.ts`: app bootstrap
