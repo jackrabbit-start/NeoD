@@ -300,9 +300,21 @@ export class ArenaScene extends Phaser.Scene {
     this.handlePlayerMovement()
     this.handleFiring(time)
     this.updateEnemies(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.updateProjectiles(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.updateLootDrops(delta)
     this.updateHazards(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
     this.cleanupDestroyedEntities()
 
     if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
@@ -438,6 +450,9 @@ export class ArenaScene extends Phaser.Scene {
             )
           ) {
             this.damagePlayer(enemy.telegraph.damage)
+            if (this.isRunEnding) {
+              return
+            }
           }
 
           enemy.telegraph.visual.destroy()
@@ -510,6 +525,9 @@ export class ArenaScene extends Phaser.Scene {
       const touchingPlayer = distanceToPlayer < enemy.config.size / 2 + ENEMY_CONTACT_PADDING
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
+        if (this.isRunEnding) {
+          return
+        }
       }
 
       this.syncEnemyHealthBar(enemy)
@@ -731,6 +749,9 @@ export class ArenaScene extends Phaser.Scene {
           this.damageEnemy(enemy, hazard.damage, {
             ignoreRecentHit: true,
           })
+          if (this.isRunEnding) {
+            return
+          }
         }
       }
 
@@ -1078,7 +1099,9 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const enemy of this.enemies) {
-      enemy.sprite.setVelocity(0, 0)
+      if (enemy.sprite.active) {
+        enemy.sprite.setVelocity(0, 0)
+      }
     }
   }
 
