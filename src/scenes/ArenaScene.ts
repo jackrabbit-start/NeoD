@@ -106,6 +106,11 @@ import {
 } from '../systems/weaponBehaviors.js'
 import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import {
+  resolveEquippedWeaponPresentation,
+  resolveEquippedWeaponTextureRefresh,
+  resolveWeaponPresentationFacing,
+} from '../systems/weaponPresentation.js'
+import {
   deriveEffectiveWeaponStats,
   getTuningEffectLabel,
   getWeaponTuningBlockReason,
@@ -248,6 +253,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private player!: PhysicsSprite
 
+  private equippedWeaponVisual?: Phaser.GameObjects.Image
+
+  private equippedWeaponTextureKey: string | null = null
+
   private playerHealthBar?: PlayerHealthBar
 
   private enemySprites!: Phaser.Physics.Arcade.Group
@@ -312,6 +321,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private lastPlayerMoveDirection = new Phaser.Math.Vector2(1, 0)
 
+  private heldWeaponFacing = new Phaser.Math.Vector2(1, 0)
+
+  private rememberedWeaponTargetDirection?: Phaser.Math.Vector2
+
   private nextFireAt = 0
 
   private remainingSpawns = 0
@@ -374,6 +387,7 @@ export class ArenaScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true)
     this.player.play('player-idle')
     this.cameras.main.startFollow(this.player, true, 0.09, 0.09)
+    this.createEquippedWeaponVisual()
     this.playerHealthBar = this.createPlayerHealthBar()
     this.syncPlayerHealthBar()
 
@@ -413,6 +427,7 @@ export class ArenaScene extends Phaser.Scene {
     this.handleInventoryToggle()
     this.handleCodexToggle()
     this.handlePlayerMovement(time, delta)
+    this.syncEquippedWeaponVisual(time)
     this.handleFiring(time)
     this.updateEnemies(delta)
     if (this.isRunEnding) {
@@ -682,6 +697,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
+    this.rememberWeaponTargetDirection(target.directionX, target.directionY)
     const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
     const attackPlan = buildAttackPlan(weapon, origin, new Phaser.Math.Vector2(target.x, target.y))
     if (!isAttackPlanActionable(attackPlan)) {
@@ -1766,6 +1782,107 @@ export class ArenaScene extends Phaser.Scene {
     return { x: body.velocity.x, y: body.velocity.y }
   }
 
+  private createEquippedWeaponVisual(): void {
+    if (!this.player?.active) {
+      return
+    }
+
+    const presentation = resolveEquippedWeaponPresentation(
+      WEAPON_DEFINITIONS[this.activeWeaponId],
+      { x: this.heldWeaponFacing.x, y: this.heldWeaponFacing.y },
+    )
+
+    this.equippedWeaponVisual = this.add
+      .image(
+        this.player.x + presentation.offset.x,
+        this.player.y + presentation.offset.y,
+        presentation.textureKey,
+      )
+      .setOrigin(0.5)
+      .setScale(presentation.scale)
+      .setRotation(presentation.rotation)
+      .setFlipY(presentation.flipY)
+      .setDepth(presentation.depth)
+      .setAlpha(0.96)
+    this.equippedWeaponTextureKey = presentation.textureKey
+  }
+
+  private syncEquippedWeaponVisual(time: number): void {
+    if (!this.player?.active) {
+      return
+    }
+
+    if (!this.equippedWeaponVisual?.active) {
+      this.createEquippedWeaponVisual()
+    }
+
+    const equippedWeaponVisual = this.equippedWeaponVisual
+    if (!equippedWeaponVisual?.active) {
+      return
+    }
+
+    const weapon = deriveEffectiveWeaponStats(this.activeWeaponId, this.tuningState)
+    const facing = resolveWeaponPresentationFacing({
+      origin: { x: this.player.x, y: this.player.y },
+      candidates: this.enemies.map((enemy) => ({
+        x: enemy.sprite.x,
+        y: enemy.sprite.y,
+        radius: enemy.config.size / 2,
+        isActive: enemy.sprite.active,
+      })),
+      maxRange: getWeaponAttackRange(weapon),
+      isInteractionBlocked: this.isInteractionBlocked(),
+      rememberedDirection: this.rememberedWeaponTargetDirection
+        ? {
+            x: this.rememberedWeaponTargetDirection.x,
+            y: this.rememberedWeaponTargetDirection.y,
+          }
+        : null,
+      isDashing: isPlayerDashActive(time, this.playerDashState),
+      dashDirection: { x: this.playerDashDirection.x, y: this.playerDashDirection.y },
+      moveDirection: { x: this.lastPlayerMoveDirection.x, y: this.lastPlayerMoveDirection.y },
+    })
+    this.heldWeaponFacing.set(facing.direction.x, facing.direction.y)
+    if (facing.source === 'nearest-target') {
+      this.rememberWeaponTargetDirection(facing.direction.x, facing.direction.y)
+    }
+
+    const presentation = resolveEquippedWeaponPresentation(weapon, facing.direction)
+    const textureRefresh = resolveEquippedWeaponTextureRefresh(this.equippedWeaponTextureKey, weapon)
+    if (textureRefresh.shouldRefresh) {
+      equippedWeaponVisual.setTexture(textureRefresh.textureKey)
+      this.equippedWeaponTextureKey = textureRefresh.textureKey
+    }
+
+    equippedWeaponVisual
+      .setPosition(
+        this.player.x + presentation.offset.x,
+        this.player.y + presentation.offset.y,
+      )
+      .setRotation(presentation.rotation)
+      .setFlipY(presentation.flipY)
+      .setScale(presentation.scale)
+      .setDepth(presentation.depth)
+  }
+
+  private destroyEquippedWeaponVisual(): void {
+    if (this.equippedWeaponVisual?.active) {
+      this.equippedWeaponVisual.destroy()
+    }
+
+    this.equippedWeaponVisual = undefined
+    this.equippedWeaponTextureKey = null
+  }
+
+  private rememberWeaponTargetDirection(x: number, y: number): void {
+    if (!this.rememberedWeaponTargetDirection) {
+      this.rememberedWeaponTargetDirection = new Phaser.Math.Vector2(x, y)
+      return
+    }
+
+    this.rememberedWeaponTargetDirection.set(x, y)
+  }
+
   private syncPlayerMotionPose(velocity: MovementVector, isMoving: boolean): void {
     if (isMoving && Math.abs(velocity.x) > 1) {
       this.player.setFlipX(velocity.x < 0)
@@ -1949,6 +2066,8 @@ export class ArenaScene extends Phaser.Scene {
     this.playerDashState = createReadyPlayerDashState()
     this.playerDashDirection.set(1, 0)
     this.lastPlayerMoveDirection.set(1, 0)
+    this.heldWeaponFacing.set(1, 0)
+    this.rememberedWeaponTargetDirection = undefined
     this.nextFireAt = initialState.nextFireAt
     this.remainingSpawns = initialState.remainingSpawns
     this.currentWaveIndex = initialState.currentWaveIndex
@@ -1968,6 +2087,7 @@ export class ArenaScene extends Phaser.Scene {
     this.enemySpacingCollider = undefined
     this.destroyPlayerHealthBar()
     this.destroyMiniMap()
+    this.destroyEquippedWeaponVisual()
 
     if (this.player?.active) {
       this.player.destroy()
@@ -2045,6 +2165,7 @@ export class ArenaScene extends Phaser.Scene {
     this.codex.update(getCodexState(false))
     this.physics.world.pause()
     this.freezeCombat(true)
+    this.destroyEquippedWeaponVisual()
     const payload = this.createResultPayload(outcome)
     this.hud.update(createRunResultHudState(payload))
     this.scene.start('result', payload)
