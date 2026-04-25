@@ -4,11 +4,13 @@ import assert from 'node:assert/strict'
 import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
 import {
   advanceEnemyCooldown,
+  createEnemySpreadBurstProjectiles,
   createEnemyTelegraph,
   getEnemyBehaviorSummary,
   isPointInsideCircle,
   resolveEnemyVelocity,
   selectAutoFireTarget,
+  shouldEnemyStartSpreadBurst,
   shouldEnemyStartTelegraph,
 } from '../.tmp-test/src/systems/enemyBehaviors.js'
 import { getCodexState } from '../.tmp-test/src/systems/codex.js'
@@ -111,6 +113,40 @@ test('telegraph start and cooldown helpers remain deterministic', () => {
   assert.equal(advanceEnemyCooldown(1200, 1500), 0)
 })
 
+test('spread-burst enemy projectiles fan around the target vector', () => {
+  const attackBehavior = ENEMY_DEFINITIONS['needle-wasp'].attackBehavior
+  assert.equal(attackBehavior.kind, 'spread-burst')
+
+  const projectiles = createEnemySpreadBurstProjectiles(
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    attackBehavior,
+  )
+
+  assert.equal(shouldEnemyStartSpreadBurst(attackBehavior, attackBehavior.range, 0), true)
+  assert.equal(shouldEnemyStartSpreadBurst(attackBehavior, attackBehavior.range + 1, 0), false)
+  assert.equal(shouldEnemyStartSpreadBurst(attackBehavior, attackBehavior.range, 1), false)
+  assert.equal(projectiles.length, attackBehavior.projectileCount)
+  assert.equal(projectiles[2]?.direction.x, 1)
+  assert.equal(projectiles[2]?.direction.y, 0)
+  assert.ok((projectiles[0]?.direction.y ?? 0) < 0)
+  assert.ok((projectiles.at(-1)?.direction.y ?? 0) > 0)
+  assert.equal(
+    Math.round(Math.abs(projectiles[0]?.direction.y ?? 0) * 1000),
+    Math.round(Math.abs(projectiles.at(-1)?.direction.y ?? 0) * 1000),
+  )
+})
+
+test('spread-burst helper avoids unsafe zero-distance directions', () => {
+  const attackBehavior = ENEMY_DEFINITIONS['needle-wasp'].attackBehavior
+
+  assert.equal(attackBehavior.kind, 'spread-burst')
+  assert.deepEqual(
+    createEnemySpreadBurstProjectiles({ x: 4, y: 4 }, { x: 4, y: 4 }, attackBehavior),
+    [],
+  )
+})
+
 test('circle hit test and codex enemy summary expose the new enemy identities', () => {
   assert.equal(isPointInsideCircle({ x: 108, y: 100 }, { x: 100, y: 100 }, 10), true)
   assert.equal(isPointInsideCircle({ x: 120, y: 100 }, { x: 100, y: 100 }, 10), false)
@@ -119,4 +155,7 @@ test('circle hit test and codex enemy summary expose the new enemy identities', 
   const codex = getCodexState(true)
   const sparkSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
   assert.ok(sparkSlime?.stats.some((entry) => /충격 범위/.test(entry)))
+
+  const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
+  assert.ok(needleWasp?.stats.some((entry) => /부채꼴/.test(entry)))
 })

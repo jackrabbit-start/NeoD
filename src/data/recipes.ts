@@ -55,4 +55,13 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
     identityHint: '차가운 안개를 넓게 머물게 해 전장을 늦추고 구역을 장악하는 분기입니다.',
     note: '서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.',
   },
+  {
+    id: 'needle-fan-recipe',
+    name: '니들 팬',
+    inputs: ['chitin-needle', 'spark-knot'],
+    outputWeaponId: 'needle-fan',
+    identityLabel: '산탄 견제',
+    identityHint: '키틴 바늘을 전하 추진으로 흩뿌려 얇은 부채꼴 압박을 만드는 분기입니다.',
+    note: '벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.',
+  },
 ]

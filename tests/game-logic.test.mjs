@@ -148,6 +148,23 @@ test('mist vortex recipe resolves from existing frost and mist drops', () => {
   assert.deepEqual(combined?.nextInventory, {})
 })
 
+test('needle fan recipe resolves from insect loot and spark drops', () => {
+  let inventory = {}
+  inventory = addItem(inventory, 'chitin-needle')
+  inventory = addItem(inventory, 'spark-knot')
+
+  const availableRecipes = getAvailableRecipes(inventory)
+  assert.ok(availableRecipes.some(({ recipe }) => recipe.id === 'needle-fan-recipe'))
+
+  const actionableRecipes = getActionableRecipes(inventory, ['starter-blaster'])
+  assert.ok(actionableRecipes.some(({ recipe }) => recipe.id === 'needle-fan-recipe'))
+
+  const combined = resolveCombine(inventory, 'needle-fan-recipe')
+  assert.ok(combined)
+  assert.equal(combined?.weaponId, 'needle-fan')
+  assert.deepEqual(combined?.nextInventory, {})
+})
+
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
@@ -293,6 +310,17 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   assert.deepEqual(describeAvailableRecipes(mistRecipes), [
     '안개 소용돌이 [안개 제어] → 피해 14 · 초당 4발 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
   ])
+
+  const needleRecipes = getActionableRecipes(
+    {
+      'chitin-needle': 1,
+      'spark-knot': 1,
+    },
+    ['starter-blaster'],
+  )
+  assert.deepEqual(describeAvailableRecipes(needleRecipes), [
+    '니들 팬 [산탄 견제] → 피해 16 · 초당 5발 · 산탄 견제 (벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.)',
+  ])
 })
 
 test('actionable recipes exclude outputs that are already owned', () => {
@@ -371,6 +399,21 @@ test('branch recipe selections add the new owned weapon paths', () => {
   assert.ok(mistResult)
   assert.deepEqual(mistResult?.ownedWeaponIds, ['starter-blaster', 'mist-vortex'])
   assert.equal(mistResult?.activeWeaponId, 'mist-vortex')
+
+  const needleResult = applyRecipeSelection(
+    {
+      inventory: {
+        'chitin-needle': 1,
+        'spark-knot': 1,
+      },
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'needle-fan-recipe',
+  )
+
+  assert.ok(needleResult)
+  assert.deepEqual(needleResult?.ownedWeaponIds, ['starter-blaster', 'needle-fan'])
+  assert.equal(needleResult?.activeWeaponId, 'needle-fan')
 })
 
 test('duplicate-output recipe selections do not consume inventory', () => {
@@ -413,6 +456,20 @@ test('duplicate-output branch recipe selections do not consume inventory', () =>
         ownedWeaponIds: ['starter-blaster', 'mist-vortex'],
       },
       'mist-vortex-recipe',
+    ),
+    null,
+  )
+
+  assert.equal(
+    applyRecipeSelection(
+      {
+        inventory: {
+          'chitin-needle': 1,
+          'spark-knot': 1,
+        },
+        ownedWeaponIds: ['starter-blaster', 'needle-fan'],
+      },
+      'needle-fan-recipe',
     ),
     null,
   )
@@ -575,6 +632,7 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'spark-knot',
     'mist-bead',
     'tuning-capsule',
+    'chitin-needle',
   ])
   assert.deepEqual(RECIPE_IDS, [
     'acid-sprayer-recipe',
@@ -583,6 +641,7 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'arc-loom-recipe',
     'spark-carbine-recipe',
     'mist-vortex-recipe',
+    'needle-fan-recipe',
   ])
   assert.deepEqual(WEAPON_IDS, [
     'starter-blaster',
@@ -592,6 +651,7 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'arc-loom',
     'spark-carbine',
     'mist-vortex',
+    'needle-fan',
   ])
   assert.deepEqual(ENEMY_IDS, [
     'slime',
@@ -599,6 +659,7 @@ test('enemy expansion keeps reward ids stable while adding regular enemy ids', (
     'prism-slime',
     'dash-slime',
     'orbit-slime',
+    'needle-wasp',
     'slime-boss',
   ])
 })
@@ -627,11 +688,13 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
       'orbit-slime',
       'orbit-slime',
       'orbit-slime',
+      'needle-wasp',
+      'needle-wasp',
       'dash-slime',
       'dash-slime',
     ],
   )
-  assert.equal(getWaveSpawnCount(thirdWave), 9)
+  assert.equal(getWaveSpawnCount(thirdWave), 11)
   assert.deepEqual(getWaveSpawnSequence(eliteWave), ['prism-slime'])
   assert.deepEqual(bossWave.entries, [{ enemyId: 'slime-boss', count: 1 }])
   assert.equal(getBossEnemyId(), 'slime-boss')
@@ -639,6 +702,7 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(isBossEnemyId('dash-slime'), false)
   assert.equal(getDefeatedEnemyRunOutcome('slime-boss'), 'win')
   assert.equal(getDefeatedEnemyRunOutcome('dash-slime'), 'continue')
+  assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
 test('boss win result presentation is explicit and reward-neutral', () => {
@@ -689,9 +753,9 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
   const codex = getCodexState(true)
 
   assert.equal(codex.isOpen, true)
-  assert.equal(codex.items.length, 6)
-  assert.equal(codex.recipes.length, 6)
-  assert.equal(codex.enemies.length, 6)
+  assert.equal(codex.items.length, 7)
+  assert.equal(codex.recipes.length, 7)
+  assert.equal(codex.enemies.length, 7)
 
   const arcRecipe = codex.recipes.find((recipe) => recipe.id === 'arc-loom-recipe')
   assert.equal(arcRecipe?.identityLabel, '연쇄 제압')
@@ -717,6 +781,14 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
   )
   assert.equal(mistRecipe?.output.id, 'mist-vortex')
 
+  const needleRecipe = codex.recipes.find((recipe) => recipe.id === 'needle-fan-recipe')
+  assert.equal(needleRecipe?.identityLabel, '산탄 견제')
+  assert.deepEqual(
+    needleRecipe?.inputs.map((input) => input.id),
+    ['chitin-needle', 'spark-knot'],
+  )
+  assert.equal(needleRecipe?.output.id, 'needle-fan')
+
   const voltSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
   assert.ok(voltSlime)
   assert.deepEqual(
@@ -738,6 +810,15 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
   const orbitSlime = codex.enemies.find((enemy) => enemy.id === 'orbit-slime')
   assert.ok(orbitSlime)
   assert.ok(orbitSlime?.stats.some((stat) => stat.includes('맴돕니다')))
+
+  const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
+  assert.ok(needleWasp)
+  assert.ok(needleWasp?.description.includes('비-슬라임'))
+  assert.ok(needleWasp?.stats.some((stat) => stat.includes('부채꼴')))
+  assert.deepEqual(
+    needleWasp?.drops.map((drop) => drop.id),
+    ['chitin-needle', 'spark-knot', 'mist-bead'],
+  )
 })
 
 test('recipe identity metadata stays aligned with known ids and weapon outputs', () => {
@@ -961,6 +1042,7 @@ test('enemy visual metadata keeps immutable gameplay geometry while adding art h
       'prism-slime': { size: 30, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
       'dash-slime': { size: 24, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
       'orbit-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
+      'needle-wasp': { size: 24, textureKey: 'needle-wasp', animationKey: 'needle-wasp-idle' },
       'slime-boss': { size: 44, textureKey: 'slime-boss', animationKey: 'slime-boss-idle' },
     },
   )
@@ -1045,6 +1127,7 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'spark-knot': 'spark-knot',
       'mist-bead': 'mist-bead',
       'tuning-capsule': 'tuning-capsule',
+      'chitin-needle': 'chitin-needle',
     },
   )
 
@@ -1061,6 +1144,7 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'spark-knot': { width: 22, height: 22, radius: 10 },
       'mist-bead': { width: 22, height: 22, radius: 10 },
       'tuning-capsule': { width: 22, height: 22, radius: 10 },
+      'chitin-needle': { width: 22, height: 22, radius: 10 },
     },
   )
 
@@ -1102,6 +1186,10 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'mist-vortex': {
         projectileTextureKey: 'mist-projectile',
         hudIconKey: 'weapon-mist-vortex',
+      },
+      'needle-fan': {
+        projectileTextureKey: 'needle-projectile',
+        hudIconKey: 'weapon-needle-fan',
       },
     },
   )

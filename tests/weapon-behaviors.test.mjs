@@ -116,6 +116,20 @@ test('mist vortex is a distinct spray hazard control branch', () => {
   assert.equal(center?.hazardOnHit?.damage, mistBehavior.hazardDamage)
 })
 
+test('needle fan reuses spray-hazard behavior for a bounded reward branch', () => {
+  const needleFan = WEAPON_DEFINITIONS['needle-fan']
+  const plan = buildAttackPlan(needleFan, { x: 0, y: 0 }, { x: 100, y: 0 })
+
+  assert.equal(needleFan.attackBehavior.kind, 'spray-hazard')
+  assert.equal(getWeaponIdentityLabel(needleFan), '산탄 견제')
+  assert.equal(plan.projectiles.length, 4)
+  assert.equal(plan.cooldownMs, needleFan.fireRateMs)
+  assert.ok((plan.projectiles[0]?.direction.y ?? 0) < 0)
+  assert.ok((plan.projectiles.at(-1)?.direction.y ?? 0) > 0)
+  assert.equal(plan.projectiles[0]?.hazardOnHit?.radius, 20)
+  assert.equal(plan.projectiles[0]?.hazardOnHit?.damage, 3)
+})
+
 test('chain target selection is deterministic by distance then runtime id', () => {
   const selected = selectChainTargets(
     { x: 0, y: 0 },

@@ -65,7 +65,7 @@ These are the default requirements for the repo unless a later workflow explicit
 - Combat: real-time
 - Run structure: start arena -> waves -> boss -> result
 - Progression focus: within-run only
-- Initial enemy scope: `slime` family plus `1 boss`
+- Initial enemy scope: `slime` family plus `1 boss`; later scoped revisions may add tightly bounded non-slime regular enemies.
 
 ## Functional Requirements
 
@@ -91,10 +91,11 @@ The game must support this loop:
 
 ### Enemy Requirements
 
-- Normal enemies in V1 are slime-type enemies only
+- Normal enemies in the original V1 baseline were slime-type enemies; current scoped revisions may add a small bounded non-slime regular enemy when explicitly planned.
 - Slimes must spawn in waves
 - Slimes must be defeatable
 - Slimes must be able to drop loot based on configured drop rules
+- Scoped non-slime enemies must stay safely fictional, data-driven, and visible through shared codex/data views.
 - A boss must appear after wave progression conditions are met
 
 ### Loot Requirements
@@ -147,11 +148,15 @@ These are hard scope boundaries for the first playable slice.
 ### Required V1 Content Bounds
 
 - `1` playable arena
-- `1` normal enemy family: slime
+- Original baseline: `1` normal enemy family (`slime`)
+- Scoped enemy-archetype revisions may add bounded non-slime regular enemies
+  when they have their own PRD/test-spec and preserve the boss flow.
 - `1` boss
-- `4-6` base loot items/components total
-- `2-3` base weapons total
-- `2-3` combine recipes
+- Original baseline: `4-6` base loot items/components total
+- Original baseline: `2-3` base weapons total
+- Original baseline: `2-3` combine recipes
+- Scoped reward revisions may add tightly bounded loot/recipe/weapon branches
+  when explicitly approved by their slice plan.
 - `3-5` waves including the boss wave
 - `8-12` minute target run length
 - `2` distinct reachable upgrade endpoints for build variation
@@ -173,7 +178,7 @@ These are hard scope boundaries for the first playable slice.
 - Skill tree systems
 - Procedural map generation
 - Multiple player characters
-- Multiple regular enemy archetypes
+- Broad unplanned regular-enemy roster expansion beyond scoped enemy-archetype revisions
 - Crafting systems outside the enemy-drop/combine loop
 
 ## Scoped Revision: Enemy Types Expansion
@@ -201,6 +206,30 @@ Durable decisions for the enemy expansion slice:
   a win, and non-boss enemy defeat must not end the run.
 - Keep new enemy data visible through shared data/codex views and cover new
   enemy/wave behavior in deterministic tests where practical.
+
+## Scoped Revision: Non-Slime Insect Spitter
+
+The non-slime insect-spitter interview is a later scoped revision that
+supersedes the older enemy-expansion slice where it conflicts.
+
+Source artifacts:
+
+- `.omx/specs/deep-interview-non-slime-enemy-type.md`
+- `.omx/interviews/non-slime-enemy-type-20260425T114118Z.md`
+- `.omx/plans/prd-non-slime-enemy-type.md`
+- `.omx/plans/test-spec-non-slime-enemy-type.md`
+
+Durable decisions for this slice:
+
+- Add one clearly non-slime regular enemy: a ranged insect spitter.
+- Its attack identity is a readable, dodgeable spread-burst fan shot.
+- This newer slice explicitly allows one new loot ID plus one new recipe and
+  weapon branch, superseding the older enemy-expansion note that disallowed
+  reward-loop expansion for that earlier pass.
+- Preserve boss victory flow: defeating the boss must still end the run in a
+  win, and non-boss enemy defeat must not end the run.
+- Enemy projectile lifecycle behavior must be covered by deterministic helper
+  tests, with browser/manual evidence for visual readability and fairness.
 
 ## Technical Requirements
 

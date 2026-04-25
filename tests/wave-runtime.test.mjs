@@ -77,7 +77,7 @@ test('wave runtime keeps existing wave shape while tightening regular-wave caden
 
   assert.deepEqual(
     starts.map(({ appliedState }) => appliedState[0]?.remainingSpawns),
-    [6, 8, 9],
+    [6, 8, 11],
   )
   assert.deepEqual(
     starts.map(({ scheduledLoops }) => scheduledLoops[0]?.delayMs),
@@ -85,7 +85,7 @@ test('wave runtime keeps existing wave shape while tightening regular-wave caden
   )
   assert.deepEqual(
     starts.map(({ scheduledLoops }) => scheduledLoops[0]?.repeat),
-    [5, 7, 8],
+    [5, 7, 10],
   )
   assert.deepEqual(
     starts.map(({ spawnedEnemies }) => spawnedEnemies[0]),

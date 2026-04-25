@@ -22,6 +22,7 @@ export const WAVE_DEFINITIONS: WaveDefinition[] = [
     entries: [
       { enemyId: 'spark-slime', count: 4 },
       { enemyId: 'orbit-slime', count: 3 },
+      { enemyId: 'needle-wasp', count: 2 },
       { enemyId: 'dash-slime', count: 2 },
     ],
     spawnIntervalMs: 520,
