@@ -47,14 +47,14 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
     { enemyId: 'slime', count: Math.max(2, 16 - clampedMinute) },
   ]
 
-  if (clampedMinute >= 2) {
-    weights.push({ enemyId: 'dash-slime', count: 3 + Math.min(6, clampedMinute) })
+  if (clampedMinute >= 0) {
+    weights.push({ enemyId: 'dash-slime', count: 2 + Math.min(7, clampedMinute) })
   }
-  if (clampedMinute >= 5) {
-    weights.push({ enemyId: 'spark-slime', count: 4 + Math.floor(clampedMinute / 3) })
+  if (clampedMinute >= 1) {
+    weights.push({ enemyId: 'spark-slime', count: 2 + Math.floor(clampedMinute / 2) })
   }
-  if (clampedMinute >= 7) {
-    weights.push({ enemyId: 'splitter-slime', count: 3 + Math.floor((clampedMinute - 7) / 2) })
+  if (clampedMinute >= 3) {
+    weights.push({ enemyId: 'splitter-slime', count: 2 + Math.floor((clampedMinute - 3) / 2) })
   }
   if (clampedMinute >= 10) {
     weights.push({ enemyId: 'orbit-slime', count: 5 + Math.floor((clampedMinute - 10) / 3) })

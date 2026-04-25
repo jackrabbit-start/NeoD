@@ -122,6 +122,7 @@ import {
 import {
   FINAL_STAGE_START_MS,
   RUN_DURATION_MS,
+  flattenRunPhaseEntries,
   formatRunTime,
   getRunEnemySpawnChanceRows,
   getRunPhaseByElapsedMs,
@@ -1152,17 +1153,34 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
     {
       enemyId: 'slime',
       enemyName: '진흙 슬라임',
-      count: 16,
-      ratio: 1,
-      percentLabel: '100%',
+      count: 17,
+      ratio: 17 / 19,
+      percentLabel: '89%',
+    },
+    {
+      enemyId: 'dash-slime',
+      enemyName: '대시 슬라임',
+      count: 2,
+      ratio: 2 / 19,
+      percentLabel: '11%',
     },
   ])
+  assert.ok(firstRows.some((row) => row.enemyId === 'dash-slime'))
   assert.notDeepEqual(thirdMinuteFrontRows, thirdMinuteBackRows)
   assert.ok(lateRows.length > 4)
   assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
   assert.ok(lateRows.some((row) => row.enemyId === 'void-orb'))
   assert.equal(lateRows.reduce((sum, row) => sum + row.count, 0) > 0, true)
   assert.equal(lateRows.reduce((sum, row) => sum + row.ratio, 0).toFixed(4), '1.0000')
+})
+
+
+test('run progression spawn sequence interleaves weighted enemies early', () => {
+  const firstPhase = getRunPhaseByElapsedMs(0)
+  const sequence = flattenRunPhaseEntries(firstPhase)
+
+  assert.equal(sequence.length, 19)
+  assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
 })
 
 test('hud places enemy spawn odds beside the game title for visibility', () => {
