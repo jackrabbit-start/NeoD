@@ -205,7 +205,7 @@ export class HudController {
         <header class="hud-modal__header">
           <div>
             <p class="hud-modal__eyebrow">LEVEL UP</p>
-            <h2>패시브 카드를 선택하세요</h2>
+            <h2>레벨업 카드를 선택하세요</h2>
           </div>
         </header>
         <div class="hud-modal__list hud-modal__list--stage" data-region="passives"></div>

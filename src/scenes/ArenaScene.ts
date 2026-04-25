@@ -98,6 +98,7 @@ import {
   getPassiveEnemyDamageMultiplier,
   getPassiveIncomingDamageMultiplier,
   getPassiveCardChoices,
+  getPassivePlayerXpMultiplier,
   getPassivePachinkoActiveWeaponWeightMultiplier,
   getPassivePachinkoNonActiveWeaponWeightMultiplier,
   getPassiveHeartHealMultiplier,
@@ -109,7 +110,8 @@ import {
   type PassiveState,
 } from '../systems/passives.js'
 import {
-  applyEnemyPlayerXp,
+  applyPlayerXp,
+  getPlayerXpForEnemy,
   getPlayerProgressionView,
   type PlayerProgressionResult,
   type PlayerProgressionState,
@@ -2903,7 +2905,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private grantPlayerXpForEnemy(enemyId: EnemyDefinition['id']): PlayerProgressionResult {
     const previousMaxHealth = this.playerMaxHealth
-    const result = applyEnemyPlayerXp(this.playerProgression, enemyId)
+    const result = applyPlayerXp(
+      this.playerProgression,
+      Math.round(getPlayerXpForEnemy(enemyId) * getPassivePlayerXpMultiplier(this.passiveState)),
+    )
     this.playerProgression = result.state
     this.syncPlayerLevelStats(previousMaxHealth)
     this.syncPlayerHealthBar()
@@ -3114,14 +3119,14 @@ export class ArenaScene extends Phaser.Scene {
       this.getActiveWeaponId(),
     )
     if (this.pendingPassiveChoices.length === 0) {
-      this.statusMessage = `Lv.${level} 달성! 패시브 후보를 만들지 못해 전투를 계속합니다.`
+      this.statusMessage = `Lv.${level} 달성! 레벨업 카드 후보를 만들지 못해 전투를 계속합니다.`
       this.updateHud()
       return
     }
 
     this.isPassiveSelectionOpen = true
     this.applyInteractionPause(true)
-    this.statusMessage = `Lv.${level} 달성! 패시브 카드 1장을 선택하세요.`
+    this.statusMessage = `Lv.${level} 달성! 레벨업 카드 1장을 선택하세요.`
     this.updateHud()
   }
 
@@ -3159,7 +3164,7 @@ export class ArenaScene extends Phaser.Scene {
     this.isPassiveSelectionOpen = false
     this.pendingPassiveChoices = []
     this.applyInteractionPause(false)
-    this.statusMessage = `패시브 선택: ${selected.name} · ${selected.effectSummary}`
+    this.statusMessage = `레벨업 카드 선택: ${selected.name} · ${selected.effectSummary}`
     this.updateHud()
   }
 

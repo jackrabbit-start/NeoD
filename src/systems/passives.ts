@@ -13,6 +13,7 @@ interface PassiveEffects {
   critChanceDelta?: number
   critDamageMultiplierDelta?: number
   playerSpeedMultiplier?: number
+  playerXpMultiplier?: number
   tokenXpMultiplier?: number
   incomingDamageMultiplier?: number
   bossDamageMultiplier?: number
@@ -26,7 +27,7 @@ interface PassiveEffects {
 }
 
 export type PassiveCardGrade = 'common' | 'rare' | 'epic' | 'legendary'
-export type PassiveCardKind = 'general' | 'weapon-specialized'
+export type PassiveCardKind = 'passive' | 'general' | 'weapon-specialized'
 
 export interface PassiveCardChoice {
   id: PassiveCardId
@@ -56,6 +57,8 @@ interface PassiveCardTemplate {
   name: string
   description: string
   kind?: PassiveCardKind
+  weaponId?: WeaponId
+  maxCount?: number
   preferredFamilies?: PachinkoWeaponFamily[]
   weight: {
     base: number
@@ -127,7 +130,8 @@ const PASSIVE_GRADE_LABELS: Record<PassiveCardGrade, string> = {
 }
 
 const PASSIVE_KIND_LABELS: Record<PassiveCardKind, string> = {
-  general: '일반 패시브',
+  passive: '패시브',
+  general: '일반 카드',
   'weapon-specialized': '무기 특화',
 }
 
@@ -135,8 +139,8 @@ const PASSIVE_CARD_TEMPLATES = [
   {
     id: 'rapid-trigger',
     name: '속사 트리거',
-    description: '모든 무기의 공격 주기가 짧아집니다.',
-    kind: 'weapon-specialized',
+    description: '전반적인 공격 주기가 짧아집니다.',
+    kind: 'passive',
     preferredFamilies: ['rapid', 'starter'],
     weight: { base: 1.25, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.52 },
     roll(level, random) {
@@ -149,7 +153,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'keen-sense',
     name: '예리한 감각',
     description: '약점을 노려 치명타가 발생할 수 있습니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['precision', 'rapid'],
     weight: { base: 1.12, levelScale: 0.018, repeatPenalty: 0.42, familyBonus: 0.44 },
     roll(level, random) {
@@ -162,7 +166,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'big-hit',
     name: '한방 각',
     description: '치명타가 더 크게 터집니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['heavy', 'precision'],
     weight: { base: 0.9, levelScale: 0.02, repeatPenalty: 0.5, familyBonus: 0.46 },
     roll(level, random) {
@@ -175,7 +179,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'long-barrel',
     name: '롱배럴 감성',
     description: '투사체 속도와 사거리가 늘어납니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['pierce', 'precision', 'rapid'],
     weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.5 },
     roll(level, random) {
@@ -196,7 +200,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'heavy-push',
     name: '묵직한 밀어내기',
     description: '무기 충격이 강해져 적을 더 잘 밀어냅니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['heavy', 'melee'],
     weight: { base: 0.9, levelScale: 0.018, repeatPenalty: 0.45, familyBonus: 0.5 },
     roll(level, random) {
@@ -217,7 +221,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'wide-zone',
     name: '영역 장악',
     description: '장판과 근접 범위가 넓어져 공간을 더 잘 지킵니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['spray', 'zone', 'melee'],
     weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.56 },
     roll(level, random) {
@@ -238,7 +242,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'split-focus',
     name: '분산 집중',
     description: '분사형·연발형 무기가 투사체를 더 뿌립니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['spray', 'zone'],
     weight: { base: 0.82, levelScale: 0.03, repeatPenalty: 0.55, familyBonus: 0.72 },
     roll(level, random) {
@@ -391,7 +395,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'lane-reading',
     name: '레인 리딩',
     description: '파친코 흐름을 읽듯 장거리 화력과 투사체 제어가 좋아집니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['pierce', 'precision', 'rapid'],
     weight: { base: 0.86, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.52 },
     roll(level, random) {
@@ -472,7 +476,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'steady-hands',
     name: '스테디 핸즈',
     description: '반동을 다듬듯 명중 안정성과 화력을 함께 끌어올립니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['precision', 'pierce', 'rapid'],
     weight: { base: 0.9, levelScale: 0.016, repeatPenalty: 0.4, familyBonus: 0.48 },
     roll(level, random) {
@@ -576,7 +580,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'needle-lattice',
     name: '니들 래티스',
     description: '관통/정밀 계열 무기가 더 빠르고 치명적으로 박힙니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['pierce', 'precision'],
     weight: { base: 0.78, levelScale: 0.022, repeatPenalty: 0.46, familyBonus: 0.74 },
     roll(level, random) {
@@ -597,7 +601,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'arc-echo',
     name: '아크 에코',
     description: '연쇄/속사 계열 무기가 리듬을 타며 화력을 더 뽑아냅니다.',
-    kind: 'weapon-specialized',
+    kind: 'passive',
     preferredFamilies: ['chain', 'rapid'],
     weight: { base: 0.78, levelScale: 0.022, repeatPenalty: 0.46, familyBonus: 0.72 },
     roll(level, random) {
@@ -634,9 +638,270 @@ const PASSIVE_CARD_TEMPLATES = [
       }
     },
   },
+  {
+    id: 'growth-cache',
+    name: '성장 캐시',
+    description: '캐릭터 경험치를 더 끌어모아 레벨업 타이밍을 앞당깁니다.',
+    kind: 'general',
+    preferredFamilies: ['starter', 'rapid', 'melee'],
+    weight: { base: 0.9, levelScale: 0.024, repeatPenalty: 0.34, familyBonus: 0.36 },
+    roll(level, random) {
+      const [xpMin, xpMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.28)
+      const [moveMin, moveMax] = createLevelScaledPercentRange(0.01, 0.04, level, 0.002, 0.08)
+      const xp = rollNumber(random, xpMin, xpMax, 2)
+      const move = rollNumber(random, moveMin, moveMax, 2)
+      return {
+        effects: {
+          playerXpMultiplier: 1 + xp.value,
+          playerSpeedMultiplier: 1 + move.value,
+        },
+        quality: averageQuality(xp.quality, move.quality),
+      }
+    },
+  },
+  {
+    id: 'token-dividend',
+    name: '토큰 배당',
+    description: '파친코 토큰 보상을 조금 더 크게 받아 런의 눈덩이를 키웁니다.',
+    kind: 'general',
+    preferredFamilies: ['rapid', 'zone', 'heavy'],
+    weight: { base: 0.84, levelScale: 0.022, repeatPenalty: 0.38, familyBonus: 0.4 },
+    roll(level, random) {
+      const [tokenMin, tokenMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.28)
+      const token = rollNumber(random, tokenMin, tokenMax, 2)
+      return {
+        effects: {
+          tokenXpMultiplier: 1 + token.value,
+          pachinkoActiveWeaponWeightMultiplier: 1 + Math.max(0.02, token.value * 0.35),
+        },
+        quality: token.quality,
+      }
+    },
+  },
 ] as const satisfies ReadonlyArray<PassiveCardTemplate>
 
-export type PassiveCardId = (typeof PASSIVE_CARD_TEMPLATES)[number]['id']
+const WEAPON_SPECIALIZATION_TEMPLATES = [
+  {
+    id: 'starter-blaster-special',
+    weaponId: 'starter-blaster',
+    name: '꾹누름 과열',
+    description: '탄막 기관총이 더 오래 이어지며 연사 리듬이 빨라집니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.1, levelScale: 0.02, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [fireMin, fireMax] = createLevelScaledPercentRange(0.05, 0.1, level, 0.004, 0.18)
+      const [countMin, countMax] = [1, getLevelTier(level) >= 2 ? 2 : 1]
+      const fire = rollNumber(random, fireMin, fireMax, 2)
+      const burst = rollNumber(random, countMin, countMax)
+      return {
+        effects: {
+          fireRateMultiplier: 1 - fire.value,
+          projectileCountDelta: burst.value,
+        },
+        quality: averageQuality(fire.quality, burst.quality),
+      }
+    },
+  },
+  {
+    id: 'acid-sprayer-special',
+    weaponId: 'acid-sprayer',
+    name: '구토 역류',
+    description: '산성 분사기가 더 넓게 퍼지고 오염 지대가 크게 남습니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.1, levelScale: 0.02, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [radiusMin, radiusMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
+      const radius = rollNumber(random, radiusMin, radiusMax, 2)
+      const extra = rollNumber(random, 1, getLevelTier(level) >= 2 ? 2 : 1)
+      return {
+        effects: {
+          hazardRadiusMultiplier: 1 + radius.value,
+          projectileCountDelta: extra.value,
+        },
+        quality: averageQuality(radius.quality, extra.quality),
+      }
+    },
+  },
+  {
+    id: 'frost-lance-special',
+    weaponId: 'frost-lance',
+    name: '불안정 탄두',
+    description: '로켓포의 폭발 반경과 직격 피해가 함께 커집니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.06, levelScale: 0.022, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.06, 0.12, level, 0.005, 0.2)
+      const rangeTier = getLevelTier(level)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      const range = rollNumber(random, 12 + rangeTier * 3, 22 + rangeTier * 4)
+      return {
+        effects: {
+          damageMultiplier: 1 + damage.value,
+          rangeDelta: range.value,
+        },
+        quality: averageQuality(damage.quality, range.quality),
+      }
+    },
+  },
+  {
+    id: 'storm-cannon-special',
+    weaponId: 'storm-cannon',
+    name: '골목 쓸기',
+    description: '산탄포가 한 번에 더 넓게 퍼지고 근접 제압력이 올라갑니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.14)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      const extra = rollNumber(random, 1, getLevelTier(level) >= 2 ? 2 : 1)
+      return {
+        effects: {
+          damageMultiplier: 1 + damage.value,
+          projectileCountDelta: extra.value,
+        },
+        quality: averageQuality(damage.quality, extra.quality),
+      }
+    },
+  },
+  {
+    id: 'arc-loom-special',
+    weaponId: 'arc-loom',
+    name: '강슛 반사',
+    description: '축구공이 더 멀리 튕기고 공이 살아있는 시간이 늘어납니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.04, levelScale: 0.02, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [speedMin, speedMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.14)
+      const speed = rollNumber(random, speedMin, speedMax, 2)
+      const range = rollNumber(random, 12 + getLevelTier(level) * 2, 22 + getLevelTier(level) * 3)
+      return {
+        effects: {
+          projectileSpeedMultiplier: 1 + speed.value,
+          rangeDelta: range.value,
+        },
+        quality: averageQuality(speed.quality, range.quality),
+      }
+    },
+  },
+  {
+    id: 'spark-carbine-special',
+    weaponId: 'spark-carbine',
+    name: '노드 확장',
+    description: '감시 포탑의 배치 수와 사거리를 밀어 설치 유지력을 높입니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.06, levelScale: 0.02, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const range = rollNumber(random, 16 + getLevelTier(level) * 3, 28 + getLevelTier(level) * 4)
+      const extra = rollNumber(random, 1, 1)
+      return {
+        effects: {
+          rangeDelta: range.value,
+          projectileCountDelta: extra.value,
+        },
+        quality: averageQuality(range.quality, extra.quality),
+      }
+    },
+  },
+  {
+    id: 'mist-vortex-special',
+    weaponId: 'mist-vortex',
+    name: '문장 증폭',
+    description: '컴파일러 함정의 폭발 범위와 위력이 함께 올라갑니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [radiusMin, radiusMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.24)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.14)
+      const radius = rollNumber(random, radiusMin, radiusMax, 2)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      return {
+        effects: {
+          hazardRadiusMultiplier: 1 + radius.value,
+          damageMultiplier: 1 + damage.value,
+        },
+        quality: averageQuality(radius.quality, damage.quality),
+      }
+    },
+  },
+  {
+    id: 'slime-glaive-special',
+    weaponId: 'slime-glaive',
+    name: '사막의 포식',
+    description: '레넥톤 손맛의 회전 반경과 버티는 화력을 동시에 올려줍니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.04, levelScale: 0.022, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.05, 0.1, level, 0.004, 0.16)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      const range = rollNumber(random, 10 + getLevelTier(level) * 2, 18 + getLevelTier(level) * 3)
+      return {
+        effects: {
+          damageMultiplier: 1 + damage.value,
+          rangeDelta: range.value,
+        },
+        quality: averageQuality(damage.quality, range.quality),
+      }
+    },
+  },
+  {
+    id: 'prism-cutter-special',
+    weaponId: 'prism-cutter',
+    name: '골목 연장전',
+    description: '주먹 콤보의 마지막 휩쓸기가 더 세지고 연속기 간격이 빨라집니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [fireMin, fireMax] = createLevelScaledPercentRange(0.05, 0.1, level, 0.004, 0.16)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.12)
+      const fire = rollNumber(random, fireMin, fireMax, 2)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      return {
+        effects: {
+          fireRateMultiplier: 1 - fire.value,
+          damageMultiplier: 1 + damage.value,
+        },
+        quality: averageQuality(fire.quality, damage.quality),
+      }
+    },
+  },
+  {
+    id: 'needle-fan-special',
+    weaponId: 'needle-fan',
+    name: '야근 충원',
+    description: '재생술사의 마무리 각과 되살린 병력 운영이 더 매끄러워집니다.',
+    kind: 'weapon-specialized',
+    maxCount: 2,
+    weight: { base: 1.06, levelScale: 0.02, repeatPenalty: 0.8 },
+    roll(level, random) {
+      const [speedMin, speedMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.004, 0.14)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.03, 0.06, level, 0.003, 0.1)
+      const speed = rollNumber(random, speedMin, speedMax, 2)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      return {
+        effects: {
+          projectileSpeedMultiplier: 1 + speed.value,
+          damageMultiplier: 1 + damage.value,
+        },
+        quality: averageQuality(speed.quality, damage.quality),
+      }
+    },
+  },
+] as const satisfies ReadonlyArray<PassiveCardTemplate>
+
+type BasePassiveCardId = (typeof PASSIVE_CARD_TEMPLATES)[number]['id']
+type WeaponSpecializationCardId = (typeof WEAPON_SPECIALIZATION_TEMPLATES)[number]['id']
+export type PassiveCardId = BasePassiveCardId | WeaponSpecializationCardId
+const ALL_PASSIVE_CARD_TEMPLATES = [...PASSIVE_CARD_TEMPLATES, ...WEAPON_SPECIALIZATION_TEMPLATES] as const
+
 export type PassiveState = Partial<Record<PassiveCardId, PassiveStateEntry>>
 export type PassiveCardDefinition = PassiveCardChoice
 
@@ -651,6 +916,7 @@ export interface PassiveTotals {
   critChance: number
   critDamageMultiplier: number
   playerSpeedMultiplier: number
+  playerXpMultiplier: number
   tokenXpMultiplier: number
   incomingDamageMultiplier: number
   bossDamageMultiplier: number
@@ -677,11 +943,19 @@ export function createInitialPassiveState(): PassiveState {
 }
 
 function getPassiveTemplate(id: PassiveCardId): PassiveCardTemplate {
-  const definition = PASSIVE_CARD_TEMPLATES.find((card) => card.id === id)
+  const definition = ALL_PASSIVE_CARD_TEMPLATES.find((card) => card.id === id)
   if (!definition) {
     throw new Error(`Unknown passive card: ${id}`)
   }
   return definition
+}
+
+function isTemplateCapped(template: PassiveCardTemplate, state: PassiveState = {}): boolean {
+  if (!template.maxCount) {
+    return false
+  }
+
+  return (state[template.id as PassiveCardId]?.count ?? 0) >= template.maxCount
 }
 
 export function getPassiveGradeLabel(grade: PassiveCardGrade): string {
@@ -724,6 +998,9 @@ function formatEffectSummary(effects: PassiveEffects): string {
   }
   if (effects.playerSpeedMultiplier !== undefined && effects.playerSpeedMultiplier > 1) {
     lines.push(`이동속도 +${roundPercent(effects.playerSpeedMultiplier - 1)}%`)
+  }
+  if (effects.playerXpMultiplier !== undefined && effects.playerXpMultiplier > 1) {
+    lines.push(`캐릭터 XP +${roundPercent(effects.playerXpMultiplier - 1)}%`)
   }
   if (effects.tokenXpMultiplier !== undefined && effects.tokenXpMultiplier > 1) {
     lines.push(`토큰 XP +${roundPercent(effects.tokenXpMultiplier - 1)}%`)
@@ -771,6 +1048,7 @@ function mergeEffects(existing: PassiveEffects = {}, next: PassiveEffects): Pass
     critChanceDelta: (existing.critChanceDelta ?? 0) + (next.critChanceDelta ?? 0),
     critDamageMultiplierDelta: (existing.critDamageMultiplierDelta ?? 0) + (next.critDamageMultiplierDelta ?? 0),
     playerSpeedMultiplier: (existing.playerSpeedMultiplier ?? 1) * (next.playerSpeedMultiplier ?? 1),
+    playerXpMultiplier: (existing.playerXpMultiplier ?? 1) * (next.playerXpMultiplier ?? 1),
     tokenXpMultiplier: (existing.tokenXpMultiplier ?? 1) * (next.tokenXpMultiplier ?? 1),
     incomingDamageMultiplier: (existing.incomingDamageMultiplier ?? 1) * (next.incomingDamageMultiplier ?? 1),
     bossDamageMultiplier: (existing.bossDamageMultiplier ?? 1) * (next.bossDamageMultiplier ?? 1),
@@ -799,17 +1077,21 @@ export function createPassiveCardChoice(
   const template = getPassiveTemplate(id)
   const roll = template.roll(level, random)
   const grade = gradeFromQuality(roll.quality)
-  const kind = template.kind ?? 'general'
+  const kind = template.kind ?? 'passive'
   const activeFamily = activeWeaponId ? getPachinkoWeaponFamily(activeWeaponId) : null
+  const specializationWeaponId = template.weaponId ?? activeWeaponId
+  const limitLabel = template.maxCount ? ` · 최대 ${template.maxCount}회` : ''
   const iconKey =
-    kind === 'weapon-specialized' && activeWeaponId && activeFamily && template.preferredFamilies?.includes(activeFamily)
-      ? `weapon-${activeWeaponId}`
+    kind === 'weapon-specialized' && specializationWeaponId
+      ? `weapon-${specializationWeaponId}`
+      : activeWeaponId && activeFamily && template.preferredFamilies?.includes(activeFamily)
+        ? `weapon-${activeWeaponId}`
       : undefined
   return {
     id,
     name: template.name,
-    description: template.description,
-    effectSummary: formatEffectSummary(roll.effects),
+    description: `${template.description}${limitLabel}`,
+    effectSummary: `${formatEffectSummary(roll.effects)}${limitLabel}`,
     effects: roll.effects,
     kind,
     kindLabel: getPassiveKindLabel(kind),
@@ -825,6 +1107,10 @@ function getPassiveCardWeight(
   state: PassiveState,
   activeWeaponId?: WeaponId,
 ): number {
+  if (template.weaponId && template.weaponId !== activeWeaponId) {
+    return 0
+  }
+
   const ownedCount = state[template.id as PassiveCardId]?.count ?? 0
   const tier = getLevelTier(level)
   const levelScale = template.weight.levelScale ?? 0
@@ -863,6 +1149,10 @@ function pickWeightedTemplate(
 }
 
 export function addPassiveCard(state: PassiveState, choice: PassiveCardChoice): PassiveState {
+  const template = getPassiveTemplate(choice.id)
+  if (template.maxCount && (state[choice.id]?.count ?? 0) >= template.maxCount) {
+    return state
+  }
   const previous = state[choice.id]
   return {
     ...state,
@@ -879,15 +1169,23 @@ export function getPassiveCardChoices(
   random: () => number = Math.random,
   activeWeaponId?: WeaponId,
 ): PassiveCardChoice[] {
-  const remaining = [...PASSIVE_CARD_TEMPLATES]
   const picks: PassiveCardChoice[] = []
+  const remainingBase = PASSIVE_CARD_TEMPLATES.filter((template) => !isTemplateCapped(template, state))
+  const remainingWeaponSpecialized = activeWeaponId
+    ? WEAPON_SPECIALIZATION_TEMPLATES.filter((template) => template.weaponId === activeWeaponId && !isTemplateCapped(template, state))
+    : []
 
-  while (remaining.length > 0 && picks.length < 3) {
-    const template = pickWeightedTemplate(remaining, level, state, random, activeWeaponId)
+  if (remainingWeaponSpecialized.length > 0) {
+    const specialization = pickWeightedTemplate(remainingWeaponSpecialized, level, state, random, activeWeaponId)
+    picks.push(createPassiveCardChoice(specialization.id as PassiveCardId, level, random, activeWeaponId))
+  }
+
+  while (remainingBase.length > 0 && picks.length < 3) {
+    const template = pickWeightedTemplate(remainingBase, level, state, random, activeWeaponId)
     picks.push(createPassiveCardChoice(template.id as PassiveCardId, level, random, activeWeaponId))
-    const index = remaining.findIndex((entry) => entry.id === template.id)
+    const index = remainingBase.findIndex((entry) => entry.id === template.id)
     if (index >= 0) {
-      remaining.splice(index, 1)
+      remainingBase.splice(index, 1)
     }
   }
 
@@ -906,6 +1204,7 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     critChance: 0,
     critDamageMultiplier: BASE_CRIT_DAMAGE_MULTIPLIER,
     playerSpeedMultiplier: 1,
+    playerXpMultiplier: 1,
     tokenXpMultiplier: 1,
     incomingDamageMultiplier: 1,
     bossDamageMultiplier: 1,
@@ -934,6 +1233,7 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     totals.critChance += effects.critChanceDelta ?? 0
     totals.critDamageMultiplier += effects.critDamageMultiplierDelta ?? 0
     totals.playerSpeedMultiplier *= effects.playerSpeedMultiplier ?? 1
+    totals.playerXpMultiplier *= effects.playerXpMultiplier ?? 1
     totals.tokenXpMultiplier *= effects.tokenXpMultiplier ?? 1
     totals.incomingDamageMultiplier *= effects.incomingDamageMultiplier ?? 1
     totals.bossDamageMultiplier *= effects.bossDamageMultiplier ?? 1
@@ -1059,6 +1359,10 @@ export function applyPassivePlayerSpeed(baseSpeed: number, state: PassiveState =
 
 export function getPassiveIncomingDamageMultiplier(state: PassiveState = {}): number {
   return getPassiveTotals(state).incomingDamageMultiplier
+}
+
+export function getPassivePlayerXpMultiplier(state: PassiveState = {}): number {
+  return getPassiveTotals(state).playerXpMultiplier
 }
 
 export function getPassiveTokenXpMultiplier(state: PassiveState = {}): number {
