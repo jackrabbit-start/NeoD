@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/combine.js'
+import { getCodexState } from '../.tmp-test/src/systems/codex.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
@@ -11,7 +12,7 @@ import {
   getActionableRecipes,
   seedOwnedWeapons,
 } from '../.tmp-test/src/systems/weaponOwnership.js'
-import { isBossWaveReady, shouldAdvanceWave } from '../.tmp-test/src/systems/waves.js'
+import { getWaveByIndex, isBossWaveReady, shouldAdvanceWave } from '../.tmp-test/src/systems/waves.js'
 
 test('weighted drops only return configured loot ids', () => {
   const result = resolveWeightedDrop(
@@ -41,6 +42,21 @@ test('combine resolves only when the required inputs exist', () => {
   assert.deepEqual(combined?.nextInventory, {})
 })
 
+test('new arc recipe resolves from the new sample drops', () => {
+  let inventory = {}
+  inventory = addItem(inventory, 'spark-knot')
+  inventory = addItem(inventory, 'mist-bead')
+
+  const availableRecipes = getAvailableRecipes(inventory)
+  assert.equal(availableRecipes.length, 1)
+  assert.equal(availableRecipes[0]?.recipe.id, 'arc-loom-recipe')
+
+  const combined = resolveCombine(inventory, 'arc-loom-recipe')
+  assert.ok(combined)
+  assert.equal(combined?.weaponId, 'arc-loom')
+  assert.deepEqual(combined?.nextInventory, {})
+})
+
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
@@ -65,7 +81,6 @@ test('applying a recipe selection adds ownership and auto-equips the new weapon'
         'acid-core': 1,
       },
       ownedWeaponIds: ['starter-blaster'],
-      activeWeaponId: 'starter-blaster',
     },
     'acid-sprayer-recipe',
   )
@@ -76,6 +91,23 @@ test('applying a recipe selection adds ownership and auto-equips the new weapon'
   assert.equal(result?.activeWeaponId, 'acid-sprayer')
 })
 
+test('new recipe selection adds the new owned weapon path', () => {
+  const result = applyRecipeSelection(
+    {
+      inventory: {
+        'spark-knot': 1,
+        'mist-bead': 1,
+      },
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'arc-loom-recipe',
+  )
+
+  assert.ok(result)
+  assert.deepEqual(result?.ownedWeaponIds, ['starter-blaster', 'arc-loom'])
+  assert.equal(result?.activeWeaponId, 'arc-loom')
+})
+
 test('duplicate-output recipe selections do not consume inventory', () => {
   const result = applyRecipeSelection(
     {
@@ -84,7 +116,6 @@ test('duplicate-output recipe selections do not consume inventory', () => {
         'acid-core': 1,
       },
       ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
-      activeWeaponId: 'starter-blaster',
     },
     'acid-sprayer-recipe',
   )
@@ -114,6 +145,32 @@ test('boss trigger stays behind the final regular wave', () => {
   assert.equal(isBossWaveReady(1), false)
   assert.equal(isBossWaveReady(2), false)
   assert.equal(isBossWaveReady(3), true)
+})
+
+test('third wave exposes the new slime-family sample enemy', () => {
+  assert.equal(getWaveByIndex(2)?.enemyId, 'spark-slime')
+})
+
+test('codex selectors expose shared items, recipes, and enemies', () => {
+  const codex = getCodexState(true)
+
+  assert.equal(codex.isOpen, true)
+  assert.equal(codex.items.length, 5)
+  assert.equal(codex.recipes.length, 4)
+  assert.equal(codex.enemies.length, 3)
+
+  const arcRecipe = codex.recipes.find((recipe) => recipe.id === 'arc-loom-recipe')
+  assert.deepEqual(
+    arcRecipe?.inputs.map((input) => input.id),
+    ['spark-knot', 'mist-bead'],
+  )
+
+  const voltSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
+  assert.ok(voltSlime)
+  assert.deepEqual(
+    voltSlime?.drops.map((drop) => drop.id),
+    ['spark-knot', 'mist-bead', 'frost-mote'],
+  )
 })
 
 test('enemy health bar metrics clamp across enemy sizes', () => {

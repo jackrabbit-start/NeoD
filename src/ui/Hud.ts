@@ -4,13 +4,14 @@ import type {
   HudOwnedWeaponView,
   HudRecipeView,
   HudState,
+  RecipeId,
   WeaponId,
 } from '../domain/types.js'
 
 export interface HudControllerHandlers {
   onInventoryToggle: () => void
   onInventoryClose: () => void
-  onRecipeSelect: (recipeId: string) => void
+  onRecipeSelect: (recipeId: RecipeId) => void
   onWeaponEquip: (weaponId: WeaponId) => void
 }
 
@@ -153,7 +154,7 @@ export class HudController {
         this.handlers.onInventoryClose()
         break
       case 'recipe-select': {
-        const recipeId = actionTarget.dataset.recipeId
+        const recipeId = actionTarget.dataset.recipeId as RecipeId | undefined
         if (recipeId) {
           this.handlers.onRecipeSelect(recipeId)
         }

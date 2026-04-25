@@ -37,4 +37,13 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectileSpeed: 560,
     projectileTint: 0xd4b5ff,
   },
+  'arc-loom': {
+    id: 'arc-loom',
+    name: 'Arc Loom',
+    description: 'Weaves static pulses into quick chained bursts.',
+    damage: 24,
+    fireRateMs: 175,
+    projectileSpeed: 590,
+    projectileTint: 0xffd866,
+  },
 }

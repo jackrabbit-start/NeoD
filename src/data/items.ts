@@ -1,6 +1,6 @@
 import type { ItemDefinition, LootId } from '../domain/types.js'
 
-export const ITEM_DEFINITIONS: Record<LootId, ItemDefinition> = {
+export const ITEM_DEFINITIONS = {
   'gel-shard': {
     id: 'gel-shard',
     name: 'Gel Shard',
@@ -19,4 +19,16 @@ export const ITEM_DEFINITIONS: Record<LootId, ItemDefinition> = {
     description: 'Chilled essence that sharpens projectile focus.',
     color: 0x83d5ff,
   },
-}
+  'spark-knot': {
+    id: 'spark-knot',
+    name: 'Spark Knot',
+    description: 'A bright tangle of charged slime fiber.',
+    color: 0xffd866,
+  },
+  'mist-bead': {
+    id: 'mist-bead',
+    name: 'Mist Bead',
+    description: 'A cool droplet that stabilizes volatile reactions.',
+    color: 0xc4f1ff,
+  },
+} as const satisfies Record<LootId, ItemDefinition>
