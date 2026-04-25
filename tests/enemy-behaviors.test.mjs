@@ -208,10 +208,12 @@ test('spread-burst enemy projectiles fan around the target vector', () => {
   assert.equal(shouldEnemyStartSpreadBurst(attackBehavior, attackBehavior.range + 1, 0), false)
   assert.equal(shouldEnemyStartSpreadBurst(attackBehavior, attackBehavior.range, 1), false)
   assert.equal(projectiles.length, attackBehavior.projectileCount)
-  assert.equal(projectiles[2]?.direction.x, 1)
-  assert.equal(projectiles[2]?.direction.y, 0)
   assert.ok((projectiles[0]?.direction.y ?? 0) < 0)
   assert.ok((projectiles.at(-1)?.direction.y ?? 0) > 0)
+  assert.equal(
+    Math.round(Math.abs(projectiles[0]?.direction.x ?? 0) * 1000),
+    Math.round(Math.abs(projectiles.at(-1)?.direction.x ?? 0) * 1000),
+  )
   assert.equal(
     Math.round(Math.abs(projectiles[0]?.direction.y ?? 0) * 1000),
     Math.round(Math.abs(projectiles.at(-1)?.direction.y ?? 0) * 1000),
@@ -259,14 +261,14 @@ test('radial-burst helper emits evenly distributed danger around the caster', ()
   assert.equal(shouldEnemyStartRadialBurst(attackBehavior, attackBehavior.range, 1), false)
   assert.equal(projectiles.length, attackBehavior.projectileCount)
   assert.deepEqual(projectiles[0]?.direction, { x: 1, y: 0 })
+  assert.deepEqual(projectiles[1] && {
+    x: Math.round(projectiles[1].direction.x * 10) / 10,
+    y: Math.round(projectiles[1].direction.y * 10) / 10,
+  }, { x: -0.5, y: 0.9 })
   assert.deepEqual(projectiles[2] && {
-    x: Math.round(projectiles[2].direction.x),
-    y: Math.round(projectiles[2].direction.y),
-  }, { x: 0, y: 1 })
-  assert.deepEqual(projectiles[4] && {
-    x: Math.round(projectiles[4].direction.x),
-    y: Math.round(projectiles[4].direction.y),
-  }, { x: -1, y: 0 })
+    x: Math.round(projectiles[2].direction.x * 10) / 10,
+    y: Math.round(projectiles[2].direction.y * 10) / 10,
+  }, { x: -0.5, y: -0.9 })
 })
 
 test('circle hit test and codex enemy summary expose the new enemy identities', () => {
