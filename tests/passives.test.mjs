@@ -58,7 +58,7 @@ test('active weapon always gets its own specialization card until the cap is rea
   const specialized = choices.find((choice) => choice.kind === 'weapon-specialized')
   assert.ok(specialized)
   assert.equal(specialized?.id, 'slime-glaive-special')
-  assert.match(specialized?.description ?? '', /최대 1회/)
+  assert.match(specialized?.description ?? '', /최대 10회/)
   assert.equal(specialized?.iconKey, 'weapon-slime-glaive')
 
   let cappedState = {}
@@ -69,7 +69,7 @@ test('active weapon always gets its own specialization card until the cap is rea
   cappedState = addPassiveCard(cappedState, second)
   cappedState = addPassiveCard(cappedState, third)
 
-  assert.equal(cappedState['slime-glaive-special']?.count, 1)
+  assert.equal(cappedState['slime-glaive-special']?.count, 3)
 
   const cappedChoices = getPassiveCardChoices(
     9,
@@ -77,7 +77,7 @@ test('active weapon always gets its own specialization card until the cap is rea
     createSequenceRandom([0.2, 0.4, 0.6, 0.8, 0.1, 0.3]),
     'slime-glaive',
   )
-  assert.equal(cappedChoices.some((choice) => choice.id === 'slime-glaive-special'), false)
+  assert.equal(cappedChoices.some((choice) => choice.id === 'slime-glaive-special'), true)
 })
 
 test('passives modify hazard, burst, impact, and melee behavior safely with rolled values', () => {
@@ -242,19 +242,29 @@ test('card categories keep loot utility in general and combat scaling in passive
   assert.equal(status.kind, 'passive')
 })
 
-test('base cards also stop stacking after the lowered shared cap', () => {
+test('general cards stop stacking after the raised shared cap while passives remain uncapped', () => {
   let state = {}
   const first = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
   const second = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
   const third = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
   const fourth = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
+  const fifth = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
+  const sixth = createPassiveCardChoice('runner-instinct', 8, createSequenceRandom([0.6]))
 
   state = addPassiveCard(state, first)
   state = addPassiveCard(state, second)
   state = addPassiveCard(state, third)
   state = addPassiveCard(state, fourth)
+  state = addPassiveCard(state, fifth)
+  state = addPassiveCard(state, sixth)
 
-  assert.equal(state['runner-instinct']?.count, 3)
+  assert.equal(state['runner-instinct']?.count, 5)
+
+  let passiveState = {}
+  for (let index = 0; index < 6; index += 1) {
+    passiveState = addPassiveCard(passiveState, createPassiveCardChoice('rapid-trigger', 8, createSequenceRandom([0.6])))
+  }
+  assert.equal(passiveState['rapid-trigger']?.count, 6)
 })
 
 test('new pachinko and enemy cards expose varied utility modifiers', () => {
