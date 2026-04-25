@@ -2933,23 +2933,26 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(depth + 1)
       .setScrollFactor(0)
 
+    const enemyOddsWidth = Math.min(viewport.width - x - 14, 430)
+    const enemyOddsX = x
+    const enemyOddsY = xpY + 19
     const enemyOddsBackground = this.add
-      .rectangle(viewport.width / 2, xpY + 19, Math.min(viewport.width - 28, 520), 21, 0x020713, 0.72)
-      .setOrigin(0.5)
+      .rectangle(enemyOddsX, enemyOddsY, enemyOddsWidth, 21, 0x020713, 0.72)
+      .setOrigin(0, 0.5)
       .setStrokeStyle(1, 0xffd866, 0.34)
       .setDepth(depth + 1)
       .setScrollFactor(0)
 
     const enemyOddsLabel = this.add
-      .text(viewport.width / 2, xpY + 19, '', {
+      .text(enemyOddsX + 8, enemyOddsY, '', {
         color: '#ffe28a',
         fontFamily: 'Inter, system-ui, sans-serif',
         fontSize: '10px',
         fontStyle: '900',
-        align: 'center',
-        wordWrap: { width: Math.min(viewport.width - 44, 500) },
+        align: 'left',
+        wordWrap: { width: enemyOddsWidth - 16 },
       })
-      .setOrigin(0.5)
+      .setOrigin(0, 0.5)
       .setDepth(depth + 2)
       .setScrollFactor(0)
       .setShadow(0, 1, '#020713', 3)

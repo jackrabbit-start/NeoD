@@ -151,6 +151,7 @@ export function getRunStageSelectionViews(currentElapsedMs: number): HudStageVie
     const entrySummary = phase.entries
       .map((entry) => `${ENEMY_DEFINITIONS[entry.enemyId]?.name ?? entry.enemyId} × ${entry.count}`)
       .join(' · ')
+    const pressureLabel = phase.label.split('·').at(-1)?.trim() ?? phase.stageLabel
     const finaleLabel = phase.startMs === FINAL_STAGE_START_MS
       ? '보스 결전'
       : `${phase.softEnemyCap}체 상한 · 체력 ×${phase.healthMultiplier}`
@@ -158,7 +159,7 @@ export function getRunStageSelectionViews(currentElapsedMs: number): HudStageVie
     return {
       index: phase.stageIndex,
       label: `${formatRunTime(phase.startMs)} · ${phase.stageLabel}`,
-      description: `${finaleLabel} · ${entrySummary}`,
+      description: `${pressureLabel} · ${finaleLabel} · ${entrySummary}`,
       isCurrent: phase.stageIndex === currentStageIndex,
       isBoss: phase.startMs === FINAL_STAGE_START_MS,
       startElapsedMs: phase.startMs,

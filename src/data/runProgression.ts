@@ -122,9 +122,9 @@ function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
 
   return {
     id: `minute-${String(phaseNumber).padStart(2, '0')}-${phaseIndex % 2 === 0 ? 'a' : 'b'}`,
-    label: `${phaseNumber}분 ${halfLabel} · ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
+    label: `Stage ${phaseNumber} ${halfLabel} · ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
     stageIndex,
-    stageLabel: `${phaseNumber}분 ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
+    stageLabel: `Stage ${phaseNumber}`,
     minuteIndex,
     startMs,
     durationMs: RUN_PHASE_DURATION_MS,
