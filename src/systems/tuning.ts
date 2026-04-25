@@ -1,6 +1,7 @@
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import type { InventoryState, WeaponDefinition, WeaponId, WeaponStar } from '../domain/types.js'
 import { consumeItems } from './inventory.js'
+import { getPlayerLevelCombatStats, type PlayerLevelCombatStats } from './playerScaling.js'
 
 export const TUNING_CAPSULE_ITEM_ID = 'tuning-capsule'
 export const STARTER_TUNING_INELIGIBLE_WEAPON_ID: WeaponId = 'starter-blaster'
@@ -49,6 +50,9 @@ export interface EffectiveWeaponStats extends WeaponDefinition {
   tuningEffectId?: TuningEffectId
   tuningLabel?: string
   star?: WeaponStar
+  playerLevel?: number
+  playerDamageMultiplier?: number
+  weaponSpecialTier?: number
 }
 
 export type RandomSource = () => number
@@ -109,11 +113,13 @@ export function deriveEffectiveWeaponStats(
   weaponId: WeaponId,
   tuningState: WeaponTuningState,
   star: WeaponStar = 1,
+  playerLevel = 1,
 ): EffectiveWeaponStats {
   const weapon = WEAPON_DEFINITIONS[weaponId]
   const effectId = tuningState[weaponId]
   const effect = TUNING_EFFECT_DEFINITIONS.find((candidate) => candidate.id === effectId)
   const starBonusSteps = Math.max(0, star - 1)
+  const playerStats = getPlayerLevelCombatStats(playerLevel)
   const tunedDamage = weapon.damage + (effect && 'damageDelta' in effect ? effect.damageDelta : 0)
   const tunedFireRateMs = Math.round(
     weapon.fireRateMs * (effect && 'fireRateMultiplier' in effect ? effect.fireRateMultiplier : 1),
@@ -125,16 +131,27 @@ export function deriveEffectiveWeaponStats(
         range: weapon.attackBehavior.range + effect.meleeRangeDelta,
       }
     : weapon.attackBehavior
-  const attackBehavior = baseAttackBehavior.kind === 'melee-cleave' && starBonusSteps > 0
-    ? {
-        ...baseAttackBehavior,
-        range: baseAttackBehavior.range + STAR_MELEE_RANGE_STEP * starBonusSteps,
-      }
-    : baseAttackBehavior
+  const attackBehavior = applyPlayerLevelWeaponMilestones(
+    baseAttackBehavior.kind === 'melee-cleave' && starBonusSteps > 0
+      ? {
+          ...baseAttackBehavior,
+          range: baseAttackBehavior.range + STAR_MELEE_RANGE_STEP * starBonusSteps,
+        }
+      : baseAttackBehavior,
+    playerStats,
+  )
+  const baseRange = typeof weapon.range === 'number'
+    ? Math.round(weapon.range * playerStats.weaponRangeMultiplier)
+    : weapon.range
 
   const effectiveWeapon: EffectiveWeaponStats = {
     ...weapon,
-    damage: Math.round(tunedDamage * (1 + STAR_DAMAGE_MULTIPLIER_STEP * starBonusSteps)),
+    range: baseRange,
+    damage: Math.round(
+      tunedDamage *
+      (1 + STAR_DAMAGE_MULTIPLIER_STEP * starBonusSteps) *
+      playerStats.damageMultiplier,
+    ),
     fireRateMs: Math.max(70, Math.round(tunedFireRateMs * (1 - STAR_FIRE_RATE_MULTIPLIER_STEP * starBonusSteps))),
     projectileSpeed: Math.round(tunedProjectileSpeed * (1 + STAR_PROJECTILE_SPEED_MULTIPLIER_STEP * starBonusSteps)),
     attackBehavior,
@@ -149,7 +166,64 @@ export function deriveEffectiveWeaponStats(
     effectiveWeapon.star = star
   }
 
+  if (playerStats.level > 1) {
+    effectiveWeapon.playerLevel = playerStats.level
+    effectiveWeapon.playerDamageMultiplier = playerStats.damageMultiplier
+  }
+
+  if (playerStats.weaponSpecialTier > 0) {
+    effectiveWeapon.weaponSpecialTier = playerStats.weaponSpecialTier
+  }
+
   return effectiveWeapon
+}
+
+function applyPlayerLevelWeaponMilestones(
+  behavior: WeaponDefinition['attackBehavior'],
+  playerStats: PlayerLevelCombatStats,
+): WeaponDefinition['attackBehavior'] {
+  const specialTier = playerStats.weaponSpecialTier
+
+  switch (behavior.kind) {
+    case 'single':
+      if (specialTier <= 0) {
+        return behavior
+      }
+
+      return {
+        kind: 'pierce',
+        projectileLifetimeMs: behavior.projectileLifetimeMs,
+        maxHits: 1 + specialTier,
+      }
+    case 'pierce':
+      return {
+        ...behavior,
+        maxHits: behavior.maxHits + specialTier,
+      }
+    case 'chain':
+      return {
+        ...behavior,
+        maxChains: behavior.maxChains + specialTier,
+        chainRange: Math.round(behavior.chainRange * playerStats.weaponRangeMultiplier),
+        chainFalloff: Math.max(0.35, behavior.chainFalloff - 0.03 * specialTier),
+      }
+    case 'spray-hazard':
+      return {
+        ...behavior,
+        projectileCount: behavior.projectileCount + specialTier,
+        hazardRadius: Math.round(behavior.hazardRadius * playerStats.weaponRangeMultiplier),
+        hazardDamage: Math.max(1, Math.round(behavior.hazardDamage * playerStats.damageMultiplier)),
+      }
+    case 'melee-cleave':
+      return {
+        ...behavior,
+        range: Math.round(behavior.range * playerStats.weaponRangeMultiplier),
+        arcDegrees: Math.min(160, behavior.arcDegrees + 6 * specialTier),
+        maxTargets: behavior.maxTargets + specialTier,
+      }
+    default:
+      return behavior
+  }
 }
 
 function selectTuningEffect(random: RandomSource): TuningEffectId {
