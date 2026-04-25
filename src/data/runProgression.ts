@@ -1,9 +1,9 @@
 import type { EnemyId, RunProgressionPhaseDefinition, RunSpawnEntryDefinition } from '../domain/types.js'
 
-export const RUN_PHASE_DURATION_MS = 60_000
-export const RUN_STAGE_DURATION_MS = RUN_PHASE_DURATION_MS
-export const RUN_DURATION_MS = 30 * RUN_PHASE_DURATION_MS
-export const FINAL_STAGE_START_MS = 25 * RUN_PHASE_DURATION_MS
+export const RUN_PHASE_DURATION_MS = 30_000
+export const RUN_STAGE_DURATION_MS = 60_000
+export const RUN_DURATION_MS = 30 * RUN_STAGE_DURATION_MS
+export const FINAL_STAGE_START_MS = 25 * RUN_STAGE_DURATION_MS
 
 const pressureNames = [
   '점액 적응',
@@ -90,22 +90,40 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
   return weights.filter((entry) => entry.count > 0)
 }
 
-function createPhase(minuteIndex: number): RunProgressionPhaseDefinition {
+function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
+  const minuteIndex = Math.floor(phaseIndex / 2)
+  const entries = entriesForMinute(minuteIndex).map((entry) => ({ ...entry }))
+  if (entries.length <= 1) {
+    return entries
+  }
+
+  const surgeIndex = (phaseIndex + minuteIndex) % entries.length
+  const surgeAmount = Math.max(1, Math.ceil((minuteIndex + 1) / 6))
+  entries[surgeIndex] = {
+    ...entries[surgeIndex],
+    count: entries[surgeIndex].count + surgeAmount,
+  }
+  return entries
+}
+
+function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
+  const minuteIndex = Math.floor(phaseIndex / 2)
   const stageIndex = minuteIndex
-  const startMs = minuteIndex * RUN_PHASE_DURATION_MS
+  const startMs = phaseIndex * RUN_PHASE_DURATION_MS
   const isFinale = startMs >= FINAL_STAGE_START_MS
   const oneTimeSpawns: EnemyId[] = startMs === FINAL_STAGE_START_MS ? ['slime-boss'] : []
   const phaseNumber = minuteIndex + 1
+  const halfLabel = phaseIndex % 2 === 0 ? '전반' : '후반'
 
   return {
-    id: `minute-${String(phaseNumber).padStart(2, '0')}`,
-    label: `${phaseNumber}분 · ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
+    id: `minute-${String(phaseNumber).padStart(2, '0')}-${phaseIndex % 2 === 0 ? 'a' : 'b'}`,
+    label: `${phaseNumber}분 ${halfLabel} · ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
     stageIndex,
     stageLabel: `${phaseNumber}분 ${pressureNames[minuteIndex] ?? '시간 왜곡'}`,
     minuteIndex,
     startMs,
     durationMs: RUN_PHASE_DURATION_MS,
-    entries: entriesForMinute(minuteIndex),
+    entries: entriesForPhase(phaseIndex),
     spawnIntervalMs: Math.max(360, 980 - minuteIndex * 22),
     burstSize: Math.min(12, 4 + Math.floor(minuteIndex / 3)),
     softEnemyCap: Math.min(100, 28 + minuteIndex * 3),
@@ -117,5 +135,5 @@ function createPhase(minuteIndex: number): RunProgressionPhaseDefinition {
 
 export const RUN_PROGRESS_PHASES: RunProgressionPhaseDefinition[] = Array.from(
   { length: RUN_DURATION_MS / RUN_PHASE_DURATION_MS },
-  (_, minuteIndex) => createPhase(minuteIndex),
+  (_, phaseIndex) => createPhase(phaseIndex),
 )

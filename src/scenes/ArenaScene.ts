@@ -2622,7 +2622,8 @@ export class ArenaScene extends Phaser.Scene {
     const extraCount = Math.max(0, rows.length - cappedRows.length)
     const suffix = extraCount > 0 ? ` 외 ${extraCount}` : ''
     const currentTimeLabel = formatRunTime(this.runElapsedMs)
-    const text = `현재 시간 ${currentTimeLabel} · 적 출현 확률 · ${phase.minuteIndex + 1}분차 · ${cappedRows.join(' · ')}${suffix}`
+    const phaseLabel = phase.label.split(' · ')[0] ?? `${phase.minuteIndex + 1}분차`
+    const text = `현재 시간 ${currentTimeLabel} · 적 출현 확률 · ${phaseLabel} · ${cappedRows.join(' · ')}${suffix}`
 
     this.playerHealthBar.enemyOddsLabel.setText(text)
     this.playerHealthBar.enemyOddsBackground.setVisible(rows.length > 0)
@@ -2864,7 +2865,7 @@ export class ArenaScene extends Phaser.Scene {
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel} · 공격력 ×${playerStats.damageMultiplier.toFixed(2)}`,
         `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
-        `적 출현 확률 (${currentPhase.minuteIndex + 1}분차)`,
+        `적 출현 확률 (${currentPhase.label.split(' · ')[0] ?? `${currentPhase.minuteIndex + 1}분차`})`,
         ...visibleEnemyChanceLines,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
@@ -2911,7 +2912,7 @@ export class ArenaScene extends Phaser.Scene {
         isTokenInFlight: this.activePachinkoTokens.length > 0,
         latestReward: this.latestPachinkoReward,
         synergy: getPachinkoWeaponSynergySummary(weaponId),
-        enemyOdds: [`${currentPhase.minuteIndex + 1}분차`, ...enemyChanceLines],
+        enemyOdds: [currentPhase.label.split(' · ')[0] ?? `${currentPhase.minuteIndex + 1}분차`, ...enemyChanceLines],
       },
       modal: {
         isOpen: this.isInventoryOpen,

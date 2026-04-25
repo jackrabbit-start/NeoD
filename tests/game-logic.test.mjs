@@ -1119,11 +1119,14 @@ test('equipping an owned weapon only changes the active weapon id', () => {
 
 test('run progression advances by elapsed time instead of enemy clear state', () => {
   const firstPhase = getRunPhaseByElapsedMs(0)
+  const firstHalfMinute = getRunPhaseByElapsedMs(30_000)
   const secondMinute = getRunPhaseByElapsedMs(60_000)
   const finale = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
 
   assert.equal(firstPhase.minuteIndex, 0)
   assert.equal(firstPhase.healthMultiplier, 1.15)
+  assert.equal(firstHalfMinute.minuteIndex, 0)
+  assert.equal(firstHalfMinute.id, 'minute-01-b')
   assert.equal(secondMinute.minuteIndex, 1)
   assert.equal(secondMinute.stageIndex, 1)
   assert.equal(finale.isFinale, true)
@@ -1135,10 +1138,14 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
 })
 
-test('run progression exposes per-enemy spawn chance rows for the current minute', () => {
+test('run progression exposes per-enemy spawn chance rows for the current half-minute phase', () => {
   const firstPhase = getRunPhaseByElapsedMs(0)
+  const thirdMinuteFront = getRunPhaseByElapsedMs(2 * 60_000)
+  const thirdMinuteBack = getRunPhaseByElapsedMs(2 * 60_000 + 30_000)
   const latePhase = getRunPhaseByElapsedMs(24 * 60_000)
   const firstRows = getRunEnemySpawnChanceRows(firstPhase)
+  const thirdMinuteFrontRows = getRunEnemySpawnChanceRows(thirdMinuteFront)
+  const thirdMinuteBackRows = getRunEnemySpawnChanceRows(thirdMinuteBack)
   const lateRows = getRunEnemySpawnChanceRows(latePhase)
 
   assert.deepEqual(firstRows, [
@@ -1150,6 +1157,7 @@ test('run progression exposes per-enemy spawn chance rows for the current minute
       percentLabel: '100%',
     },
   ])
+  assert.notDeepEqual(thirdMinuteFrontRows, thirdMinuteBackRows)
   assert.ok(lateRows.length > 4)
   assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
   assert.ok(lateRows.some((row) => row.enemyId === 'void-orb'))
@@ -1174,13 +1182,14 @@ test('arena hud injects enemy spawn odds into the visible stats list', () => {
   const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
 
   assert.ok(arenaSceneSource.includes('const visibleEnemyChanceLines = enemyChanceLines.slice(0, 5)'))
-  assert.ok(arenaSceneSource.includes('`적 출현 확률 (${currentPhase.minuteIndex + 1}분차)`'))
+  assert.ok(arenaSceneSource.includes("`적 출현 확률 (${currentPhase.label.split(' · ')[0]"))
   assert.ok(arenaSceneSource.includes('...visibleEnemyChanceLines'))
   assert.ok(arenaSceneSource.includes('currentTimeLabel: formatRunTime(this.runElapsedMs)'))
   assert.ok(arenaSceneSource.includes('enemyOddsLabel'))
   assert.ok(arenaSceneSource.includes('syncEnemyOddsHudText(enemyChanceLines)'))
   assert.ok(arenaSceneSource.includes('const currentTimeLabel = formatRunTime(this.runElapsedMs)'))
-  assert.ok(arenaSceneSource.includes('현재 시간 ${currentTimeLabel} · 적 출현 확률 · ${phase.minuteIndex + 1}분차'))
+  assert.ok(arenaSceneSource.includes('const phaseLabel = phase.label.split'))
+  assert.ok(arenaSceneSource.includes('현재 시간 ${currentTimeLabel} · 적 출현 확률 · ${phaseLabel} ·'))
   assert.ok(hudSource.includes('<span>현재 시간</span>'))
   assert.ok(hudSource.includes('state.currentTimeLabel'))
   assert.ok(hudSource.includes('hud-summary__status-line--time'))
@@ -1957,7 +1966,8 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
     })
 
     const weaponList = controller.weaponList
-    const firstWeaponRow = weaponList.children[0]
+    const firstWeaponGroup = weaponList.children[0]
+    const firstWeaponRow = firstWeaponGroup.children[0]
     const actions = firstWeaponRow.children[1]
     const meta = actions.children[0]
 
