@@ -29,6 +29,7 @@ export interface MapLayout {
   playerStart: Point
   obstacles: RectObstacle[]
   ambientItemSpawns: AmbientItemSpawnPoint[]
+  heartItemSpawns: Point[]
 }
 
 export type RandomSource = () => number
@@ -44,6 +45,7 @@ export const PLAYER_SAFE_RADIUS = 220
 export const ENEMY_SPAWN_MIN_DISTANCE = 360
 export const ENEMY_SPAWN_RING_DISTANCE = 520
 export const AMBIENT_ITEM_RADIUS = 18
+export const HEART_ITEM_RADIUS = 18
 
 const AMBIENT_ITEM_SEQUENCE: LootId[] = [
   'gel-shard',
@@ -81,27 +83,9 @@ export function isCircleClearOfObstacles(
   })
 }
 
-function scaleRect(bounds: WorldBounds, id: string, x: number, y: number, width: number, height: number): RectObstacle {
-  return {
-    id,
-    x: Math.round(bounds.x + bounds.width * x),
-    y: Math.round(bounds.y + bounds.height * y),
-    width: Math.round(bounds.width * width),
-    height: Math.round(bounds.height * height),
-  }
-}
-
 export function getStaticMapObstacles(bounds: WorldBounds = ARENA_WORLD_BOUNDS): RectObstacle[] {
-  return [
-    scaleRect(bounds, 'north-west-pillar', 0.18, 0.2, 0.08, 0.2),
-    scaleRect(bounds, 'north-ridge', 0.42, 0.14, 0.2, 0.055),
-    scaleRect(bounds, 'north-east-rock', 0.78, 0.25, 0.1, 0.09),
-    scaleRect(bounds, 'west-low-rock', 0.12, 0.68, 0.11, 0.08),
-    scaleRect(bounds, 'center-left-column', 0.34, 0.56, 0.06, 0.19),
-    scaleRect(bounds, 'center-right-column', 0.64, 0.39, 0.06, 0.19),
-    scaleRect(bounds, 'south-ridge', 0.46, 0.79, 0.22, 0.06),
-    scaleRect(bounds, 'south-east-rock', 0.79, 0.68, 0.09, 0.12),
-  ]
+  void bounds
+  return []
 }
 
 function isClearForSpawn(
@@ -140,16 +124,39 @@ export function getAmbientItemSpawnPoints(
     }))
 }
 
+export function getHeartItemSpawnPoints(
+  bounds: WorldBounds = ARENA_WORLD_BOUNDS,
+  obstacles: RectObstacle[] = getStaticMapObstacles(bounds),
+): Point[] {
+  const candidates: Point[] = [
+    { x: bounds.x + bounds.width * 0.22, y: bounds.y + bounds.height * 0.28 },
+    { x: bounds.x + bounds.width * 0.5, y: bounds.y + bounds.height * 0.18 },
+    { x: bounds.x + bounds.width * 0.78, y: bounds.y + bounds.height * 0.32 },
+    { x: bounds.x + bounds.width * 0.18, y: bounds.y + bounds.height * 0.74 },
+    { x: bounds.x + bounds.width * 0.52, y: bounds.y + bounds.height * 0.82 },
+    { x: bounds.x + bounds.width * 0.82, y: bounds.y + bounds.height * 0.72 },
+  ]
+
+  return candidates
+    .filter((point) => isClearForSpawn(point, bounds, obstacles, HEART_ITEM_RADIUS, 56))
+    .map((point) => ({
+      x: Math.round(point.x),
+      y: Math.round(point.y),
+    }))
+}
+
 export function createMapLayout(bounds: WorldBounds = ARENA_WORLD_BOUNDS): MapLayout {
   const obstacles = getStaticMapObstacles(bounds)
   const playerStart = getWorldCenter(bounds)
   const ambientItemSpawns = getAmbientItemSpawnPoints(bounds, obstacles)
+  const heartItemSpawns = getHeartItemSpawnPoints(bounds, obstacles)
 
   return {
     worldBounds: bounds,
     playerStart,
     obstacles,
     ambientItemSpawns,
+    heartItemSpawns,
   }
 }
 
@@ -157,6 +164,18 @@ export function selectAmbientItemSpawnPoint(
   spawnPoints: AmbientItemSpawnPoint[],
   random: RandomSource = Math.random,
 ): AmbientItemSpawnPoint | null {
+  if (spawnPoints.length === 0) {
+    return null
+  }
+
+  const index = Math.min(spawnPoints.length - 1, Math.floor(random() * spawnPoints.length))
+  return spawnPoints[index] ?? null
+}
+
+export function selectHeartItemSpawnPoint(
+  spawnPoints: Point[],
+  random: RandomSource = Math.random,
+): Point | null {
   if (spawnPoints.length === 0) {
     return null
   }
