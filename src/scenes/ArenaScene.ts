@@ -38,6 +38,12 @@ import {
   getLootPickupPhase,
   LOOT_COLLECT_RADIUS,
 } from '../systems/lootPickup.js'
+import {
+  createMapLayout,
+  selectEnemySpawnPoint,
+  type MapLayout,
+  type RectObstacle,
+} from '../systems/mapLayout.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
 import {
   canStartPlayerDash,
@@ -99,6 +105,9 @@ import {
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
 type PhysicsSprite = Phaser.Physics.Arcade.Sprite
+type ObstacleBody = Phaser.GameObjects.Rectangle & {
+  body: Phaser.Physics.Arcade.StaticBody
+}
 
 interface EnemyHealthBar {
   background: Phaser.GameObjects.Rectangle
@@ -187,6 +196,16 @@ export class ArenaScene extends Phaser.Scene {
 
   private enemySpacingCollider?: Phaser.Physics.Arcade.Collider
 
+  private obstacleBodies?: Phaser.Physics.Arcade.StaticGroup
+
+  private playerObstacleCollider?: Phaser.Physics.Arcade.Collider
+
+  private enemyObstacleCollider?: Phaser.Physics.Arcade.Collider
+
+  private mapVisuals: Phaser.GameObjects.GameObject[] = []
+
+  private readonly mapLayout: MapLayout = createMapLayout()
+
   private cursors!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
 
   private inventoryKey!: Phaser.Input.Keyboard.Key
@@ -267,27 +286,33 @@ export class ArenaScene extends Phaser.Scene {
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
-    this.physics.world.setBounds(24, 24, GAME_WIDTH - 48, GAME_HEIGHT - 48)
-
-    const arena = this.add.rectangle(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      GAME_WIDTH - 48,
-      GAME_HEIGHT - 48,
-      0x0d1d33,
-      1,
+    const { worldBounds, playerStart } = this.mapLayout
+    this.physics.world.setBounds(
+      worldBounds.x,
+      worldBounds.y,
+      worldBounds.width,
+      worldBounds.height,
     )
-    arena.setStrokeStyle(2, 0x214266, 0.9)
+    this.cameras.main.setBounds(
+      worldBounds.x,
+      worldBounds.y,
+      worldBounds.width,
+      worldBounds.height,
+    )
+    this.createMapVisuals()
 
-    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'player')
+    this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'player')
     this.player.setCircle(PLAYER_COLLISION_RADIUS)
     this.player.setCollideWorldBounds(true)
     this.player.play('player-idle')
+    this.cameras.main.startFollow(this.player, true, 0.09, 0.09)
     this.playerHealthBar = this.createPlayerHealthBar()
     this.syncPlayerHealthBar()
 
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
+    this.createObstacles()
+    this.seedAmbientLoot()
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
@@ -346,6 +371,69 @@ export class ArenaScene extends Phaser.Scene {
 
   private isInteractionBlocked(): boolean {
     return this.isInventoryOpen || this.isCodexOpen
+  }
+
+  private createMapVisuals(): void {
+    const { worldBounds } = this.mapLayout
+    const arena = this.add.rectangle(
+      worldBounds.x + worldBounds.width / 2,
+      worldBounds.y + worldBounds.height / 2,
+      worldBounds.width,
+      worldBounds.height,
+      0x0d1d33,
+      1,
+    )
+    arena.setStrokeStyle(3, 0x214266, 0.9)
+    arena.setDepth(-20)
+    this.mapVisuals.push(arena)
+
+    const grid = this.add.graphics()
+    grid.lineStyle(1, 0x173150, 0.28)
+    for (let x = worldBounds.x; x <= worldBounds.x + worldBounds.width; x += 160) {
+      grid.lineBetween(x, worldBounds.y, x, worldBounds.y + worldBounds.height)
+    }
+    for (let y = worldBounds.y; y <= worldBounds.y + worldBounds.height; y += 135) {
+      grid.lineBetween(worldBounds.x, y, worldBounds.x + worldBounds.width, y)
+    }
+    grid.setDepth(-19)
+    this.mapVisuals.push(grid)
+  }
+
+  private createObstacles(): void {
+    this.obstacleBodies = this.physics.add.staticGroup()
+
+    for (const obstacle of this.mapLayout.obstacles) {
+      const visual = this.createObstacleBody(obstacle)
+      this.obstacleBodies.add(visual)
+      this.mapVisuals.push(visual)
+    }
+    this.obstacleBodies.refresh()
+
+    this.playerObstacleCollider = this.physics.add.collider(this.player, this.obstacleBodies)
+    this.enemyObstacleCollider = this.physics.add.collider(this.enemySprites, this.obstacleBodies)
+  }
+
+  private createObstacleBody(obstacle: RectObstacle): ObstacleBody {
+    const visual = this.add.rectangle(
+      obstacle.x + obstacle.width / 2,
+      obstacle.y + obstacle.height / 2,
+      obstacle.width,
+      obstacle.height,
+      0x1b3145,
+      0.96,
+    ) as ObstacleBody
+    visual.setStrokeStyle(2, 0x426a8f, 0.82)
+    visual.setDepth(1)
+    this.physics.add.existing(visual, true)
+    visual.body.setSize(obstacle.width, obstacle.height)
+    visual.body.updateFromGameObject()
+    return visual
+  }
+
+  private seedAmbientLoot(): void {
+    for (const spawn of this.mapLayout.ambientItemSpawns) {
+      this.spawnLootDrop(spawn.x, spawn.y, spawn.itemId)
+    }
   }
 
   private handleInventoryToggle(): void {
@@ -596,8 +684,7 @@ export class ArenaScene extends Phaser.Scene {
       if (
         isProjectileOutOfBounds(
           { x: projectile.sprite.x, y: projectile.sprite.y },
-          GAME_WIDTH,
-          GAME_HEIGHT,
+          this.mapLayout.worldBounds,
         )
       ) {
         this.destroyProjectile(projectile, projectile.hazardOnExpire)
@@ -749,6 +836,35 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private spawnLootDrop(x: number, y: number, itemId: LootId): void {
+    const itemDefinition = ITEM_DEFINITIONS[itemId]
+    const aura = this.add.circle(x, y, 16, itemDefinition.color, 0.18)
+    aura.setStrokeStyle(2, itemDefinition.color, 0.78)
+    aura.setBlendMode(Phaser.BlendModes.ADD)
+    aura.setDepth(3)
+    const auraTween = this.tweens.add({
+      targets: aura,
+      scale: { from: 0.88, to: 1.18 },
+      alpha: { from: 0.48, to: 0.86 },
+      duration: 720,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    })
+
+    const loot = this.physics.add.image(x, y, itemDefinition.textureKey)
+    loot.setCircle(10)
+    loot.setDepth(4)
+    loot.setScale(1.08)
+    this.lootDrops.push({
+      sprite: loot,
+      itemId,
+      aura,
+      auraTween,
+      isAttracting: false,
+    })
+  }
+
   private updateHazards(delta: number): void {
     if (this.isInteractionBlocked()) {
       return
@@ -861,20 +977,15 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnEnemy(enemyId: EnemyDefinition['id']): void {
     const config = ENEMY_DEFINITIONS[enemyId]
-    const x =
-      Math.random() < 0.5
-        ? Phaser.Math.Between(48, GAME_WIDTH - 48)
-        : Math.random() < 0.5
-          ? 48
-          : GAME_WIDTH - 48
-    const y =
-      x === 48 || x === GAME_WIDTH - 48
-        ? Phaser.Math.Between(48, GAME_HEIGHT - 48)
-        : Math.random() < 0.5
-          ? 48
-          : GAME_HEIGHT - 48
+    const spawnPoint = selectEnemySpawnPoint(
+      { x: this.player.x, y: this.player.y },
+      this.mapLayout.worldBounds,
+      this.mapLayout.obstacles,
+      Math.random,
+      config.size / 2,
+    )
 
-    const sprite = this.physics.add.sprite(x, y, config.textureKey)
+    const sprite = this.physics.add.sprite(spawnPoint.x, spawnPoint.y, config.textureKey)
     sprite.setCircle(config.size / 2)
     sprite.setCollideWorldBounds(true)
     sprite.setBounce(0)
@@ -929,32 +1040,7 @@ export class ArenaScene extends Phaser.Scene {
     if (enemy.config.drops) {
       const droppedItem = resolveWeightedDrop(enemy.config.drops)
       if (droppedItem) {
-        const itemDefinition = ITEM_DEFINITIONS[droppedItem]
-        const aura = this.add.circle(enemy.sprite.x, enemy.sprite.y, 16, itemDefinition.color, 0.18)
-        aura.setStrokeStyle(2, itemDefinition.color, 0.78)
-        aura.setBlendMode(Phaser.BlendModes.ADD)
-        aura.setDepth(3)
-        const auraTween = this.tweens.add({
-          targets: aura,
-          scale: { from: 0.88, to: 1.18 },
-          alpha: { from: 0.48, to: 0.86 },
-          duration: 720,
-          ease: 'Sine.easeInOut',
-          yoyo: true,
-          repeat: -1,
-        })
-
-        const loot = this.physics.add.image(enemy.sprite.x, enemy.sprite.y, itemDefinition.textureKey)
-        loot.setCircle(10)
-        loot.setDepth(4)
-        loot.setScale(1.08)
-        this.lootDrops.push({
-          sprite: loot,
-          itemId: droppedItem,
-          aura,
-          auraTween,
-          isAttracting: false,
-        })
+        this.spawnLootDrop(enemy.sprite.x, enemy.sprite.y, droppedItem)
       }
     }
 
@@ -1219,11 +1305,13 @@ export class ArenaScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setStrokeStyle(1, 0x9cb5ff, 0.36)
       .setDepth(depth)
+      .setScrollFactor(0)
 
     const fill = this.add
       .rectangle(x + 2, y, width - 4, height - 4, 0x43ef9a, 0.92)
       .setOrigin(0, 0.5)
       .setDepth(depth + 1)
+      .setScrollFactor(0)
 
     const label = this.add
       .text(GAME_WIDTH / 2, y - 1, '', {
@@ -1234,6 +1322,7 @@ export class ArenaScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(depth + 2)
+      .setScrollFactor(0)
       .setShadow(0, 1, '#020713', 2)
 
     return {
@@ -1315,6 +1404,10 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnTimer = undefined
     this.enemySpacingCollider?.destroy()
     this.enemySpacingCollider = undefined
+    this.playerObstacleCollider?.destroy()
+    this.playerObstacleCollider = undefined
+    this.enemyObstacleCollider?.destroy()
+    this.enemyObstacleCollider = undefined
     this.destroyPlayerHealthBar()
 
     if (this.player?.active) {
@@ -1351,10 +1444,22 @@ export class ArenaScene extends Phaser.Scene {
       this.enemySprites.clear(true, true)
     }
 
+    if (this.obstacleBodies) {
+      this.obstacleBodies.clear(true, true)
+      this.obstacleBodies = undefined
+    }
+
+    for (const visual of this.mapVisuals) {
+      if ('active' in visual && visual.active) {
+        visual.destroy()
+      }
+    }
+
     this.enemies = []
     this.lootDrops = []
     this.projectiles = []
     this.hazardZones = []
+    this.mapVisuals = []
   }
 
   private endRun(outcome: RunOutcome): void {

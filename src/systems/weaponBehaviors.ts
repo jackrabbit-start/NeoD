@@ -12,6 +12,13 @@ export interface Point {
   y: number
 }
 
+export interface Bounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export interface HazardSpawnSpec {
   radius: number
   durationMs: number
@@ -402,8 +409,21 @@ export function applyProjectileHitState(
   }
 }
 
-export function isProjectileOutOfBounds(position: Point, width: number, height: number): boolean {
-  return position.x < 0 || position.x > width || position.y < 0 || position.y > height
+export function isProjectileOutOfBounds(
+  position: Point,
+  boundsOrWidth: Bounds | number,
+  height?: number,
+): boolean {
+  const bounds = typeof boundsOrWidth === 'number'
+    ? { x: 0, y: 0, width: boundsOrWidth, height: height ?? boundsOrWidth }
+    : boundsOrWidth
+
+  return (
+    position.x < bounds.x
+    || position.x > bounds.x + bounds.width
+    || position.y < bounds.y
+    || position.y > bounds.y + bounds.height
+  )
 }
 
 export function shouldWeaponFire(

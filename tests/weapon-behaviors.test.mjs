@@ -206,6 +206,9 @@ test('projectiles track same-enemy dedupe and arena bounds as pure combat rules'
   assert.equal(canProjectileHitEnemy(hitEnemyIds, 4), true)
   assert.equal(isProjectileOutOfBounds({ x: -1, y: 30 }, 100, 100), true)
   assert.equal(isProjectileOutOfBounds({ x: 40, y: 40 }, 100, 100), false)
+  assert.equal(isProjectileOutOfBounds({ x: 24, y: 24 }, { x: 24, y: 24, width: 200, height: 120 }), false)
+  assert.equal(isProjectileOutOfBounds({ x: 23, y: 24 }, { x: 24, y: 24, width: 200, height: 120 }), true)
+  assert.equal(isProjectileOutOfBounds({ x: 225, y: 24 }, { x: 24, y: 24, width: 200, height: 120 }), true)
 })
 
 test('piercing projectile hit state survives early hits and stops on the last one', () => {

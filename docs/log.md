@@ -56,6 +56,12 @@
 - Updated `docs/index.md` so future agents can find the melee architecture guidance.
 - Source artifacts: `.omx/specs/deep-interview-weapon-capsule-variety.md`, `.omx/plans/prd-melee-weapon-line.md`, `.omx/plans/test-spec-melee-weapon-line.md`, and `.omx/context/post-interview-melee-weapon-line-20260425T114954Z.md`.
 
+## [2026-04-25] gameplay | Captured map traversal and obstacle architecture
+
+- Added `docs/wiki/map-traversal-obstacles.md` to synthesize the larger scrolling map, sparse blocking obstacle, ambient item, and safe spawn rules.
+- Updated `docs/index.md` so future agents can find the traversal/obstacle guidance.
+- Source artifacts: `.omx/specs/deep-interview-map-traversal-obstacles-items.md`, `.omx/plans/prd-map-traversal-obstacles-items.md`, `.omx/plans/test-spec-map-traversal-obstacles-items.md`, and `.omx/context/post-interview-map-traversal-obstacles-items-20260425T123230Z.md`.
+
 ## [2026-04-25] gameplay | Captured near-miss difficulty follow-up
 
 - Updated `docs/wiki/enemy-boss-pressure.md` with the low-clear-rate near-miss follow-up: burst/group spawns, harder dash/AOE reach, and explicit readability non-goals.
@@ -65,7 +71,6 @@
 
 - Updated `docs/wiki/enemy-boss-pressure.md` with the Space dash + short i-frame rule for avoiding boss telegraphed AOE without reducing wave or boss pressure.
 - Source artifacts: `.omx/specs/deep-interview-boss-dash-dodge.md`, `.omx/interviews/boss-dash-dodge-20260425T121731Z.md`, and `.omx/context/post-interview-boss-dash-dodge-20260425T122704Z.md`.
-
 
 ## [2026-04-25] gameplay-ui | Switched dash input away from Space
 

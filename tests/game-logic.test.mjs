@@ -25,6 +25,19 @@ import {
   LOOT_COLLECT_RADIUS,
   LEGACY_LOOT_PICKUP_DISTANCE,
 } from '../.tmp-test/src/systems/lootPickup.js'
+import {
+  AMBIENT_ITEM_RADIUS,
+  ARENA_WORLD_BOUNDS,
+  ENEMY_SPAWN_MIN_DISTANCE,
+  PLAYER_SAFE_RADIUS,
+  createMapLayout,
+  getAmbientItemSpawnPoints,
+  getWorldCenter,
+  isCircleClearOfObstacles,
+  isPointWithinWorld,
+  selectAmbientItemSpawnPoint,
+  selectEnemySpawnPoint,
+} from '../.tmp-test/src/systems/mapLayout.js'
 import { createInitialArenaRunState } from '../.tmp-test/src/systems/runState.js'
 import {
   describeAvailableRecipes,
@@ -265,6 +278,63 @@ test('new arena run state does not reuse mutable containers', () => {
   assert.deepEqual(second.inventory, {})
   assert.deepEqual(second.ownedWeaponIds, ['starter-blaster'])
   assert.deepEqual(second.tuningState, {})
+})
+
+test('map layout defines a larger scrolling world with a safe starting area', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const start = getWorldCenter(layout.worldBounds)
+
+  assert.equal(layout.worldBounds.width > 960, true)
+  assert.equal(layout.worldBounds.height > 540, true)
+  assert.deepEqual(layout.playerStart, start)
+  assert.ok(layout.obstacles.length > 0)
+
+  for (const obstacle of layout.obstacles) {
+    assert.equal(isPointWithinWorld({ x: obstacle.x, y: obstacle.y }, layout.worldBounds), true)
+    assert.equal(
+      isPointWithinWorld(
+        { x: obstacle.x + obstacle.width, y: obstacle.y + obstacle.height },
+        layout.worldBounds,
+      ),
+      true,
+    )
+  }
+
+  assert.equal(isCircleClearOfObstacles(start, PLAYER_SAFE_RADIUS, layout.obstacles), true)
+})
+
+test('ambient map item points stay clear and reuse existing loot ids', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawnPoints = getAmbientItemSpawnPoints(layout.worldBounds, layout.obstacles)
+
+  assert.equal(spawnPoints.length >= 5, true)
+  for (const spawn of spawnPoints) {
+    assert.equal(LOOT_IDS.includes(spawn.itemId), true)
+    assert.notEqual(spawn.itemId, 'tuning-capsule')
+    assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 48), true)
+    assert.equal(isCircleClearOfObstacles(spawn, AMBIENT_ITEM_RADIUS, layout.obstacles), true)
+  }
+
+  assert.deepEqual(selectAmbientItemSpawnPoint(spawnPoints, () => 0), spawnPoints[0])
+  assert.deepEqual(selectAmbientItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
+})
+
+test('enemy map spawn selection respects player distance, world bounds, and obstacle clearance', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawn = selectEnemySpawnPoint(
+    layout.playerStart,
+    layout.worldBounds,
+    layout.obstacles,
+    () => 0,
+    28,
+  )
+
+  assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 48), true)
+  assert.equal(isCircleClearOfObstacles(spawn, 28, layout.obstacles), true)
+  assert.equal(
+    Math.hypot(spawn.x - layout.playerStart.x, spawn.y - layout.playerStart.y) >= ENEMY_SPAWN_MIN_DISTANCE,
+    true,
+  )
 })
 
 test('recipe presenter mirrors the actionable combine summary strings', () => {
