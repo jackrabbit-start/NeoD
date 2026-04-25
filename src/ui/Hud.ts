@@ -3,6 +3,8 @@ import type {
   HudOwnedItemView,
   HudOwnedWeaponView,
   HudRecipeView,
+  HudStageSelectionState,
+  HudStageView,
   HudState,
   RecipeId,
   WeaponId,
@@ -15,6 +17,9 @@ export interface HudControllerHandlers {
   onRecipeSelect: (recipeId: RecipeId) => void
   onWeaponEquip: (weaponId: WeaponId) => void
   onWeaponTune: (weaponId: WeaponId) => void
+  onStageSelectionToggle: () => void
+  onStageSelectionClose: () => void
+  onStageSelect: (stageIndex: number) => void
 }
 
 export interface HudRenderMetrics {
@@ -64,7 +69,13 @@ export class HudController {
 
   private readonly modalLayer: HTMLDivElement
 
+  private readonly stageModalLayer: HTMLDivElement
+
   private readonly resumeButton: HTMLButtonElement
+
+  private readonly stageResumeButton: HTMLButtonElement
+
+  private readonly stageList: HTMLDivElement
 
   private readonly itemList: HTMLDivElement
 
@@ -82,6 +93,8 @@ export class HudController {
 
   private summaryMarkup = ''
 
+  private stageSignature = ''
+
   private renderMetrics: HudRenderMetrics = {
     summaryAssignments: 0,
     summarySkips: 0,
@@ -94,6 +107,9 @@ export class HudController {
     onRecipeSelect: () => undefined,
     onWeaponEquip: () => undefined,
     onWeaponTune: () => undefined,
+    onStageSelectionToggle: () => undefined,
+    onStageSelectionClose: () => undefined,
+    onStageSelect: () => undefined,
   }
 
   constructor(private readonly element: HTMLElement) {
@@ -133,23 +149,51 @@ export class HudController {
       </section>
     `
 
+    this.stageModalLayer = document.createElement('div')
+    this.stageModalLayer.className = 'hud-modal-layer'
+    this.stageModalLayer.innerHTML = `
+      <div class="hud-modal__backdrop" data-action="stage-close"></div>
+      <section class="hud-modal hud-modal--stage" role="dialog" aria-modal="true" aria-label="스테이지 선택">
+        <header class="hud-modal__header">
+          <div>
+            <p class="hud-modal__eyebrow">스테이지 선택</p>
+            <h2>시작할 웨이브를 고르세요</h2>
+          </div>
+          <button type="button" class="hud-button hud-button--secondary" data-action="stage-close">선택 닫기</button>
+        </header>
+        <div class="hud-modal__list hud-modal__list--stage" data-region="stages"></div>
+      </section>
+    `
+
     const resumeButton = this.modalLayer.querySelector<HTMLButtonElement>('button[data-action="inventory-close"]')
     const itemList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="items"]')
     const itemDetail = this.modalLayer.querySelector<HTMLDivElement>('[data-region="item-detail"]')
     const recipeList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="recipes"]')
     const weaponList = this.modalLayer.querySelector<HTMLDivElement>('[data-region="weapons"]')
+    const stageResumeButton = this.stageModalLayer.querySelector<HTMLButtonElement>('button[data-action="stage-close"]')
+    const stageList = this.stageModalLayer.querySelector<HTMLDivElement>('[data-region="stages"]')
 
-    if (!resumeButton || !itemList || !itemDetail || !recipeList || !weaponList) {
+    if (
+      !resumeButton ||
+      !itemList ||
+      !itemDetail ||
+      !recipeList ||
+      !weaponList ||
+      !stageResumeButton ||
+      !stageList
+    ) {
       throw new Error('안정적인 HUD 모달 경계를 초기화하지 못했습니다.')
     }
 
     this.resumeButton = resumeButton
+    this.stageResumeButton = stageResumeButton
+    this.stageList = stageList
     this.itemList = itemList
     this.itemDetail = itemDetail
     this.recipeList = recipeList
     this.weaponList = weaponList
 
-    this.element.replaceChildren(this.summaryElement, this.modalLayer)
+    this.element.replaceChildren(this.summaryElement, this.modalLayer, this.stageModalLayer)
     this.element.addEventListener('click', this.handleClick)
     this.element.addEventListener('mouseover', this.handleHover)
     this.element.addEventListener('focusin', this.handleHover)
@@ -165,6 +209,7 @@ export class HudController {
   update(state: HudState): void {
     this.renderSummary(state)
     this.updateModal(state.modal)
+    this.updateStageSelection(state.stageSelection)
   }
 
   getRenderMetrics(): HudRenderMetrics {
@@ -177,6 +222,7 @@ export class HudController {
     this.element.removeEventListener('focusin', this.handleHover)
     this.summaryMarkup = ''
     this.modalSignature = ''
+    this.stageSignature = ''
     this.element.innerHTML = ''
   }
 
@@ -198,6 +244,19 @@ export class HudController {
       case 'inventory-close':
         this.handlers.onInventoryClose()
         break
+      case 'stage-toggle':
+        this.handlers.onStageSelectionToggle()
+        break
+      case 'stage-close':
+        this.handlers.onStageSelectionClose()
+        break
+      case 'stage-select': {
+        const stageIndex = Number(actionTarget.dataset.stageIndex)
+        if (Number.isInteger(stageIndex)) {
+          this.handlers.onStageSelect(stageIndex)
+        }
+        break
+      }
       case 'recipe-select': {
         const recipeId = actionTarget.dataset.recipeId as RecipeId | undefined
         if (recipeId) {
@@ -257,6 +316,12 @@ export class HudController {
             <p>${escapeHtml(state.subtitle)}</p>
           </div>
           ${renderStatusPanel(state)}
+          <button
+            type="button"
+            class="hud-button hud-button--stage"
+            data-action="stage-toggle"
+            ${state.stageButtonDisabled ? 'disabled' : ''}
+          >${escapeHtml(state.stageButtonLabel)}</button>
         </header>
         <div class="hud-summary__grid">
           ${renderSummarySection('능력치', renderList(state.stats), 'hud-summary__section--stats')}
@@ -319,6 +384,22 @@ export class HudController {
     if (!modal.items.some((item) => item.id === this.hoveredItemId)) {
       this.hoveredItemId = this.resolveHoveredItemId(modal.items)
       this.renderHoveredItemState()
+    }
+  }
+
+  private updateStageSelection(stageSelection: HudStageSelectionState): void {
+    this.stageModalLayer.classList.toggle('is-open', stageSelection.isOpen)
+    this.stageResumeButton.disabled = !stageSelection.isOpen
+
+    if (!stageSelection.isOpen) {
+      this.stageSignature = ''
+      return
+    }
+
+    const nextSignature = JSON.stringify(stageSelection)
+    if (nextSignature !== this.stageSignature) {
+      this.stageSignature = nextSignature
+      this.stageList.replaceChildren(...this.createStageButtons(stageSelection.stages))
     }
   }
 
@@ -474,6 +555,40 @@ export class HudController {
       actions.append(meta, equipButton, tuneButton)
       row.append(left, actions)
       return row
+    })
+  }
+
+  private createStageButtons(stages: HudStageView[]): HTMLElement[] {
+    if (stages.length === 0) {
+      const empty = document.createElement('p')
+      empty.className = 'hud-empty'
+      empty.textContent = '선택 가능한 스테이지가 없습니다.'
+      return [empty]
+    }
+
+    return stages.map((stage) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = `hud-modal__item hud-modal__item--stage${stage.isCurrent ? ' is-equipped' : ''}`
+      button.dataset.action = 'stage-select'
+      button.dataset.stageIndex = String(stage.index)
+
+      const textGroup = document.createElement('span')
+      textGroup.className = 'hud-modal__content'
+
+      const label = document.createElement('strong')
+      label.textContent = stage.label
+
+      const description = document.createElement('small')
+      description.textContent = stage.description
+
+      const meta = document.createElement('span')
+      meta.className = 'hud-modal__weapon-meta'
+      meta.textContent = stage.isCurrent ? '현재' : stage.isBoss ? '보스' : '시작'
+
+      textGroup.append(label, description)
+      button.append(textGroup, meta)
+      return button
     })
   }
 

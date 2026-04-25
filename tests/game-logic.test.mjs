@@ -97,6 +97,10 @@ import {
   shouldAdvanceWave,
 } from '../.tmp-test/src/systems/waves.js'
 import {
+  getSkippedRegularWaveCount,
+  getStageSelectionViews,
+} from '../.tmp-test/src/systems/stageSelection.js'
+import {
   createRunResultHudState,
   createRunResultPresentation,
   isRunResultRestartKey,
@@ -863,6 +867,23 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(getDefeatedEnemyRunOutcome('needle-wasp'), 'continue')
 })
 
+test('stage selection views expose readable wave choices and current marker', () => {
+  const stages = getStageSelectionViews(2)
+
+  assert.equal(stages.length, 5)
+  assert.equal(stages[2]?.isCurrent, true)
+  assert.match(stages[2]?.description ?? '', /침날개 벌레/)
+  assert.equal(stages.at(-1)?.isBoss, true)
+  assert.match(stages.at(-1)?.description ?? '', /보스 결전/)
+})
+
+test('stage selection skipped clear count preserves boss result accounting', () => {
+  assert.equal(getSkippedRegularWaveCount(0), 0)
+  assert.equal(getSkippedRegularWaveCount(2), 2)
+  assert.equal(getSkippedRegularWaveCount(4), 4)
+  assert.equal(getSkippedRegularWaveCount(99), 4)
+})
+
 test('boss win result presentation is explicit and reward-neutral', () => {
   const presentation = createRunResultPresentation({
     outcome: 'win',
@@ -886,6 +907,8 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   assert.ok(presentation.inventoryLines.every((line) => !/해금|unlock/i.test(line)))
   assert.equal(hudState.title, '런 클리어')
   assert.equal(hudState.inventoryButtonDisabled, true)
+  assert.equal(hudState.stageButtonDisabled, true)
+  assert.equal(hudState.stageSelection.isOpen, false)
   assert.equal(hudState.modal.isOpen, false)
 })
 
@@ -1128,6 +1151,10 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
         this.#regions.set('[data-region="recipes"]', new FakeElement('div'))
         this.#regions.set('[data-region="weapons"]', new FakeElement('div'))
       }
+      if (value.includes('data-region="stages"')) {
+        this.#regions.set('button[data-action="stage-close"]', new FakeElement('button'))
+        this.#regions.set('[data-region="stages"]', new FakeElement('div'))
+      }
     }
 
     addEventListener() {}
@@ -1170,6 +1197,12 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
       status: '전투 중입니다. 계속 움직이세요.',
       inventoryButtonLabel: '인벤토리 열기',
       inventoryButtonDisabled: false,
+      stageButtonLabel: '스테이지 선택',
+      stageButtonDisabled: false,
+      stageSelection: {
+        isOpen: false,
+        stages: [],
+      },
       modal: {
         isOpen: false,
         items: [],

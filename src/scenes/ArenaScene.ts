@@ -112,7 +112,8 @@ import {
   equipOwnedWeapon,
   getActionableRecipes,
 } from '../systems/weaponOwnership.js'
-import { getDefeatedEnemyRunOutcome, shouldAdvanceWave } from '../systems/waves.js'
+import { getSkippedRegularWaveCount, getStageSelectionViews } from '../systems/stageSelection.js'
+import { getDefeatedEnemyRunOutcome, getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
 import { resolveAutoAttackShot } from './arena/autoAttack.js'
 import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
 import {
@@ -230,6 +231,10 @@ interface HazardZoneEntity {
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
 
+interface ArenaSceneStartData {
+  startWaveIndex?: number
+}
+
 export class ArenaScene extends Phaser.Scene {
   private hud!: HudController
 
@@ -285,6 +290,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private isCodexOpen = false
 
+  private isStageSelectOpen = false
+
   private isRunEnding = false
 
   private playerHealth = 100
@@ -323,8 +330,9 @@ export class ArenaScene extends Phaser.Scene {
     super('arena')
   }
 
-  create(): void {
+  create(data: ArenaSceneStartData = {}): void {
     this.resetRunState()
+    const startWaveIndex = this.resolveStartWaveIndex(data.startWaveIndex)
 
     this.hud = this.game.registry.get('hud') as HudController
     this.codex = this.game.registry.get('codex') as CodexController
@@ -334,6 +342,9 @@ export class ArenaScene extends Phaser.Scene {
       onRecipeSelect: (recipeId) => this.handleRecipeSelection(recipeId),
       onWeaponEquip: (weaponId) => this.handleWeaponEquip(weaponId),
       onWeaponTune: (weaponId) => this.handleWeaponTune(weaponId),
+      onStageSelectionToggle: () => this.toggleStageSelection(),
+      onStageSelectionClose: () => this.closeStageSelection(),
+      onStageSelect: (stageIndex) => this.handleStageSelection(stageIndex),
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
@@ -381,7 +392,8 @@ export class ArenaScene extends Phaser.Scene {
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
 
-    this.startWave(0)
+    this.wavesCleared = getSkippedRegularWaveCount(startWaveIndex)
+    this.startWave(startWaveIndex)
     this.syncMiniMap(this.time.now, true)
     this.updateHud()
     this.updateCodex()
@@ -430,7 +442,15 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private isInteractionBlocked(): boolean {
-    return this.isInventoryOpen || this.isCodexOpen
+    return this.isInventoryOpen || this.isCodexOpen || this.isStageSelectOpen
+  }
+
+  private resolveStartWaveIndex(startWaveIndex?: number): number {
+    if (startWaveIndex === undefined || !Number.isInteger(startWaveIndex)) {
+      return 0
+    }
+
+    return getWaveByIndex(startWaveIndex) ? startWaveIndex : 0
   }
 
   private createMapVisuals(): void {
@@ -564,7 +584,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleCodexToggle(): void {
-    if (!Phaser.Input.Keyboard.JustDown(this.codexKey) || this.isInventoryOpen) {
+    if (!Phaser.Input.Keyboard.JustDown(this.codexKey) || this.isInventoryOpen || this.isStageSelectOpen) {
       return
     }
 
@@ -1511,7 +1531,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    if (this.isCodexOpen) {
+    if (this.isCodexOpen || this.isStageSelectOpen) {
       return
     }
 
@@ -1534,6 +1554,47 @@ export class ArenaScene extends Phaser.Scene {
     this.applyInteractionPause(false)
     this.statusMessage = '인벤토리가 닫혔습니다. 전투가 재개됩니다.'
     this.updateHud()
+  }
+
+  private toggleStageSelection(): void {
+    if (this.isStageSelectOpen) {
+      this.closeStageSelection()
+      return
+    }
+
+    this.openStageSelection()
+  }
+
+  private openStageSelection(): void {
+    if (this.isInventoryOpen || this.isCodexOpen || this.isRunEnding) {
+      return
+    }
+
+    this.isStageSelectOpen = true
+    this.applyInteractionPause(true)
+    this.statusMessage = '스테이지 선택이 열렸습니다. 시작할 웨이브를 고르면 런이 새로 시작됩니다.'
+    this.updateHud()
+  }
+
+  private closeStageSelection(): void {
+    if (!this.isStageSelectOpen) {
+      return
+    }
+
+    this.isStageSelectOpen = false
+    this.applyInteractionPause(false)
+    this.statusMessage = '스테이지 선택을 닫았습니다. 전투가 재개됩니다.'
+    this.updateHud()
+  }
+
+  private handleStageSelection(stageIndex: number): void {
+    if (!this.isStageSelectOpen || this.isRunEnding || !getWaveByIndex(stageIndex)) {
+      return
+    }
+
+    this.isStageSelectOpen = false
+    this.applyInteractionPause(false)
+    this.scene.restart({ startWaveIndex: stageIndex })
   }
 
   private applyInteractionPause(shouldPause: boolean): void {
@@ -1822,6 +1883,7 @@ export class ArenaScene extends Phaser.Scene {
     this.tuningState = initialState.tuningState
     this.isInventoryOpen = initialState.isInventoryOpen
     this.isCodexOpen = initialState.isCodexOpen
+    this.isStageSelectOpen = false
     this.isRunEnding = initialState.isRunEnding
     this.playerHealth = initialState.playerHealth
     this.playerMaxHealth = initialState.playerMaxHealth
@@ -1921,6 +1983,7 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnTimer = undefined
     this.isInventoryOpen = false
     this.isCodexOpen = false
+    this.isStageSelectOpen = false
     this.codex.update(getCodexState(false))
     this.physics.world.pause()
     this.freezeCombat(true)
@@ -1956,10 +2019,16 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isBossActive
         ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
         : '웨이브를 돌파하며 드롭을 모아 새로운 무기를 완성하세요.',
-      tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스',
+      tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스 · 스테이지 선택 버튼',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
-      inventoryButtonDisabled: this.isCodexOpen,
+      inventoryButtonDisabled: this.isCodexOpen || this.isStageSelectOpen,
+      stageButtonLabel: this.isStageSelectOpen ? '선택 닫기' : '스테이지 선택',
+      stageButtonDisabled: this.isInventoryOpen || this.isCodexOpen || this.isRunEnding,
+      stageSelection: {
+        isOpen: this.isStageSelectOpen,
+        stages: getStageSelectionViews(this.currentWaveIndex),
+      },
       modal: {
         isOpen: this.isInventoryOpen,
         items: this.getOwnedItemViews(),
