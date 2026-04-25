@@ -7,6 +7,14 @@ import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
 import {
+  describeAvailableRecipes,
+  describeInventoryEntries,
+} from '../.tmp-test/src/scenes/arena/combineInventoryPresenter.js'
+import {
+  applyLootPickup,
+  applyRecipeSelectionWorkflow,
+} from '../.tmp-test/src/scenes/arena/combineInventoryWorkflow.js'
+import {
   applyRecipeSelection,
   equipOwnedWeapon,
   getActionableRecipes,
@@ -60,6 +68,72 @@ test('new arc recipe resolves from the new sample drops', () => {
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
+})
+
+test('loot pickup workflow updates inventory and reports the pickup message', () => {
+  const result = applyLootPickup({}, 'gel-shard')
+
+  assert.deepEqual(result, {
+    nextInventory: { 'gel-shard': 1 },
+    statusMessage: '젤 파편 획득.',
+  })
+})
+
+test('recipe selection workflow reports the current not-actionable status message', () => {
+  const result = applyRecipeSelectionWorkflow(
+    {
+      inventory: {},
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'acid-sprayer-recipe',
+  )
+
+  assert.deepEqual(result, {
+    kind: 'not-actionable',
+    statusMessage: '해당 조합은 더 이상 실행할 수 없습니다. 다른 옵션을 선택하세요.',
+  })
+})
+
+test('recipe selection workflow returns the equipped upgrade state on success', () => {
+  const result = applyRecipeSelectionWorkflow(
+    {
+      inventory: {
+        'gel-shard': 1,
+        'acid-core': 1,
+      },
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'acid-sprayer-recipe',
+  )
+
+  assert.deepEqual(result, {
+    kind: 'success',
+    nextInventory: {},
+    ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
+    activeWeaponId: 'acid-sprayer',
+    statusMessage: '산성 분사기 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
+  })
+})
+
+test('inventory presenter mirrors the arena summary strings', () => {
+  assert.deepEqual(describeInventoryEntries({}), ['아직 획득한 드롭이 없습니다.'])
+  assert.deepEqual(describeInventoryEntries({ 'gel-shard': 2 }), ['젤 파편 × 2'])
+})
+
+test('recipe presenter mirrors the actionable combine summary strings', () => {
+  assert.deepEqual(describeAvailableRecipes([]), ['지금 바로 가능한 조합이 없습니다.'])
+
+  const recipes = getActionableRecipes(
+    {
+      'gel-shard': 1,
+      'acid-core': 1,
+    },
+    ['starter-blaster'],
+  )
+
+  assert.deepEqual(describeAvailableRecipes(recipes), [
+    '산성 분사기 → 피해 20 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
+  ])
 })
 
 test('actionable recipes exclude outputs that are already owned', () => {
