@@ -45,6 +45,7 @@ import {
   type EnemyProjectileState,
 } from '../systems/enemyProjectiles.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import { getEnemyAttackMotionProfile, getEnemyHitMotionProfile } from '../systems/enemyMotion.js'
 import {
   getLootAttractionStep,
   getLootPickupPhase,
@@ -1070,6 +1071,7 @@ export class ArenaScene extends Phaser.Scene {
         )
 
         if (telegraphSpec) {
+          this.playEnemyAttackMotion(enemy)
           const visual = this.add
             .circle(telegraphSpec.x, telegraphSpec.y, telegraphSpec.radius, telegraphSpec.tint, 0.25)
             .setStrokeStyle(2, telegraphSpec.tint, 0.9)
@@ -1107,6 +1109,7 @@ export class ArenaScene extends Phaser.Scene {
         )
 
         if (projectiles.length > 0) {
+          this.playEnemyAttackMotion(enemy)
           enemy.spreadBurst = {
             visual: this.createSpreadBurstWarning(enemy, projectiles),
             projectiles,
@@ -1135,6 +1138,7 @@ export class ArenaScene extends Phaser.Scene {
         )
 
         if (beam) {
+          this.playEnemyAttackMotion(enemy)
           enemy.lineBeam = {
             visual: this.createLineBeamWarning(beam),
             beam,
@@ -1159,6 +1163,7 @@ export class ArenaScene extends Phaser.Scene {
         const projectiles = createEnemyRadialBurstProjectiles(attackBehavior)
 
         if (projectiles.length > 0) {
+          this.playEnemyAttackMotion(enemy)
           enemy.spreadBurst = {
             visual: this.createRadialBurstWarning(enemy, projectiles),
             projectiles,
@@ -1189,6 +1194,7 @@ export class ArenaScene extends Phaser.Scene {
 
       const touchingPlayer = distanceToPlayer < enemy.config.size / 2 + ENEMY_CONTACT_PADDING
       if (touchingPlayer) {
+        this.playEnemyAttackMotion(enemy)
         this.damagePlayer(enemy.config.contactDamage)
         if (this.isRunEnding) {
           return
@@ -1918,12 +1924,7 @@ export class ArenaScene extends Phaser.Scene {
     this.showDamageFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage, criticalHit.isCritical)
 
     if (enemy.currentHealth > 0) {
-      enemy.sprite.setScale(1.08)
-      this.tweens.add({
-        targets: enemy.sprite,
-        scale: 1,
-        duration: 100,
-      })
+      this.playEnemyHitMotion(enemy)
       return true
     }
 
@@ -3003,6 +3004,48 @@ export class ArenaScene extends Phaser.Scene {
     return eligible.map((stack) => {
       const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
       return `${WEAPON_DEFINITIONS[stack.weaponId].name} ${'★'.repeat(stack.star)} 합성 가능 · ${getWeaponSummary(effectiveWeapon)}`
+    })
+  }
+
+  private playEnemyAttackMotion(enemy: EnemyEntity): void {
+    const profile = getEnemyAttackMotionProfile(enemy.config.id, enemy.config.attackBehavior)
+    enemy.sprite.setTint(profile.tint ?? enemy.config.tint)
+    this.tweens.add({
+      targets: enemy.sprite,
+      scaleX: profile.scaleX,
+      scaleY: profile.scaleY,
+      angle: profile.angle,
+      duration: profile.durationMs,
+      yoyo: true,
+      onComplete: () => {
+        if (!enemy.sprite.active) {
+          return
+        }
+        enemy.sprite.setScale(1)
+        enemy.sprite.setAngle(0)
+        enemy.sprite.clearTint()
+      },
+    })
+  }
+
+  private playEnemyHitMotion(enemy: EnemyEntity): void {
+    const profile = getEnemyHitMotionProfile(enemy.config.id)
+    enemy.sprite.setTintFill(profile.tint ?? 0xffffff)
+    this.tweens.add({
+      targets: enemy.sprite,
+      scaleX: profile.scaleX,
+      scaleY: profile.scaleY,
+      angle: profile.angle,
+      duration: profile.durationMs,
+      yoyo: true,
+      onComplete: () => {
+        if (!enemy.sprite.active) {
+          return
+        }
+        enemy.sprite.setScale(1)
+        enemy.sprite.setAngle(0)
+        enemy.sprite.clearTint()
+      },
     })
   }
 
