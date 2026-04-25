@@ -31,29 +31,29 @@ test('wave runtime starts a regular wave with an immediate spawn and scheduled f
   assert.equal(started, true)
   assert.equal(clearedLoops, 1)
   assert.equal(scheduledLoops.length, 1)
-  assert.equal(scheduledLoops[0]?.delayMs, 850)
-  assert.equal(scheduledLoops[0]?.repeat, 5)
+  assert.equal(scheduledLoops[0]?.delayMs, 650)
+  assert.equal(scheduledLoops[0]?.repeat, 17)
   assert.deepEqual(appliedState[0], {
     currentWaveIndex: 0,
     activeWaveLabel: '1 웨이브',
-    remainingSpawns: 6,
+    remainingSpawns: 18,
     statusMessage: '1 웨이브 시작.',
     isBossActive: false,
   })
   assert.deepEqual(spawnedEnemies, ['slime'])
   assert.deepEqual(appliedState[1], {
-    remainingSpawns: 5,
+    remainingSpawns: 17,
   })
 
   scheduledLoops[0]?.onTick()
 
   assert.deepEqual(spawnedEnemies, ['slime', 'slime'])
   assert.deepEqual(appliedState[2], {
-    remainingSpawns: 4,
+    remainingSpawns: 16,
   })
 })
 
-test('wave runtime keeps existing wave shape while tightening regular-wave cadence', () => {
+test('wave runtime locks the extreme-density regular wave cadence', () => {
   const starts = [0, 1, 2].map((index) => {
     const appliedState = []
     const scheduledLoops = []
@@ -77,15 +77,15 @@ test('wave runtime keeps existing wave shape while tightening regular-wave caden
 
   assert.deepEqual(
     starts.map(({ appliedState }) => appliedState[0]?.remainingSpawns),
-    [6, 8, 9],
+    [18, 24, 27],
   )
   assert.deepEqual(
     starts.map(({ scheduledLoops }) => scheduledLoops[0]?.delayMs),
-    [850, 650, 520],
+    [650, 520, 420],
   )
   assert.deepEqual(
     starts.map(({ scheduledLoops }) => scheduledLoops[0]?.repeat),
-    [5, 7, 8],
+    [17, 23, 26],
   )
   assert.deepEqual(
     starts.map(({ spawnedEnemies }) => spawnedEnemies[0]),

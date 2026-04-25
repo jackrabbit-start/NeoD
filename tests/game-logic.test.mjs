@@ -615,23 +615,17 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.ok(bossWave)
   assert.deepEqual(
     getWaveSpawnSequence(secondWave),
-    ['slime', 'slime', 'slime', 'slime', 'slime', 'dash-slime', 'dash-slime', 'dash-slime'],
+    [...Array(15).fill('slime'), ...Array(9).fill('dash-slime')],
   )
   assert.deepEqual(
     flattenWaveEntries(thirdWave.entries),
     [
-      'spark-slime',
-      'spark-slime',
-      'spark-slime',
-      'spark-slime',
-      'orbit-slime',
-      'orbit-slime',
-      'orbit-slime',
-      'dash-slime',
-      'dash-slime',
+      ...Array(12).fill('spark-slime'),
+      ...Array(9).fill('orbit-slime'),
+      ...Array(6).fill('dash-slime'),
     ],
   )
-  assert.equal(getWaveSpawnCount(thirdWave), 9)
+  assert.equal(getWaveSpawnCount(thirdWave), 27)
   assert.deepEqual(getWaveSpawnSequence(eliteWave), ['prism-slime'])
   assert.deepEqual(bossWave.entries, [{ enemyId: 'slime-boss', count: 1 }])
   assert.equal(getBossEnemyId(), 'slime-boss')
