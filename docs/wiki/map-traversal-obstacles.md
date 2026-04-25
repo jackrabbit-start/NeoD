@@ -1,8 +1,8 @@
-# Map Traversal and Blocking Obstacles
+# Map Traversal, Minimap, and Recovery Pickups
 
 ## Status
 
-Durable architecture and verification note for NeoD V1 map traversal, sparse blocking obstacles, and intermittent existing item placement.
+Durable architecture and verification note for NeoD V1 larger-map traversal, obstacle-free movement, top-right minimap display, intermittent existing-material pickups, and intermittent heart recovery pickups.
 
 ## Sources
 
@@ -11,29 +11,37 @@ Durable architecture and verification note for NeoD V1 map traversal, sparse blo
 - PRD: `.omx/plans/prd-map-traversal-obstacles-items.md`
 - Test spec: `.omx/plans/test-spec-map-traversal-obstacles-items.md`
 - Post-interview context: `.omx/context/post-interview-map-traversal-obstacles-items-20260425T123230Z.md`
+- Follow-up change: obstacle-free traversal with top-right minimap and heart recovery pickups.
 
-## Decision
+## Current Decision
 
-Model V1 traversal as a static larger scrolling world, not as a decorative camera illusion or room/portal progression. The player moves through a world larger than the viewport, the camera follows the player, and sparse authored obstacles create real terrain by blocking both player and enemies.
+Model V1 traversal as a static larger scrolling world, not as a decorative camera illusion or room/portal progression. The player moves through a world larger than the viewport and the camera follows the player.
 
-The map layout belongs in pure rules where possible. Runtime Phaser code should consume those rules for camera/world bounds, obstacle bodies, safe enemy spawns, and ambient item placement.
+The current play direction is **obstacle-free traversal**. Keep the map open so enemies can pressure the player without pathfinding or terrain-stuck edge cases. Use the top-right minimap to preserve orientation, and use sparse heart pickups as recovery pressure relief without adding them to the material inventory economy.
+
+Pure helper modules should own projection, bounds, spawn, and healing rules where possible. Runtime Phaser code should consume those helpers for world bounds, safe enemy spawns, ambient item placement, minimap projection, and timed heart pickup behavior.
 
 ## V1 Invariants
 
 - **Viewport vs world:** keep `GAME_WIDTH` / `GAME_HEIGHT` as viewport/UI metrics. Use a separate rectangular world-bounds contract for map/physics/projectile cleanup.
 - **World bounds shape:** prefer `WorldBounds { x, y, width, height }` over width/height-only helpers so origin and margins remain explicit.
-- **Obstacles:** static authored obstacles block player and enemies. They should be sparse, non-maze-like, and tested for start/spawn clearance.
-- **Enemy movement:** V1 enemies are not pathfinding-aware. Mitigate with layout and spawn rules before adding new AI/pathfinding complexity.
-- **Ambient items:** map-placed pickups reuse existing `LootId` item definitions and the existing `LootEntity` attraction/collection path.
+- **Obstacles:** current V1 traversal has no blocking obstacles. Preserve `layout.obstacles = []` unless a new interview/plan explicitly reopens terrain blockers.
+- **Enemy movement:** V1 enemies are velocity-driven and not pathfinding-aware. The obstacle-free map is intentional to avoid stuck enemies while keeping pressure readable.
+- **Ambient material items:** map-placed material pickups reuse existing `LootId` item definitions and the existing `LootEntity` attraction/collection path.
+- **Heart recovery item:** heart pickups are health-only runtime pickups, not `LootId` inventory items and not codex/recipe materials.
 - **Item economy:** do not ambient-spawn `tuning-capsule` in the first pass; keep ambient materials sparse so recipe progression is not flooded.
-- **Projectile terrain:** projectiles are cleaned up against world bounds but are not obstacle-blocked in V1 unless a later plan explicitly reopens that scope.
+- **Minimap:** keep the minimap screen-fixed in the top-right via `setScrollFactor(0)` and deterministic projection helpers.
+- **Projectile terrain:** projectiles are cleaned up against world bounds; there is no obstacle collision in the current map pass.
 - **HUD:** Phaser HUD-like objects that should remain screen-fixed must use `setScrollFactor(0)` after camera follow is introduced.
 
 ## Implementation Surfaces
 
 - Pure layout rules: `src/systems/mapLayout.ts`
+- Minimap projection rules: `src/systems/minimap.ts`
+- Heart pickup timing/healing rules: `src/systems/healthPickups.ts`
 - Runtime scene integration: `src/scenes/ArenaScene.ts`
 - Projectile bounds helper: `src/systems/weaponBehaviors.ts`
+- Heart visual asset: `public/assets/loot/heart-pickup.svg`, registered in `src/game/visualManifest.ts`
 - Tests: `tests/game-logic.test.mjs`, `tests/weapon-behaviors.test.mjs`
 
 ## Verification Expectations
@@ -48,24 +56,29 @@ pnpm build
 
 Preserve or update deterministic tests for:
 
-- obstacle rectangles staying inside rectangular world bounds;
+- world bounds staying larger than the viewport;
 - player start area staying clear;
-- ambient item spawn points staying inside bounds and clear of obstacles;
-- enemy spawn points staying distant from the player, in bounds, and clear of obstacles;
+- obstacle list staying empty while this follow-up decision stands;
+- ambient material spawn points staying inside bounds and excluding `tuning-capsule`;
+- heart spawn points staying inside bounds and outside the `LootId` inventory list;
+- heart pickup healing clamp and intermittent spawn gates;
+- minimap top-right placement and world/viewport projection;
+- enemy spawn points staying distant from the player and in bounds;
 - projectile cleanup using rectangular world bounds;
-- existing loot pickup, wave progression, and weapon behavior regressions.
+- existing loot pickup, wave progression, dash, and weapon behavior regressions.
 
-Manual browser smoke is still important because unit tests cannot prove camera feel or Phaser collision feel. Check camera scrolling, obstacle blocking, enemy engagement, ambient pickup readability, and wave progression.
+Manual browser smoke is still important because unit tests cannot prove camera feel or Phaser rendering feel. Check camera scrolling, minimap readability, heart pickup readability, recovery amount feedback, enemy engagement, ambient pickup readability, and wave progression.
 
-## Rejected Alternatives
+## Rejected / Reversed Alternatives
 
-- **Decorative-only scroll illusion:** rejected because the user explicitly selected a larger scrolling map and real blocking obstacles.
-- **Player-only or visual-only obstacles:** rejected because the requested V1 terrain blocks both player and enemies.
-- **Procedural maps or room transitions:** rejected as out of scope for this first pass.
-- **Immediate pathfinding:** rejected for V1; collision-only enemy behavior is acceptable while layout stays sparse.
+- **Decorative-only scroll illusion:** rejected because the user explicitly selected a larger scrolling map.
+- **Blocking obstacles as the current traversal constraint:** reversed by follow-up request; current V1 map should be obstacle-free.
+- **Heart as inventory loot/material:** rejected because recovery hearts should not pollute recipes, codex material lists, or inventory counts.
+- **Procedural maps or room transitions:** still out of scope for this first pass.
+- **Immediate pathfinding:** unnecessary while the map remains obstacle-free.
 
 ## Remaining Risks
 
-- Collision-only enemies can still get stuck or create exploits if future obstacle layouts become too dense.
 - Large-world combat can feel too sparse if enemy spawns drift too far from the player/camera.
-- Ambient item economy should be playtested before adding replenishment or rare capsules.
+- Heart spawn interval and heal amount need playtesting; too many hearts can erase survival pressure, too few may be invisible.
+- Minimap symbols may need an art/UI pass for readability at small sizes.

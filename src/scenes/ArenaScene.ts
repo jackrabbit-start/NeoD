@@ -48,10 +48,25 @@ import {
 } from '../systems/lootPickup.js'
 import {
   createMapLayout,
+  selectHeartItemSpawnPoint,
   selectEnemySpawnPoint,
   type MapLayout,
-  type RectObstacle,
 } from '../systems/mapLayout.js'
+import {
+  HEART_PICKUP_COLOR,
+  HEART_PICKUP_HEAL_AMOUNT,
+  HEART_PICKUP_TEXTURE_KEY,
+  getHealedPlayerHealth,
+  getInitialHeartPickupSpawnAt,
+  getNextHeartPickupSpawnAt,
+  shouldSpawnHeartPickup,
+} from '../systems/healthPickups.js'
+import {
+  getTopRightMiniMapBounds,
+  projectWorldPointToMiniMap,
+  projectWorldRectToMiniMap,
+  type MiniMapBounds,
+} from '../systems/minimap.js'
 import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
 import {
   canStartPlayerDash,
@@ -113,9 +128,6 @@ import {
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
 type PhysicsSprite = Phaser.Physics.Arcade.Sprite
-type ObstacleBody = Phaser.GameObjects.Rectangle & {
-  body: Phaser.Physics.Arcade.StaticBody
-}
 
 interface EnemyHealthBar {
   background: Phaser.GameObjects.Rectangle
@@ -131,6 +143,12 @@ interface PlayerHealthBar {
   label: Phaser.GameObjects.Text
   width: number
   height: number
+}
+
+interface MiniMapDisplay {
+  graphics: Phaser.GameObjects.Graphics
+  label: Phaser.GameObjects.Text
+  bounds: MiniMapBounds
 }
 
 interface EnemyTelegraph {
@@ -167,6 +185,13 @@ interface EnemyEntity {
 interface LootEntity {
   sprite: PhysicsImage
   itemId: LootId
+  aura: Phaser.GameObjects.Arc
+  auraTween: Phaser.Tweens.Tween
+  isAttracting: boolean
+}
+
+interface HealthPickupEntity {
+  sprite: PhysicsImage
   aura: Phaser.GameObjects.Arc
   auraTween: Phaser.Tweens.Tween
   isAttracting: boolean
@@ -216,13 +241,9 @@ export class ArenaScene extends Phaser.Scene {
 
   private enemySpacingCollider?: Phaser.Physics.Arcade.Collider
 
-  private obstacleBodies?: Phaser.Physics.Arcade.StaticGroup
-
-  private playerObstacleCollider?: Phaser.Physics.Arcade.Collider
-
-  private enemyObstacleCollider?: Phaser.Physics.Arcade.Collider
-
   private mapVisuals: Phaser.GameObjects.GameObject[] = []
+
+  private miniMap?: MiniMapDisplay
 
   private readonly mapLayout: MapLayout = createMapLayout()
 
@@ -237,6 +258,10 @@ export class ArenaScene extends Phaser.Scene {
   private enemies: EnemyEntity[] = []
 
   private lootDrops: LootEntity[] = []
+
+  private healthPickups: HealthPickupEntity[] = []
+
+  private nextHeartPickupAt = 0
 
   private projectiles: ProjectileEntity[] = []
 
@@ -333,12 +358,13 @@ export class ArenaScene extends Phaser.Scene {
 
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
-    this.createObstacles()
+    this.createMiniMap()
     this.seedAmbientLoot()
+    this.nextHeartPickupAt = getInitialHeartPickupSpawnAt(this.time.now)
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
-      throw new Error('NeoD 프로토타입에는 키보드 입력이 필요합니다.')
+      throw new Error('NeoD에는 키보드 입력이 필요합니다.')
     }
 
     this.cursors = keyboard.addKeys({
@@ -352,6 +378,7 @@ export class ArenaScene extends Phaser.Scene {
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
 
     this.startWave(0)
+    this.syncMiniMap()
     this.updateHud()
     this.updateCodex()
   }
@@ -381,12 +408,14 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.updateLootDrops(delta)
+    this.updateHealthPickups(time, delta)
     this.updateHazards(delta)
     if (this.isRunEnding) {
       return
     }
 
     this.cleanupDestroyedEntities()
+    this.syncMiniMap()
 
     if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
       this.advanceWave()
@@ -426,41 +455,95 @@ export class ArenaScene extends Phaser.Scene {
     this.mapVisuals.push(grid)
   }
 
-  private createObstacles(): void {
-    this.obstacleBodies = this.physics.add.staticGroup()
-
-    for (const obstacle of this.mapLayout.obstacles) {
-      const visual = this.createObstacleBody(obstacle)
-      this.obstacleBodies.add(visual)
-      this.mapVisuals.push(visual)
-    }
-    this.obstacleBodies.refresh()
-
-    this.playerObstacleCollider = this.physics.add.collider(this.player, this.obstacleBodies)
-    this.enemyObstacleCollider = this.physics.add.collider(this.enemySprites, this.obstacleBodies)
-  }
-
-  private createObstacleBody(obstacle: RectObstacle): ObstacleBody {
-    const visual = this.add.rectangle(
-      obstacle.x + obstacle.width / 2,
-      obstacle.y + obstacle.height / 2,
-      obstacle.width,
-      obstacle.height,
-      0x1b3145,
-      0.96,
-    ) as ObstacleBody
-    visual.setStrokeStyle(2, 0x426a8f, 0.82)
-    visual.setDepth(1)
-    this.physics.add.existing(visual, true)
-    visual.body.setSize(obstacle.width, obstacle.height)
-    visual.body.updateFromGameObject()
-    return visual
-  }
-
   private seedAmbientLoot(): void {
     for (const spawn of this.mapLayout.ambientItemSpawns) {
       this.spawnLootDrop(spawn.x, spawn.y, spawn.itemId)
     }
+  }
+
+  private createMiniMap(): void {
+    const bounds = getTopRightMiniMapBounds(GAME_WIDTH)
+    const graphics = this.add
+      .graphics()
+      .setDepth(48)
+      .setScrollFactor(0)
+
+    const label = this.add
+      .text(bounds.x + bounds.padding, bounds.y + 4, 'MAP', {
+        color: '#dbeafe',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '10px',
+        fontStyle: '700',
+      })
+      .setDepth(49)
+      .setScrollFactor(0)
+      .setShadow(0, 1, '#020713', 2)
+
+    this.miniMap = {
+      graphics,
+      label,
+      bounds,
+    }
+  }
+
+  private syncMiniMap(): void {
+    if (!this.miniMap || !this.player?.active) {
+      return
+    }
+
+    const { graphics, bounds } = this.miniMap
+    const { worldBounds } = this.mapLayout
+    graphics.clear()
+    graphics.fillStyle(0x020713, 0.72)
+    graphics.fillRoundedRect(bounds.x, bounds.y, bounds.width, bounds.height, 10)
+    graphics.lineStyle(1, 0x93c5fd, 0.52)
+    graphics.strokeRoundedRect(bounds.x, bounds.y, bounds.width, bounds.height, 10)
+
+    const viewport = projectWorldRectToMiniMap(
+      {
+        x: this.cameras.main.worldView.x,
+        y: this.cameras.main.worldView.y,
+        width: this.cameras.main.worldView.width,
+        height: this.cameras.main.worldView.height,
+      },
+      worldBounds,
+      bounds,
+    )
+    graphics.lineStyle(1, 0xffffff, 0.46)
+    graphics.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height)
+
+    for (const loot of this.lootDrops) {
+      if (!loot.sprite.active) {
+        continue
+      }
+      const dot = projectWorldPointToMiniMap(loot.sprite, worldBounds, bounds)
+      graphics.fillStyle(ITEM_DEFINITIONS[loot.itemId].color, 0.82)
+      graphics.fillCircle(dot.x, dot.y, 1.9)
+    }
+
+    for (const pickup of this.healthPickups) {
+      if (!pickup.sprite.active) {
+        continue
+      }
+      const dot = projectWorldPointToMiniMap(pickup.sprite, worldBounds, bounds)
+      graphics.fillStyle(HEART_PICKUP_COLOR, 0.95)
+      graphics.fillCircle(dot.x, dot.y, 2.4)
+    }
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active) {
+        continue
+      }
+      const dot = projectWorldPointToMiniMap(enemy.sprite, worldBounds, bounds)
+      graphics.fillStyle(enemy.config.tint, 0.9)
+      graphics.fillCircle(dot.x, dot.y, enemy.config.id === 'slime-boss' ? 3.3 : 2.2)
+    }
+
+    const playerDot = projectWorldPointToMiniMap(this.player, worldBounds, bounds)
+    graphics.fillStyle(0x66d9ef, 1)
+    graphics.fillCircle(playerDot.x, playerDot.y, 3)
+    graphics.lineStyle(1, 0xffffff, 0.9)
+    graphics.strokeCircle(playerDot.x, playerDot.y, 3.8)
   }
 
   private handleInventoryToggle(): void {
@@ -949,6 +1032,46 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private updateHealthPickups(time: number, delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    const activePickups = this.healthPickups.filter((pickup) => pickup.sprite.active).length
+    if (shouldSpawnHeartPickup(time, this.nextHeartPickupAt, activePickups)) {
+      this.spawnHeartPickup()
+      this.nextHeartPickupAt = getNextHeartPickupSpawnAt(time)
+    }
+
+    for (const pickup of this.healthPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyHealthPickup(pickup)
+        continue
+      }
+
+      const distance = Phaser.Math.Distance.Between(
+        pickup.sprite.x,
+        pickup.sprite.y,
+        this.player.x,
+        this.player.y,
+      )
+      const pickupPhase = getLootPickupPhase(distance)
+
+      if (pickupPhase === 'collect') {
+        this.collectHeartPickup(pickup)
+        continue
+      }
+
+      if (pickupPhase === 'attract') {
+        this.applyHealthPickupAttraction(pickup, distance, delta)
+        continue
+      }
+
+      this.setHealthPickupAttractionStyle(pickup, false)
+      this.syncHealthPickupAura(pickup)
+    }
+  }
+
   private applyLootAttraction(loot: LootEntity, distance: number, delta: number): void {
     this.setLootAttractionStyle(loot, true)
 
@@ -987,9 +1110,52 @@ export class ArenaScene extends Phaser.Scene {
     loot.aura.setStrokeStyle(2, itemColor, 0.78)
   }
 
+  private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number): void {
+    this.setHealthPickupAttractionStyle(pickup, true)
+
+    const attractionStep = getLootAttractionStep(distance, delta)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    if (distance <= 0 || travelDistance <= 0) {
+      this.syncHealthPickupAura(pickup)
+      return
+    }
+
+    const travelRatio = travelDistance / distance
+    pickup.sprite.setPosition(
+      pickup.sprite.x + (this.player.x - pickup.sprite.x) * travelRatio,
+      pickup.sprite.y + (this.player.y - pickup.sprite.y) * travelRatio,
+    )
+    this.syncHealthPickupAura(pickup)
+  }
+
+  private setHealthPickupAttractionStyle(pickup: HealthPickupEntity, isAttracting: boolean): void {
+    if (pickup.isAttracting === isAttracting) {
+      return
+    }
+
+    pickup.isAttracting = isAttracting
+
+    if (isAttracting) {
+      pickup.sprite.setScale(1.2)
+      pickup.sprite.setTint(0xffffff)
+      pickup.aura.setStrokeStyle(3, 0xffffff, 0.95)
+      return
+    }
+
+    pickup.sprite.setScale(1.08)
+    pickup.sprite.clearTint()
+    pickup.aura.setStrokeStyle(2, HEART_PICKUP_COLOR, 0.82)
+  }
+
   private syncLootAura(loot: LootEntity): void {
     if (loot.aura.active) {
       loot.aura.setPosition(loot.sprite.x, loot.sprite.y)
+    }
+  }
+
+  private syncHealthPickupAura(pickup: HealthPickupEntity): void {
+    if (pickup.aura.active) {
+      pickup.aura.setPosition(pickup.sprite.x, pickup.sprite.y)
     }
   }
 
@@ -1002,6 +1168,33 @@ export class ArenaScene extends Phaser.Scene {
 
     if (loot.sprite.active) {
       loot.sprite.destroy()
+    }
+  }
+
+  private collectHeartPickup(pickup: HealthPickupEntity): void {
+    const previousHealth = this.playerHealth
+    this.playerHealth = getHealedPlayerHealth(
+      this.playerHealth,
+      this.playerMaxHealth,
+      HEART_PICKUP_HEAL_AMOUNT,
+    )
+    this.syncPlayerHealthBar()
+    const healedAmount = this.playerHealth - previousHealth
+    this.statusMessage = healedAmount > 0
+      ? `하트 아이템으로 체력 ${healedAmount} 회복.`
+      : '체력이 이미 가득합니다.'
+    this.destroyHealthPickup(pickup)
+  }
+
+  private destroyHealthPickup(pickup: HealthPickupEntity): void {
+    pickup.auraTween.stop()
+
+    if (pickup.aura.active) {
+      pickup.aura.destroy()
+    }
+
+    if (pickup.sprite.active) {
+      pickup.sprite.destroy()
     }
   }
 
@@ -1028,6 +1221,38 @@ export class ArenaScene extends Phaser.Scene {
     this.lootDrops.push({
       sprite: loot,
       itemId,
+      aura,
+      auraTween,
+      isAttracting: false,
+    })
+  }
+
+  private spawnHeartPickup(): void {
+    const spawn = selectHeartItemSpawnPoint(this.mapLayout.heartItemSpawns, Math.random)
+    if (!spawn) {
+      return
+    }
+
+    const aura = this.add.circle(spawn.x, spawn.y, 18, HEART_PICKUP_COLOR, 0.2)
+    aura.setStrokeStyle(2, HEART_PICKUP_COLOR, 0.82)
+    aura.setBlendMode(Phaser.BlendModes.ADD)
+    aura.setDepth(3)
+    const auraTween = this.tweens.add({
+      targets: aura,
+      scale: { from: 0.86, to: 1.22 },
+      alpha: { from: 0.5, to: 0.9 },
+      duration: 680,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    })
+
+    const sprite = this.physics.add.image(spawn.x, spawn.y, HEART_PICKUP_TEXTURE_KEY)
+    sprite.setCircle(11)
+    sprite.setDepth(4)
+    sprite.setScale(1.08)
+    this.healthPickups.push({
+      sprite,
       aura,
       auraTween,
       isAttracting: false,
@@ -1109,6 +1334,12 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
     this.lootDrops = this.lootDrops.filter((loot) => loot.sprite.active)
+    for (const pickup of this.healthPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyHealthPickup(pickup)
+      }
+    }
+    this.healthPickups = this.healthPickups.filter((pickup) => pickup.sprite.active)
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
     this.enemyProjectiles = this.enemyProjectiles.filter((projectile) => projectile.sprite.active)
     this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
@@ -1314,6 +1545,7 @@ export class ArenaScene extends Phaser.Scene {
 
     setSpawnLoopPaused(this.spawnTimer, shouldPause)
     this.setLootPulsePaused(shouldPause)
+    this.setHealthPickupPulsePaused(shouldPause)
 
     this.freezeCombat(shouldPause)
   }
@@ -1326,6 +1558,17 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       loot.auraTween.resume()
+    }
+  }
+
+  private setHealthPickupPulsePaused(shouldPause: boolean): void {
+    for (const pickup of this.healthPickups) {
+      if (shouldPause) {
+        pickup.auraTween.pause()
+        continue
+      }
+
+      pickup.auraTween.resume()
     }
   }
 
@@ -1543,6 +1786,22 @@ export class ArenaScene extends Phaser.Scene {
     this.playerHealthBar = undefined
   }
 
+  private destroyMiniMap(): void {
+    if (!this.miniMap) {
+      return
+    }
+
+    const { graphics, label } = this.miniMap
+    if (graphics.active) {
+      graphics.destroy()
+    }
+    if (label.active) {
+      label.destroy()
+    }
+
+    this.miniMap = undefined
+  }
+
   private resetRunState(): void {
     this.destroyRunEntities()
     this.physics.world.resume()
@@ -1570,6 +1829,7 @@ export class ArenaScene extends Phaser.Scene {
     this.statusMessage = initialState.statusMessage
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
+    this.nextHeartPickupAt = 0
   }
 
   private destroyRunEntities(): void {
@@ -1577,11 +1837,8 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnTimer = undefined
     this.enemySpacingCollider?.destroy()
     this.enemySpacingCollider = undefined
-    this.playerObstacleCollider?.destroy()
-    this.playerObstacleCollider = undefined
-    this.enemyObstacleCollider?.destroy()
-    this.enemyObstacleCollider = undefined
     this.destroyPlayerHealthBar()
+    this.destroyMiniMap()
 
     if (this.player?.active) {
       this.player.destroy()
@@ -1602,6 +1859,10 @@ export class ArenaScene extends Phaser.Scene {
 
     for (const loot of this.lootDrops) {
       this.destroyLootDrop(loot)
+    }
+
+    for (const pickup of this.healthPickups) {
+      this.destroyHealthPickup(pickup)
     }
 
     for (const projectile of this.projectiles) {
@@ -1626,11 +1887,6 @@ export class ArenaScene extends Phaser.Scene {
       this.enemySprites.clear(true, true)
     }
 
-    if (this.obstacleBodies) {
-      this.obstacleBodies.clear(true, true)
-      this.obstacleBodies = undefined
-    }
-
     for (const visual of this.mapVisuals) {
       if ('active' in visual && visual.active) {
         visual.destroy()
@@ -1639,6 +1895,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.enemies = []
     this.lootDrops = []
+    this.healthPickups = []
     this.projectiles = []
     this.enemyProjectiles = []
     this.hazardZones = []
@@ -1677,8 +1934,8 @@ export class ArenaScene extends Phaser.Scene {
     const tuningText = weapon.tuningLabel ? ` · ${weapon.tuningLabel}` : ''
 
     this.hud.update({
-      title: 'NeoD 프로토타입',
-      subtitle: this.activeWaveLabel || '아레나 준비 중',
+      title: 'NeoD',
+      subtitle: this.activeWaveLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `무기: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
@@ -1688,8 +1945,8 @@ export class ArenaScene extends Phaser.Scene {
       inventory: describeInventoryEntries(this.inventory),
       recipes: describeAvailableRecipes(actionableRecipes),
       objective: this.isBossActive
-        ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
-        : '웨이브를 버티고 드롭을 모아 인벤토리에서 업그레이드를 조합하세요.',
+        ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
+        : '웨이브를 돌파하며 드롭을 모아 새로운 무기를 완성하세요.',
       tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',

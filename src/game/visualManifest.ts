@@ -224,6 +224,13 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     fallback: { radius: 10, color: 0xffb15c },
   },
   {
+    key: 'heart-pickup',
+    path: 'assets/loot/heart-pickup.svg',
+    width: 24,
+    height: 24,
+    fallback: { radius: 11, color: 0xff5c8a },
+  },
+  {
     key: 'weapon-starter-blaster',
     path: getHudWeaponAssetPath('weapon-starter-blaster'),
     width: 96,

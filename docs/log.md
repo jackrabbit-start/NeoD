@@ -76,3 +76,8 @@
 
 - Updated the boss dash guidance and player-facing control copy from Space to J because Space can scroll the browser page in the web prototype.
 - Preserved the existing short i-frame dash behavior and boss-pressure constraints.
+
+## [2026-04-25] gameplay-ui | Reworked traversal map toward minimap recovery flow
+
+- Updated `docs/wiki/map-traversal-obstacles.md` to record the follow-up direction: no blocking obstacles, top-right minimap, and intermittent health-only heart pickups.
+- Preserved larger-map traversal rules while marking blocking obstacles as reversed unless a later plan reopens terrain blockers.
