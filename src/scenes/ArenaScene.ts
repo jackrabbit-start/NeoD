@@ -147,6 +147,16 @@ import {
 } from '../systems/weaponBehaviors.js'
 import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import {
+  createHazardZoneEffect,
+  destroyHazardZoneEffect,
+  spawnChainLightningEffect,
+  spawnHazardTickEffect,
+  spawnMeleeSwingEffect,
+  spawnProjectileTrailEffect,
+  updateHazardZoneEffect,
+  type HazardZoneEffect,
+} from './arena/combatEffects.js'
+import {
   resolveEquippedWeaponPresentation,
   resolveEquippedWeaponTextureRefresh,
   resolveWeaponPresentationFacing,
@@ -316,6 +326,8 @@ interface ProjectileEntity {
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
+  visualPowerTier: number
+  trailCooldownMs: number
 }
 
 interface EnemyProjectileEntity extends EnemyProjectileState {
@@ -324,6 +336,7 @@ interface EnemyProjectileEntity extends EnemyProjectileState {
 
 interface HazardZoneEntity {
   visual: Phaser.GameObjects.Arc
+  effect: HazardZoneEffect
   x: number
   y: number
   radius: number
@@ -333,6 +346,8 @@ interface HazardZoneEntity {
   totalLifetimeMs: number
   tickEveryMs: number
   tickCountdownMs: number
+  tint: number
+  visualPowerTier?: number
 }
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
@@ -1257,6 +1272,17 @@ export class ArenaScene extends Phaser.Scene {
         }
       }
 
+      projectile.trailCooldownMs = Math.max(0, projectile.trailCooldownMs - delta)
+      if ((projectile.chain || projectile.visualPowerTier > 0) && projectile.sprite.active && projectile.trailCooldownMs <= 0) {
+        spawnProjectileTrailEffect(
+          this,
+          { x: projectile.sprite.x, y: projectile.sprite.y },
+          projectile.tint,
+          projectile.visualPowerTier,
+        )
+        projectile.trailCooldownMs = projectile.chain ? 70 : 110
+      }
+
       if (didExpireAtRange && projectile.sprite.active) {
         this.destroyProjectile(projectile, projectile.hazardOnExpire)
       }
@@ -1719,6 +1745,14 @@ export class ArenaScene extends Phaser.Scene {
             canCrit: true,
             baseDamage: hazard.baseDamage,
           })
+          spawnHazardTickEffect(this, {
+            radius: hazard.radius,
+            durationMs: hazard.totalLifetimeMs,
+            tickEveryMs: hazard.tickEveryMs,
+            damage: hazard.damage,
+            tint: hazard.tint,
+            visualPowerTier: hazard.visualPowerTier,
+          }, { x: enemy.sprite.x, y: enemy.sprite.y })
           if (this.isRunEnding || this.isInteractionBlocked()) {
             return
           }
@@ -1726,14 +1760,11 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       if (hazardStep.expired) {
-        hazard.visual.destroy()
+        destroyHazardZoneEffect(hazard.effect)
         continue
       }
 
-      hazard.visual.setFillStyle(
-        hazard.visual.fillColor,
-        Math.max(0.12, 0.3 * (hazard.remainingLifetimeMs / hazard.totalLifetimeMs)),
-      )
+      updateHazardZoneEffect(hazard.effect, hazard.remainingLifetimeMs / hazard.totalLifetimeMs)
     }
   }
 
@@ -2671,7 +2702,7 @@ export class ArenaScene extends Phaser.Scene {
 
     for (const hazard of this.hazardZones) {
       if (hazard.visual.active) {
-        hazard.visual.destroy()
+        destroyHazardZoneEffect(hazard.effect)
       }
     }
 
@@ -3364,6 +3395,8 @@ export class ArenaScene extends Phaser.Scene {
       chain: projectileSpec.chain,
       hazardOnHit: projectileSpec.hazardOnHit,
       hazardOnExpire: projectileSpec.hazardOnExpire,
+      visualPowerTier: visualTier,
+      trailCooldownMs: 0,
     })
   }
 
@@ -3408,29 +3441,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnMeleeSwingVisual(swing: MeleeSwingSpec): void {
-    const graphics = this.add.graphics({ x: this.player.x, y: this.player.y })
-    const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
-    const visualTier = Math.max(0, swing.visualPowerTier ?? 0)
-
-    graphics.fillStyle(swing.tint, Math.min(0.44, 0.28 + visualTier * 0.04))
-    graphics.lineStyle(3 + visualTier, swing.tint, Math.min(0.9, 0.65 + visualTier * 0.05))
-    graphics.beginPath()
-    graphics.moveTo(0, 0)
-    graphics.slice(0, 0, swing.range, -halfArcRadians, halfArcRadians, false)
-    graphics.closePath()
-    graphics.fillPath()
-    graphics.strokePath()
-    graphics.setRotation(Math.atan2(swing.direction.y, swing.direction.x))
-    graphics.setDepth(0.7)
-
-    this.tweens.add({
-      targets: graphics,
-      alpha: 0,
-      scaleX: 1.08 + visualTier * 0.03,
-      scaleY: 1.08 + visualTier * 0.03,
-      duration: swing.visualDurationMs,
-      onComplete: () => graphics.destroy(),
-    })
+    spawnMeleeSwingEffect(this, { x: this.player.x, y: this.player.y }, swing)
   }
 
   private applyDirectProjectileKnockback(enemy: EnemyEntity, projectile: ProjectileEntity): void {
@@ -3478,10 +3489,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnHazardZone(x: number, y: number, hazard: HazardSpawnSpec): void {
-    const visual = this.add.circle(x, y, hazard.radius, hazard.tint, 0.3).setDepth(0.4)
+    const effect = createHazardZoneEffect(this, x, y, hazard)
 
     this.hazardZones.push({
-      visual,
+      visual: effect.core,
+      effect,
       x,
       y,
       radius: hazard.radius,
@@ -3491,6 +3503,8 @@ export class ArenaScene extends Phaser.Scene {
       totalLifetimeMs: hazard.durationMs,
       tickEveryMs: hazard.tickEveryMs,
       tickCountdownMs: hazard.tickEveryMs,
+      tint: hazard.tint,
+      visualPowerTier: hazard.visualPowerTier,
     })
   }
 
@@ -3522,6 +3536,14 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
+      spawnChainLightningEffect(
+        this,
+        { x: primaryEnemy.sprite.x, y: primaryEnemy.sprite.y },
+        { x: target.sprite.x, y: target.sprite.y },
+        chain,
+        target.config.tint,
+        chainIndex,
+      )
       const chainBaseDamage = getChainDamage(baseDamage, chainIndex + 1, chain.falloff)
       this.damageEnemy(target, chainBaseDamage, {
         canCrit: true,

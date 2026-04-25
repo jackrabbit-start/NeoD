@@ -2031,7 +2031,7 @@ test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
 
   assert.ok(arenaSceneSource.includes('levelUpgradeLabel: effectiveWeapon.levelUpgradeLabel'))
   assert.ok(arenaSceneSource.includes('projectile.setScale(1 + visualTier * 0.08)'))
-  assert.ok(arenaSceneSource.includes('graphics.lineStyle(3 + visualTier'))
+  assert.ok(arenaSceneSource.includes('spawnMeleeSwingEffect(this'))
   assert.ok(hudSource.includes('weapon.levelUpgradeLabel'))
   assert.ok(hudSource.includes('weapon.levelUpgradeDescription'))
 })
@@ -2044,6 +2044,23 @@ test('arena damage feedback shows normal hits as numbers and critical hits with 
   assert.ok(arenaSceneSource.includes('label: `CRIT! ${damage}`'))
   assert.ok(arenaSceneSource.includes("color: '#f7fbff'"))
   assert.ok(arenaSceneSource.includes("color: '#ffd866'"))
+})
+
+test('combat effects are split out for chain lightning, projectile trails, and hazard range pulses', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+  const combatEffectsSource = readFileSync(resolve(TEST_DIR, '../src/scenes/arena/combatEffects.ts'), 'utf8')
+  const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
+  const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
+  const arcPlan = buildAttackPlan(levelTwentyArc, { x: 0, y: 0 }, { x: 10, y: 0 })
+  const mistPlan = buildAttackPlan(levelTwentyMist, { x: 0, y: 0 }, { x: 10, y: 0 })
+
+  assert.equal(arcPlan.projectiles[0]?.chain?.visualPowerTier, 2)
+  assert.equal(mistPlan.projectiles[0]?.hazardOnHit?.visualPowerTier, 2)
+  assert.ok(arenaSceneSource.includes('spawnChainLightningEffect('))
+  assert.ok(arenaSceneSource.includes('spawnProjectileTrailEffect('))
+  assert.ok(arenaSceneSource.includes('createHazardZoneEffect('))
+  assert.ok(combatEffectsSource.includes('drawJaggedLine'))
+  assert.ok(combatEffectsSource.includes('spawnHazardTickEffect'))
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {
