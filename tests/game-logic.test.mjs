@@ -1148,6 +1148,16 @@ test('run progression exposes per-enemy spawn chance rows for the current minute
   assert.equal(lateRows.reduce((sum, row) => sum + row.ratio, 0).toFixed(4), '1.0000')
 })
 
+test('hud places enemy spawn odds beside the game title for visibility', () => {
+  const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
+  const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
+
+  assert.ok(hudSource.includes('renderTitleEnemyOdds(state.pachinko?.enemyOdds)'))
+  assert.ok(hudSource.includes('hud-summary__enemy-odds'))
+  assert.ok(hudSource.includes('적 출현 확률 ·'))
+  assert.ok(styleSource.includes('.hud-summary__enemy-odds'))
+})
+
 test('nearest auto-attack target returns null when no active enemies are available', () => {
   assert.equal(resolveNearestAutoAttackTarget({ x: 10, y: 10 }, []), null)
   assert.equal(
@@ -2018,6 +2028,16 @@ test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
   assert.ok(arenaSceneSource.includes('graphics.lineStyle(3 + visualTier'))
   assert.ok(hudSource.includes('weapon.levelUpgradeLabel'))
   assert.ok(hudSource.includes('weapon.levelUpgradeDescription'))
+})
+
+test('arena damage feedback shows normal hits as numbers and critical hits with emphasis', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+
+  assert.ok(arenaSceneSource.includes('this.showDamageFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage, criticalHit.isCritical)'))
+  assert.ok(arenaSceneSource.includes('label: `${damage}`'))
+  assert.ok(arenaSceneSource.includes('label: `CRIT! ${damage}`'))
+  assert.ok(arenaSceneSource.includes("color: '#f7fbff'"))
+  assert.ok(arenaSceneSource.includes("color: '#ffd866'"))
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {
