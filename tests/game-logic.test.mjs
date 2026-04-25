@@ -296,7 +296,7 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
     nextInventory: {},
     ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
     activeWeaponId: 'acid-sprayer',
-    statusMessage: '매운맛 분무기 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
+    statusMessage: '난리자베스 분사기 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
   })
 })
 
@@ -577,7 +577,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(acidRecipes), [
-    '매운맛 분무기 [부식 압박] → 피해 20 · 초당 4발 · 사거리 130 · 부식 압박 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
+    '난리자베스 분사기 [난리 분사] → 피해 20 · 초당 4발 · 사거리 130 · 난리 분사 (안정적인 젤을 난리 난 초록 리액션 분사로 바꿉니다.)',
   ])
 
   const sparkRecipes = getActionableRecipes(
@@ -596,10 +596,10 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(sparkRecipes), [
-    '번쩍댓글 카빈 [고속 전격] → 피해 15 · 초당 7발 · 사거리 560 · 고속 전격 (안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.)',
+    '오버드라이브 카빈 [오버드라이브 속사] → 피해 15 · 초당 7발 · 사거리 560 · 오버드라이브 속사 (안정적인 젤 코어로 전하를 붙잡아 쇼츠 박자의 속사 무기로 만듭니다.)',
   ])
   assert.deepEqual(describeAvailableRecipes(mistRecipes), [
-    '시야차단 안개팡 [안개 제어] → 피해 14 · 초당 4발 · 사거리 190 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
+    '멘탈나감 소용돌이 [멘탈 안개] → 피해 14 · 초당 4발 · 사거리 190 · 멘탈 안개 (서리 입자와 안개 구슬을 멘탈 나간 듯한 회전 제어 지대로 만듭니다.)',
   ])
 
   const needleRecipes = getActionableRecipes(
@@ -610,7 +610,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
   assert.deepEqual(describeAvailableRecipes(needleRecipes), [
-    '니들 팬 [산탄 견제] → 피해 16 · 초당 5발 · 사거리 210 · 산탄 견제 (벌레 사수의 날카로운 키틴을 빠른 산탄 무기로 다듬습니다.)',
+    '간바레 응원부채 [간바레 산탄] → 피해 16 · 초당 5발 · 사거리 210 · 간바레 산탄 (벌레 사수의 날카로운 키틴을 간바레 구호 같은 산탄 부채로 다듬습니다.)',
   ])
 })
 

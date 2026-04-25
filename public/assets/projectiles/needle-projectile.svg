@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="8" viewBox="0 0 24 8" role="img" aria-label="needle projectile">
-  <path d="M1 4 L17 1.5 L23 4 L17 6.5 Z" fill="#ffb15c" stroke="#ffe6b8" stroke-width="1"/>
-  <path d="M4 4 H18" stroke="#6b2e14" stroke-width="1.2" stroke-linecap="round" opacity="0.55"/>
+<svg width="24" height="8" viewBox="0 0 24 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M2 4L22 1L18 4L22 7L2 4Z" fill="#FDBA74"/>
+  <path d="M5 4H17" stroke="#7C2D12" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M10 2L13 6" stroke="#FED7AA" stroke-width="1" stroke-linecap="round"/>
 </svg>
