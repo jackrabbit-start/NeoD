@@ -488,7 +488,7 @@ test('player level raises pachinko star range before live table rolls stars', ()
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(17), { minStar: 3, maxStar: 6 })
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(25), { minStar: 4, maxStar: 8 })
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(33), { minStar: 5, maxStar: 10 })
-  assert.deepEqual(getPachinkoStarRangeForTokenXp(PACHINKO_STAR_20_TARGET_TOKEN_XP, 1), { minStar: 16, maxStar: 20 })
+  assert.deepEqual(getPachinkoStarRangeForTokenXp(PACHINKO_STAR_20_TARGET_TOKEN_XP, 1), { minStar: 14, maxStar: 18 })
 
   const lowLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 1).map((slot) => slot.star)
   const midLevelStars = buildPachinkoSlotRewards(1200, PACHINKO_SLOT_COUNT, 0, 9).map((slot) => slot.star)
@@ -564,7 +564,7 @@ test('enemy defeat token progress feeds the same landing reward resolver as the 
 })
 
 test('player progression starts per run and levels from token pickup xp', () => {
-  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 700, 1800, 3400, 5600])
+  assert.deepEqual(PLAYER_LEVEL_XP_THRESHOLDS, [0, 750, 1900, 3600, 5900])
   assert.deepEqual(ENEMY_PLAYER_XP, {
     slime: 60,
     'spark-slime': 90,
@@ -592,26 +592,31 @@ test('player progression starts per run and levels from token pickup xp', () => 
   assert.equal(getPlayerXpForEnemy('slime-boss'), 0)
   assert.equal(getPlayerLevelForXp(0), 1)
   assert.equal(getPlayerLevelForXp(699), 1)
-  assert.equal(getPlayerLevelForXp(700), 2)
-  assert.equal(getPlayerLevelForXp(1800), 3)
-  assert.equal(getPlayerLevelForXp(5600), 5)
-  assert.equal(getPlayerLevelForXp(10300), 7)
-  assert.equal(getPlayerLevelForXp(99900), 35)
-  assert.equal(getPlayerLevelForXp(240000), 56)
-  assert.equal(getPlayerLevelForXp(340000), 67)
+  assert.equal(getPlayerLevelForXp(700), 1)
+  assert.equal(getPlayerLevelForXp(1900), 3)
+  assert.equal(getPlayerLevelForXp(5900), 5)
+  assert.equal(getPlayerLevelForXp(10580), 7)
+  assert.equal(getPlayerLevelForXp(99900), 33)
+  assert.equal(getPlayerLevelForXp(240000), 53)
+  assert.equal(getPlayerLevelForXp(340000), 62)
 
   const firstTokenPickup = applyEnemyPlayerXp(initial, 'prism-slime')
   assert.deepEqual(firstTokenPickup.state, { totalXp: 180, level: 1 })
   assert.equal(firstTokenPickup.grantedXp, 180)
   assert.equal(firstTokenPickup.didLevelUp, false)
   assert.equal(firstTokenPickup.view.xpIntoLevel, 180)
-  assert.equal(firstTokenPickup.view.xpToNextLevel, 700)
+  assert.equal(firstTokenPickup.view.xpToNextLevel, 750)
 
   const nextTokenPickup = applyEnemyPlayerXp(firstTokenPickup.state, 'needle-wasp')
   assert.deepEqual(nextTokenPickup.state, { totalXp: 300, level: 1 })
   assert.equal(nextTokenPickup.didLevelUp, false)
   assert.equal(nextTokenPickup.view.xpIntoLevel, 300)
-  assert.equal(nextTokenPickup.view.progressRatio, 300 / 700)
+  assert.equal(nextTokenPickup.view.xpToNextLevel, 750)
+  assert.equal(nextTokenPickup.view.progressRatio, 300 / 750)
+
+  const levelTwoPickup = applyPlayerXp(nextTokenPickup.state, 500)
+  assert.deepEqual(levelTwoPickup.state, { totalXp: 800, level: 2 })
+  assert.equal(levelTwoPickup.didLevelUp, true)
 
   const bossTokenPickup = applyEnemyPlayerXp(nextTokenPickup.state, 'slime-boss')
   assert.deepEqual(bossTokenPickup.state, nextTokenPickup.state)
@@ -625,8 +630,8 @@ test('player progression view clamps invalid xp and continues past seeded levels
     level: 1,
     currentLevelXp: 0,
     xpIntoLevel: 0,
-    xpToNextLevel: 700,
-    nextLevelAt: 700,
+    xpToNextLevel: 750,
+    nextLevelAt: 750,
     progressRatio: 0,
     isMaxLevel: false,
   })
@@ -634,22 +639,22 @@ test('player progression view clamps invalid xp and continues past seeded levels
   assert.deepEqual(getPlayerProgressionView(10000), {
     totalXp: 10000,
     level: 6,
-    currentLevelXp: 7820,
-    xpIntoLevel: 2180,
-    xpToNextLevel: 2244,
-    nextLevelAt: 10064,
-    progressRatio: 2180 / 2244,
+    currentLevelXp: 8225,
+    xpIntoLevel: 1775,
+    xpToNextLevel: 2355,
+    nextLevelAt: 10580,
+    progressRatio: 1775 / 2355,
     isMaxLevel: false,
   })
 
   assert.deepEqual(getPlayerProgressionView(99900), {
     totalXp: 99900,
-    level: 35,
-    currentLevelXp: 98880,
-    xpIntoLevel: 1020,
-    xpToNextLevel: 4680,
-    nextLevelAt: 103560,
-    progressRatio: 1020 / 4680,
+    level: 33,
+    currentLevelXp: 98720,
+    xpIntoLevel: 1180,
+    xpToNextLevel: 5055,
+    nextLevelAt: 103775,
+    progressRatio: 1180 / 5055,
     isMaxLevel: false,
   })
 

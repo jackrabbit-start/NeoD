@@ -4,7 +4,7 @@ import type { WeaponStar } from '../domain/types.js'
 
 export type RandomSource = () => number
 
-export const MAX_PACHINKO_REWARD_STAR = 20 as const
+export const MAX_PACHINKO_REWARD_STAR = 18 as const
 export const MAX_ACTIVE_PACHINKO_TOKENS = 30 as const
 export const PACHINKO_SLOT_COUNT = 10 as const
 export const PACHINKO_TOKEN_LAUNCH_INTERVAL_MS = 110 as const

@@ -1,8 +1,8 @@
 import type { EnemyId } from '../data/contentIds.js'
 
-export const XP_DISPLAY_SCALE = 4 as const
+export const XP_DISPLAY_SCALE = 5 as const
 
-export const PLAYER_LEVEL_XP_THRESHOLDS = [0, 700, 1800, 3400, 5600] as const
+export const PLAYER_LEVEL_XP_THRESHOLDS = [0, 750, 1900, 3600, 5900] as const
 
 const MIN_PLAYER_LEVEL = 1
 const LAST_SEEDED_LEVEL = PLAYER_LEVEL_XP_THRESHOLDS.length
