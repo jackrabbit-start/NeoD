@@ -5,6 +5,12 @@ import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/co
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
+import {
+  applyRecipeSelection,
+  equipOwnedWeapon,
+  getActionableRecipes,
+  seedOwnedWeapons,
+} from '../.tmp-test/src/systems/weaponOwnership.js'
 import { isBossWaveReady, shouldAdvanceWave } from '../.tmp-test/src/systems/waves.js'
 
 test('weighted drops only return configured loot ids', () => {
@@ -38,6 +44,63 @@ test('combine resolves only when the required inputs exist', () => {
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
+})
+
+test('actionable recipes exclude outputs that are already owned', () => {
+  const inventory = {
+    'gel-shard': 1,
+    'acid-core': 1,
+  }
+
+  assert.deepEqual(seedOwnedWeapons(), ['starter-blaster'])
+  assert.equal(getActionableRecipes(inventory, ['starter-blaster']).length, 1)
+  assert.equal(getActionableRecipes(inventory, ['starter-blaster', 'acid-sprayer']).length, 0)
+})
+
+test('applying a recipe selection adds ownership and auto-equips the new weapon', () => {
+  const result = applyRecipeSelection(
+    {
+      inventory: {
+        'gel-shard': 1,
+        'acid-core': 1,
+      },
+      ownedWeaponIds: ['starter-blaster'],
+      activeWeaponId: 'starter-blaster',
+    },
+    'acid-sprayer-recipe',
+  )
+
+  assert.ok(result)
+  assert.deepEqual(result?.nextInventory, {})
+  assert.deepEqual(result?.ownedWeaponIds, ['starter-blaster', 'acid-sprayer'])
+  assert.equal(result?.activeWeaponId, 'acid-sprayer')
+})
+
+test('duplicate-output recipe selections do not consume inventory', () => {
+  const result = applyRecipeSelection(
+    {
+      inventory: {
+        'gel-shard': 1,
+        'acid-core': 1,
+      },
+      ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
+      activeWeaponId: 'starter-blaster',
+    },
+    'acid-sprayer-recipe',
+  )
+
+  assert.equal(result, null)
+})
+
+test('equipping an owned weapon only changes the active weapon id', () => {
+  assert.equal(
+    equipOwnedWeapon(['starter-blaster', 'frost-lance'], 'starter-blaster', 'frost-lance'),
+    'frost-lance',
+  )
+  assert.equal(
+    equipOwnedWeapon(['starter-blaster'], 'starter-blaster', 'storm-cannon'),
+    'starter-blaster',
+  )
 })
 
 test('wave progression only advances when the current wave is fully cleared', () => {

@@ -2,13 +2,26 @@ import Phaser from 'phaser'
 import { ENEMY_DEFINITIONS } from '../data/enemies.js'
 import { ITEM_DEFINITIONS } from '../data/items.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
+import type {
+  AvailableRecipe,
+  EnemyDefinition,
+  HudOwnedItemView,
+  HudOwnedWeaponView,
+  InventoryState,
+  LootId,
+  WeaponId,
+} from '../domain/types.js'
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { HudController } from '../ui/Hud.js'
-import type { AvailableRecipe, EnemyDefinition, InventoryState, LootId, WeaponId } from '../domain/types.js'
-import { getAvailableRecipes, resolveCombine } from '../systems/combine.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import { addItem } from '../systems/inventory.js'
+import {
+  applyRecipeSelection,
+  equipOwnedWeapon,
+  getActionableRecipes,
+  seedOwnedWeapons,
+} from '../systems/weaponOwnership.js'
 import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
@@ -50,17 +63,19 @@ export class ArenaScene extends Phaser.Scene {
 
   private cursors!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
 
-  private combineKey!: Phaser.Input.Keyboard.Key
-
   private enemies: EnemyEntity[] = []
 
   private lootDrops: LootEntity[] = []
 
   private projectiles: ProjectileEntity[] = []
 
+  private ownedWeaponIds: WeaponId[] = seedOwnedWeapons()
+
   private activeWeaponId: WeaponId = 'starter-blaster'
 
   private inventory: InventoryState = {}
+
+  private isInventoryOpen = false
 
   private playerHealth = 100
 
@@ -82,8 +97,6 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private isCombining = false
-
   private statusMessage = 'Move with WASD, aim with the mouse, and click to fire.'
 
   private lastPlayerHitAt = 0
@@ -94,6 +107,20 @@ export class ArenaScene extends Phaser.Scene {
 
   create(): void {
     this.hud = this.game.registry.get('hud') as HudController
+    this.hud.setHandlers({
+      onInventoryToggle: () => {
+        this.toggleInventory()
+      },
+      onInventoryClose: () => {
+        this.closeInventory()
+      },
+      onRecipeSelect: (recipeId) => {
+        this.handleRecipeSelection(recipeId)
+      },
+      onWeaponEquip: (weaponId) => {
+        this.handleWeaponEquip(weaponId)
+      },
+    })
 
     this.cameras.main.setBackgroundColor('#07111f')
     this.physics.world.setBounds(24, 24, GAME_WIDTH - 48, GAME_HEIGHT - 48)
@@ -133,7 +160,6 @@ export class ArenaScene extends Phaser.Scene {
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D,
     }) as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
-    this.combineKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C)
 
     this.startWave(0)
     this.updateHud()
@@ -142,11 +168,11 @@ export class ArenaScene extends Phaser.Scene {
   update(time: number): void {
     this.handlePlayerMovement()
     this.handleFiring(time)
-    this.handleCombine()
     this.updateEnemies()
     this.updateProjectiles()
     this.cleanupDestroyedEntities()
-    if (shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
+
+    if (!this.isInventoryOpen && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
       this.advanceWave()
     }
 
@@ -154,6 +180,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handlePlayerMovement(): void {
+    if (this.isInventoryOpen) {
+      this.player.setVelocity(0, 0)
+      return
+    }
+
     const velocity = new Phaser.Math.Vector2(
       Number(this.cursors.right.isDown) - Number(this.cursors.left.isDown),
       Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
@@ -167,7 +198,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleFiring(time: number): void {
-    if (this.isCombining || !this.input.activePointer.isDown || time < this.nextFireAt) {
+    if (this.isInventoryOpen || !this.input.activePointer.isDown || time < this.nextFireAt) {
       return
     }
 
@@ -199,44 +230,13 @@ export class ArenaScene extends Phaser.Scene {
     this.nextFireAt = time + weapon.fireRateMs
   }
 
-  private handleCombine(): void {
-    if (this.isCombining || !Phaser.Input.Keyboard.JustDown(this.combineKey)) {
-      return
-    }
-
-    const availableRecipes = getAvailableRecipes(this.inventory)
-    const recipe = availableRecipes[0]
-
-    if (!recipe) {
-      this.statusMessage = 'No valid combine yet. Collect matching drops first.'
-      return
-    }
-
-    const combineResult = resolveCombine(this.inventory, recipe.recipe.id)
-    if (!combineResult) {
-      this.statusMessage = 'Combine failed. Inventory did not match the recipe.'
-      return
-    }
-
-    this.isCombining = true
-    this.inventory = combineResult.nextInventory
-    this.activeWeaponId = combineResult.weaponId
-    this.statusMessage = `Combined into ${recipe.weapon.name}. Combat paused briefly to confirm the upgrade.`
-
-    this.freezeCombat(true)
-    this.time.delayedCall(450, () => {
-      this.isCombining = false
-      this.freezeCombat(false)
-    })
-  }
-
   private updateEnemies(): void {
     for (const enemy of this.enemies) {
       if (!enemy.sprite.active) {
         continue
       }
 
-      if (this.isCombining) {
+      if (this.isInventoryOpen) {
         enemy.sprite.setVelocity(0, 0)
         this.syncEnemyHealthBar(enemy)
         continue
@@ -274,6 +274,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private updateProjectiles(): void {
+    if (this.isInventoryOpen) {
+      return
+    }
+
     for (const projectile of this.projectiles) {
       if (!projectile.sprite.active) {
         continue
@@ -473,7 +477,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private damagePlayer(damage: number): void {
     const now = this.time.now
-    if (now - this.lastPlayerHitAt < 450 || this.isCombining) {
+    if (now - this.lastPlayerHitAt < 450 || this.isInventoryOpen) {
       return
     }
 
@@ -489,6 +493,89 @@ export class ArenaScene extends Phaser.Scene {
     if (this.playerHealth <= 0) {
       this.endRun('loss')
     }
+  }
+
+  private toggleInventory(): void {
+    if (this.isInventoryOpen) {
+      this.closeInventory()
+      return
+    }
+
+    this.openInventory()
+  }
+
+  private openInventory(): void {
+    this.isInventoryOpen = true
+    this.applyInventoryPause(true)
+    this.statusMessage = 'Inventory opened. Combat is paused while you inspect and combine.'
+    this.updateHud()
+  }
+
+  private closeInventory(): void {
+    if (!this.isInventoryOpen) {
+      return
+    }
+
+    this.isInventoryOpen = false
+    this.applyInventoryPause(false)
+    this.statusMessage = 'Inventory closed. Combat resumed.'
+    this.updateHud()
+  }
+
+  private applyInventoryPause(shouldPause: boolean): void {
+    if (shouldPause) {
+      this.player.setVelocity(0, 0)
+      this.physics.world.pause()
+    } else {
+      this.physics.world.resume()
+    }
+
+    if (this.spawnTimer) {
+      this.spawnTimer.paused = shouldPause
+    }
+
+    this.freezeCombat(shouldPause)
+  }
+
+  private handleRecipeSelection(recipeId: string): void {
+    if (!this.isInventoryOpen) {
+      return
+    }
+
+    const result = applyRecipeSelection({
+      inventory: this.inventory,
+      ownedWeaponIds: this.ownedWeaponIds,
+    }, recipeId)
+
+    if (!result) {
+      this.statusMessage = 'That combine is no longer actionable. Choose another option.'
+      this.updateHud()
+      return
+    }
+
+    const weapon = WEAPON_DEFINITIONS[result.weaponId]
+    this.inventory = result.nextInventory
+    this.ownedWeaponIds = result.ownedWeaponIds
+    this.activeWeaponId = result.activeWeaponId
+    this.statusMessage = `${weapon.name} crafted and equipped. Resume the run when ready.`
+    this.updateHud()
+  }
+
+  private handleWeaponEquip(weaponId: WeaponId): void {
+    if (!this.isInventoryOpen) {
+      return
+    }
+
+    const nextWeaponId = equipOwnedWeapon(this.ownedWeaponIds, this.activeWeaponId, weaponId)
+    if (nextWeaponId === this.activeWeaponId) {
+      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} is already equipped.`
+      this.updateHud()
+      return
+    }
+
+    this.activeWeaponId = nextWeaponId
+    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} equipped.`
+    this.updateHud()
   }
 
   private freezeCombat(shouldFreeze: boolean): void {
@@ -562,6 +649,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private endRun(outcome: 'win' | 'loss'): void {
     this.spawnTimer?.remove(false)
+    this.isInventoryOpen = false
     this.freezeCombat(true)
     this.hud.update({
       title: outcome === 'win' ? 'Run complete' : 'Run failed',
@@ -573,8 +661,16 @@ export class ArenaScene extends Phaser.Scene {
       inventory: [],
       recipes: [],
       objective: 'Press R on the result screen to restart.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · C combine',
+      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to swap or combine',
       status: this.statusMessage,
+      inventoryButtonLabel: 'Inventory unavailable',
+      inventoryButtonDisabled: true,
+      modal: {
+        isOpen: false,
+        items: [],
+        recipes: [],
+        weapons: [],
+      },
     })
 
     this.time.delayedCall(600, () => {
@@ -588,7 +684,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private updateHud(): void {
     const weapon = WEAPON_DEFINITIONS[this.activeWeaponId]
-    const recipes = getAvailableRecipes(this.inventory)
+    const actionableRecipes = getActionableRecipes(this.inventory, this.ownedWeaponIds)
 
     this.hud.update({
       title: 'NeoD Prototype',
@@ -600,12 +696,20 @@ export class ArenaScene extends Phaser.Scene {
         `Remaining spawns: ${this.remainingSpawns}`,
       ],
       inventory: this.describeInventory(),
-      recipes: this.describeRecipes(recipes),
+      recipes: this.describeRecipes(actionableRecipes),
       objective: this.isBossActive
         ? 'Defeat the Crown Slime to clear the run.'
-        : 'Survive the waves, collect drops, and press C when a combine is ready.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · C combine',
+        : 'Survive the waves, collect drops, and open inventory to combine upgrades.',
+      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to combine or swap weapons',
       status: this.statusMessage,
+      inventoryButtonLabel: this.isInventoryOpen ? 'Resume run' : 'Open inventory',
+      inventoryButtonDisabled: false,
+      modal: {
+        isOpen: this.isInventoryOpen,
+        items: this.getOwnedItemViews(),
+        recipes: this.getRecipeViews(actionableRecipes),
+        weapons: this.getOwnedWeaponViews(),
+      },
     })
   }
 
@@ -623,11 +727,45 @@ export class ArenaScene extends Phaser.Scene {
 
   private describeRecipes(recipes: AvailableRecipe[]): string[] {
     if (recipes.length === 0) {
-      return ['No valid combine yet.']
+      return ['No actionable combine yet.']
     }
 
     return recipes.map(
       ({ recipe, weapon }) => `${recipe.name} → ${weapon.damage} dmg (${recipe.note})`,
     )
+  }
+
+  private getOwnedItemViews(): HudOwnedItemView[] {
+    return (Object.entries(this.inventory) as [LootId, number][]).map(([itemId, count]) => ({
+      id: itemId,
+      name: ITEM_DEFINITIONS[itemId].name,
+      description: ITEM_DEFINITIONS[itemId].description,
+      count,
+    }))
+  }
+
+  private getRecipeViews(recipes: AvailableRecipe[]) {
+    return recipes.map(({ recipe, weapon }) => ({
+      id: recipe.id,
+      name: recipe.name,
+      outputWeaponId: recipe.outputWeaponId,
+      outputWeaponName: weapon.name,
+      damage: weapon.damage,
+      inputs: recipe.inputs.map((itemId) => ITEM_DEFINITIONS[itemId].name),
+    }))
+  }
+
+  private getOwnedWeaponViews(): HudOwnedWeaponView[] {
+    return this.ownedWeaponIds.map((weaponId) => {
+      const ownedWeapon = WEAPON_DEFINITIONS[weaponId]
+
+      return {
+        id: weaponId,
+        name: ownedWeapon.name,
+        description: ownedWeapon.description,
+        damage: ownedWeapon.damage,
+        isEquipped: weaponId === this.activeWeaponId,
+      }
+    })
   }
 }
