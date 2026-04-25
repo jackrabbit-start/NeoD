@@ -196,8 +196,12 @@ function getWeaponLevelUpgradeLabel(
       return `Lv.${playerStats.level} 공명 · 관통 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
     case 'chain':
       return `Lv.${playerStats.level} 공명 · 연계 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
+    case 'volley':
+      return `Lv.${playerStats.level} 공명 · 연발 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
     case 'spray-hazard':
       return `Lv.${playerStats.level} 공명 · 탄막 +${playerStats.weaponSpecialTier} · 장판 강화`
+    case 'impact-burst':
+      return `Lv.${playerStats.level} 공명 · 폭발 반경 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
     case 'melee-cleave':
       return `Lv.${playerStats.level} 공명 · 범위/타깃 강화 · ${rangeLabel}`
     default:
@@ -216,8 +220,12 @@ function getWeaponLevelUpgradeDescription(
       return '캐릭터 레벨 공명으로 관통 한계가 더 넓어졌습니다.'
     case 'chain':
       return '캐릭터 레벨 공명으로 전하가 더 멀리, 더 많이 이어집니다.'
+    case 'volley':
+      return '캐릭터 레벨 공명으로 연사 수가 늘어나 전방 압박이 더 촘촘해졌습니다.'
     case 'spray-hazard':
       return '캐릭터 레벨 공명으로 탄막 수와 장판 위력이 커졌습니다.'
+    case 'impact-burst':
+      return '캐릭터 레벨 공명으로 착탄 폭발 반경과 여파가 함께 강화됐습니다.'
     case 'melee-cleave':
       return '캐릭터 레벨 공명으로 휘두르는 각도와 타깃 수가 확장됐습니다.'
     default:
@@ -254,12 +262,23 @@ function applyPlayerLevelWeaponMilestones(
         chainRange: Math.round(behavior.chainRange * playerStats.weaponRangeMultiplier),
         chainFalloff: Math.max(0.35, behavior.chainFalloff - 0.03 * specialTier),
       }
+    case 'volley':
+      return {
+        ...behavior,
+        projectileCount: behavior.projectileCount + specialTier,
+      }
     case 'spray-hazard':
       return {
         ...behavior,
         projectileCount: behavior.projectileCount + specialTier,
         hazardRadius: Math.round(behavior.hazardRadius * playerStats.weaponRangeMultiplier),
         hazardDamage: Math.max(1, Math.round(behavior.hazardDamage * playerStats.damageMultiplier)),
+      }
+    case 'impact-burst':
+      return {
+        ...behavior,
+        splashRadius: Math.round(behavior.splashRadius * playerStats.weaponRangeMultiplier),
+        splashDamageMultiplier: Math.min(0.95, behavior.splashDamageMultiplier + 0.08 * specialTier),
       }
     case 'melee-cleave':
       return {

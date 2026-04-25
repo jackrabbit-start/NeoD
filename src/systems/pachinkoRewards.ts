@@ -530,7 +530,7 @@ export function applyEnemyPachinkoTokenProgress(
   tokenXpMultiplier = 1,
 ): PachinkoTokenProgressResult {
   const baseTokenXp = getTokenXpForEnemy(enemyId)
-  const grantedTokenXp = Math.max(0, Math.round(baseTokenXp * tokenXpMultiplier))
+  const grantedTokenXp = Math.max(0, Math.round(baseTokenXp * Math.max(0, tokenXpMultiplier)))
   if (grantedTokenXp <= 0) {
     return {
       ...state,

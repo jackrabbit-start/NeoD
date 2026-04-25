@@ -513,9 +513,13 @@ export class HudController {
     title.textContent = `${weapon.name}${starText ? ` · ${starText}` : ''}${countText}`
     const description = document.createElement('small')
     description.textContent = weapon.levelUpgradeDescription
-      ? `${weapon.description} · ${weapon.levelUpgradeDescription}`
-      : weapon.description
-    textGroup.append(title, description)
+      ? `${weapon.identityLabel} · ${weapon.description} · ${weapon.levelUpgradeDescription}`
+      : `${weapon.identityLabel} · ${weapon.description}`
+
+    const summary = document.createElement('small')
+    summary.className = 'hud-modal__weapon-meta'
+    summary.textContent = weapon.summary
+    textGroup.append(title, description, summary)
 
     const left = document.createElement('div')
     left.className = 'hud-modal__left'
@@ -553,6 +557,7 @@ export class HudController {
     stats.className = `hud-modal__weapon-meta hud-modal__weapon-stats hud-modal__weapon-stats--${variant}`
     const upgradeText = weapon.levelUpgradeLabel ? ` · ${weapon.levelUpgradeLabel}` : ''
     stats.textContent = `${weapon.summary}${upgradeText}`
+    stats.title = weapon.summary
     if (weapon.accentColor != null) {
       stats.style.color = `#${weapon.accentColor.toString(16).padStart(6, '0')}`
     }

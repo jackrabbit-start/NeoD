@@ -300,6 +300,25 @@ export function shouldEnemyStartRadialBurst(
   )
 }
 
+
+export function createEnemyAttackTarget(
+  playerPosition: Point,
+  jitterRadius = 0,
+  random: () => number = Math.random,
+): Point {
+  const radius = Math.max(0, jitterRadius)
+  if (radius <= 0) {
+    return playerPosition
+  }
+
+  const angle = Math.max(0, Math.min(0.999999, random())) * Math.PI * 2
+  const distance = Math.sqrt(Math.max(0, Math.min(0.999999, random()))) * radius
+  return {
+    x: playerPosition.x + Math.cos(angle) * distance,
+    y: playerPosition.y + Math.sin(angle) * distance,
+  }
+}
+
 export function createEnemyTelegraph(
   enemyPosition: Point,
   playerPosition: Point,

@@ -1,6 +1,7 @@
 export const LEGACY_LOOT_PICKUP_DISTANCE = 20
 export const LOOT_ATTRACTION_RADIUS = 72
 export const LOOT_COLLECT_RADIUS = 32
+export const LOOT_ATTRACTION_SETTLE_EPSILON = 1
 
 export type LootPickupPhase = 'idle' | 'attract' | 'collect'
 
@@ -50,6 +51,27 @@ export function getLootPickupPhase(distance: number, tuning?: LootPickupTuningIn
   }
 
   return 'attract'
+}
+
+
+export function getLootAttractionTravelDistance(
+  distance: number,
+  deltaMs: number,
+  tuning?: LootPickupTuningInput,
+): number {
+  const normalized = normalizeLootPickupTuning(tuning)
+  const collectRadius = getEffectiveCollectRadius(normalized)
+  const step = getLootAttractionStep(distance, deltaMs, tuning)
+  if (step <= 0 || distance <= 0) {
+    return 0
+  }
+
+  const collectBoundaryDistance = Math.max(0, distance - collectRadius)
+  if (step >= collectBoundaryDistance) {
+    return Math.min(distance, collectBoundaryDistance + LOOT_ATTRACTION_SETTLE_EPSILON)
+  }
+
+  return step
 }
 
 export function getLootAttractionStep(distance: number, deltaMs: number, tuning?: LootPickupTuningInput): number {

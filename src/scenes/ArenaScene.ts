@@ -26,6 +26,7 @@ import {
   createEnemyRadialBurstProjectiles,
   createEnemySpreadBurstProjectiles,
   createEnemyRuntimeState,
+  createEnemyAttackTarget,
   createEnemyTelegraph,
   getDistanceBetween,
   isPointInsideCircle,
@@ -47,7 +48,7 @@ import {
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import { getEnemyAttackMotionProfile, getEnemyHitMotionProfile } from '../systems/enemyMotion.js'
 import {
-  getLootAttractionStep,
+  getLootAttractionTravelDistance,
   getLootPickupPhase,
   LOOT_ATTRACTION_RADIUS,
   LOOT_COLLECT_RADIUS,
@@ -158,6 +159,7 @@ import {
   collectTargetsInRadius,
   getChainDamage,
   getWeaponAttackRange,
+  getWeaponIdentityLabel,
   getWeaponSummary,
   isAttackPlanActionable,
   isPointWithinRadius,
@@ -165,7 +167,14 @@ import {
   resolveProjectileRangeStep,
   selectChainTargets,
 } from '../systems/weaponBehaviors.js'
-import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
+import type {
+  ChainSpec,
+  HazardSpawnSpec,
+  ImpactBurstSpec,
+  MeleeSwingSpec,
+  Point,
+  ProjectileSpawnSpec,
+} from '../systems/weaponBehaviors.js'
 import {
   createHazardZoneEffect,
   destroyHazardZoneEffect,
@@ -363,6 +372,7 @@ interface ProjectileEntity {
   explosionOnExpire?: HazardSpawnSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
+  impactBurstOnHit?: ImpactBurstSpec
   visualPowerTier: number
   trailCooldownMs: number
 }
@@ -435,6 +445,8 @@ export class ArenaScene extends Phaser.Scene {
   private codexKey!: Phaser.Input.Keyboard.Key
 
   private dashKey!: Phaser.Input.Keyboard.Key
+
+  private passiveChoiceKeys: Phaser.Input.Keyboard.Key[] = []
 
   private enemies: EnemyEntity[] = []
 
@@ -633,6 +645,11 @@ export class ArenaScene extends Phaser.Scene {
     this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
+    this.passiveChoiceKeys = [
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+    ]
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
@@ -651,6 +668,13 @@ export class ArenaScene extends Phaser.Scene {
 
     this.handleInventoryToggle()
     this.handleCodexToggle()
+    this.handlePassiveSelectionHotkeys()
+    if (this.isPassiveSelectionOpen) {
+      this.updateHud()
+      this.updateCodex()
+      return
+    }
+
     this.handlePlayerMovement(time, delta)
     this.syncEquippedWeaponVisual(time)
     this.handleFiring(time)
@@ -1107,9 +1131,16 @@ export class ArenaScene extends Phaser.Scene {
           enemy.attackCooldownMs,
         )
       ) {
+        const attackTarget = createEnemyAttackTarget(
+          { x: this.player.x, y: this.player.y },
+          enemy.config.attackBehavior.kind === 'telegraphed-aoe'
+            ? enemy.config.attackBehavior.targetJitterRadius ?? 0
+            : 0,
+          Math.random,
+        )
         const telegraphSpec = createEnemyTelegraph(
           { x: enemy.sprite.x, y: enemy.sprite.y },
-          { x: this.player.x, y: this.player.y },
+          attackTarget,
           enemy.config.attackBehavior,
         )
 
@@ -1145,9 +1176,14 @@ export class ArenaScene extends Phaser.Scene {
           enemy.attackCooldownMs,
         )
       ) {
+        const attackTarget = createEnemyAttackTarget(
+          { x: this.player.x, y: this.player.y },
+          attackBehavior.targetJitterRadius ?? 0,
+          Math.random,
+        )
         const projectiles = createEnemySpreadBurstProjectiles(
           { x: enemy.sprite.x, y: enemy.sprite.y },
-          { x: this.player.x, y: this.player.y },
+          attackTarget,
           attackBehavior,
         )
 
@@ -1174,9 +1210,14 @@ export class ArenaScene extends Phaser.Scene {
           enemy.attackCooldownMs,
         )
       ) {
+        const attackTarget = createEnemyAttackTarget(
+          { x: this.player.x, y: this.player.y },
+          attackBehavior.targetJitterRadius ?? 0,
+          Math.random,
+        )
         const beam = createEnemyLineBeam(
           { x: enemy.sprite.x, y: enemy.sprite.y },
-          { x: this.player.x, y: this.player.y },
+          attackTarget,
           attackBehavior,
         )
 
@@ -1326,6 +1367,10 @@ export class ArenaScene extends Phaser.Scene {
 
           if (projectile.explosionOnHit) {
             this.applyImpactExplosion(projectile.sprite.x, projectile.sprite.y, projectile.explosionOnHit)
+          }
+
+          if (projectile.impactBurstOnHit) {
+            this.applyImpactBurstDamage(enemy, projectile.impactBurstOnHit, projectile)
           }
 
           if (projectile.hazardOnHit) {
@@ -1527,9 +1572,7 @@ export class ArenaScene extends Phaser.Scene {
     this.setHealthPickupAttractionStyle(pickup, true)
 
     const pickupTuning = this.getLootPickupTuningAt(time)
-    const effectiveCollectRadius = pickupTuning.collectRadius
-    const attractionStep = getLootAttractionStep(distance, delta, pickupTuning)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
+    const travelDistance = getLootAttractionTravelDistance(distance, delta, pickupTuning)
     if (distance <= 0 || travelDistance <= 0) {
       this.syncHealthPickupAura(pickup)
       return
@@ -1640,8 +1683,7 @@ export class ArenaScene extends Phaser.Scene {
   private applyMagnetPickupAttraction(pickup: MagnetPickupEntity, distance: number, delta: number): void {
     this.setMagnetPickupAttractionStyle(pickup, true)
 
-    const attractionStep = getLootAttractionStep(distance, delta)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    const travelDistance = getLootAttractionTravelDistance(distance, delta)
     if (distance <= 0 || travelDistance <= 0) {
       this.syncMagnetPickupAura(pickup)
       return
@@ -1759,9 +1801,7 @@ export class ArenaScene extends Phaser.Scene {
     this.setPachinkoTokenAttractionStyle(pickup, true)
 
     const pickupTuning = this.getLootPickupTuningAt(time)
-    const effectiveCollectRadius = pickupTuning.collectRadius
-    const attractionStep = getLootAttractionStep(distance, delta, pickupTuning)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
+    const travelDistance = getLootAttractionTravelDistance(distance, delta, pickupTuning)
     if (distance <= 0 || travelDistance <= 0) {
       this.syncPachinkoTokenAura(pickup)
       return
@@ -2387,10 +2427,35 @@ export class ArenaScene extends Phaser.Scene {
       Math.random,
       this.getActiveWeaponId(),
     )
+    if (this.pendingPassiveChoices.length === 0) {
+      this.statusMessage = `Lv.${level} 달성! 패시브 후보를 만들지 못해 전투를 계속합니다.`
+      this.updateHud()
+      return
+    }
+
     this.isPassiveSelectionOpen = true
     this.applyInteractionPause(true)
     this.statusMessage = `Lv.${level} 달성! 패시브 카드 1장을 선택하세요.`
     this.updateHud()
+  }
+
+  private handlePassiveSelectionHotkeys(): void {
+    if (!this.isPassiveSelectionOpen || this.pendingPassiveChoices.length === 0) {
+      return
+    }
+
+    for (let index = 0; index < this.passiveChoiceKeys.length; index += 1) {
+      const key = this.passiveChoiceKeys[index]
+      if (!Phaser.Input.Keyboard.JustDown(key)) {
+        continue
+      }
+
+      const choice = this.pendingPassiveChoices[index]
+      if (choice) {
+        this.handlePassiveSelection(choice.id)
+      }
+      return
+    }
   }
 
   private handlePassiveSelection(passiveId: string): void {
@@ -3202,6 +3267,7 @@ export class ArenaScene extends Phaser.Scene {
         stackKey,
         name: ownedWeapon.name,
         description: ownedWeapon.description,
+        identityLabel: getWeaponIdentityLabel(effectiveWeapon),
         summary: getWeaponSummary(effectiveWeapon),
         star: stack.star,
         count: stack.count,
@@ -3221,7 +3287,10 @@ export class ArenaScene extends Phaser.Scene {
     const weaponId = this.getActiveWeaponId()
     const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
     const activeStar = activeStack?.star ?? 1
-    const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar, this.playerProgression.level)
+    const weapon = applyPassiveWeaponEffects(
+      deriveEffectiveWeaponStats(weaponId, {}, activeStar, this.playerProgression.level),
+      this.passiveState,
+    )
     const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
     const attackRange = getWeaponAttackRange(weapon)
 
@@ -3869,6 +3938,7 @@ export class ArenaScene extends Phaser.Scene {
       explosionOnExpire: projectileSpec.explosionOnExpire,
       hazardOnHit: projectileSpec.hazardOnHit,
       hazardOnExpire: projectileSpec.hazardOnExpire,
+      impactBurstOnHit: projectileSpec.impactBurstOnHit,
       visualPowerTier: visualTier,
       trailCooldownMs: 0,
     })
@@ -3977,6 +4047,88 @@ export class ArenaScene extends Phaser.Scene {
     })
 
     enemy.knockback = result.state
+  }
+
+  private applyScaledProjectileKnockback(
+    enemy: EnemyEntity,
+    direction: Point,
+    knockbackMultiplier: number,
+    baseKnockback: ProjectileEntity['knockback'],
+  ): void {
+    const result = resolveKnockbackHit({
+      source: 'direct-projectile',
+      direction,
+      weapon: {
+        force: Math.max(1, Math.round(baseKnockback.force * knockbackMultiplier)),
+        durationMs: Math.max(40, Math.round(baseKnockback.durationMs * Math.max(0.5, knockbackMultiplier))),
+      },
+      enemy: enemy.config.knockback,
+      activeState: enemy.knockback,
+      targetIsTelegraphing: Boolean(enemy.telegraph),
+      hitTimeMs: this.time.now,
+    })
+
+    enemy.knockback = result.state
+  }
+
+  private applyImpactBurstDamage(
+    primaryEnemy: EnemyEntity,
+    impactBurst: ImpactBurstSpec,
+    projectile: ProjectileEntity,
+  ): void {
+    this.spawnImpactBurstVisual(primaryEnemy.sprite.x, primaryEnemy.sprite.y, impactBurst)
+
+    const nearbyTargetIds = new Set(
+      collectTargetsInRadius(
+        { x: primaryEnemy.sprite.x, y: primaryEnemy.sprite.y },
+        impactBurst.radius,
+        this.enemies
+          .filter((enemy) => enemy.sprite.active && enemy.runtimeId !== primaryEnemy.runtimeId)
+          .map((enemy) => ({
+            id: enemy.runtimeId,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            radius: enemy.config.size / 2,
+          })),
+      ),
+    )
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active || !nearbyTargetIds.has(enemy.runtimeId)) {
+        continue
+      }
+
+      const didDamage = this.damageEnemy(enemy, impactBurst.damage, {
+        ignoreRecentHit: true,
+        baseDamage: impactBurst.baseDamage,
+      })
+      if (this.isRunEnding || this.isInteractionBlocked()) {
+        return
+      }
+
+      if (didDamage && enemy.sprite.active) {
+        this.applyScaledProjectileKnockback(
+          enemy,
+          projectile.direction,
+          impactBurst.knockbackMultiplier,
+          projectile.knockback,
+        )
+      }
+    }
+  }
+
+  private spawnImpactBurstVisual(x: number, y: number, impactBurst: ImpactBurstSpec): void {
+    const burst = this.add.circle(x, y, Math.max(18, impactBurst.radius * 0.45), impactBurst.tint, 0.28)
+    burst.setDepth(0.65)
+
+    this.tweens.add({
+      targets: burst,
+      alpha: 0,
+      scaleX: 1.8,
+      scaleY: 1.8,
+      duration: 120,
+      onComplete: () => burst.destroy(),
+    })
   }
 
   private destroyProjectile(

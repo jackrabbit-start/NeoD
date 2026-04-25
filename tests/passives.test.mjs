@@ -46,29 +46,39 @@ test('level-up passive choices are varied but deterministic from the injected ra
   assert.equal(weightedChoices.some((choice) => choice.id === 'rapid-trigger'), false)
 })
 
-test('passives modify effective weapon stats and behavior safely with rolled values', () => {
+test('passives modify hazard, volley, and melee behavior safely with rolled values', () => {
   const rapidTrigger = createPassiveCardChoice('rapid-trigger', 8, createSequenceRandom([0.8]))
   const splitFocus = createPassiveCardChoice('split-focus', 12, createSequenceRandom([0.9]))
   const wideZone = createPassiveCardChoice('wide-zone', 10, createSequenceRandom([0.7, 0.6]))
 
-  let sprayerState = {}
-  sprayerState = addPassiveCard(sprayerState, rapidTrigger)
-  sprayerState = addPassiveCard(sprayerState, splitFocus)
-  sprayerState = addPassiveCard(sprayerState, wideZone)
+  let state = {}
+  state = addPassiveCard(state, rapidTrigger)
+  state = addPassiveCard(state, splitFocus)
+  state = addPassiveCard(state, wideZone)
 
   const baseSprayer = WEAPON_DEFINITIONS['acid-sprayer']
-  const modifiedSprayer = applyPassiveWeaponEffects(baseSprayer, sprayerState)
-
+  const modifiedSprayer = applyPassiveWeaponEffects(baseSprayer, state)
   assert.ok(modifiedSprayer.fireRateMs < baseSprayer.fireRateMs)
   assert.equal(modifiedSprayer.attackBehavior.kind, 'spray-hazard')
   assert.ok(modifiedSprayer.attackBehavior.projectileCount > baseSprayer.attackBehavior.projectileCount)
   assert.ok(modifiedSprayer.attackBehavior.hazardRadius > baseSprayer.attackBehavior.hazardRadius)
+
+  const baseVolley = WEAPON_DEFINITIONS['spark-carbine']
+  const modifiedVolley = applyPassiveWeaponEffects(baseVolley, state)
+  assert.equal(modifiedVolley.attackBehavior.kind, 'volley')
+  assert.ok(modifiedVolley.attackBehavior.projectileCount > baseVolley.attackBehavior.projectileCount)
+  assert.equal(modifiedVolley.attackBehavior.spreadDegrees, baseVolley.attackBehavior.spreadDegrees)
 
   const glaiveState = addPassiveCard({}, createPassiveCardChoice('wide-zone', 6, createSequenceRandom([0.4, 0.9])))
   const baseGlaive = WEAPON_DEFINITIONS['slime-glaive']
   const modifiedGlaive = applyPassiveWeaponEffects(baseGlaive, glaiveState)
   assert.equal(modifiedGlaive.attackBehavior.kind, 'melee-cleave')
   assert.ok(modifiedGlaive.attackBehavior.range > baseGlaive.attackBehavior.range)
+
+  const baseStorm = WEAPON_DEFINITIONS['storm-cannon']
+  const modifiedStorm = applyPassiveWeaponEffects(baseStorm, state)
+  assert.equal(modifiedStorm.attackBehavior.kind, 'impact-burst')
+  assert.equal(modifiedStorm.attackBehavior.splashRadius, baseStorm.attackBehavior.splashRadius)
 })
 
 test('critical-hit resolution stays deterministic from rolled passive state', () => {
@@ -90,14 +100,15 @@ test('passive summaries and player speed reflect rolled and stacked run-local ch
   state = addPassiveCard(state, createPassiveCardChoice('runner-instinct', 4, createSequenceRandom([0.2])))
   state = addPassiveCard(state, createPassiveCardChoice('runner-instinct', 11, createSequenceRandom([0.8])))
   state = addPassiveCard(state, createPassiveCardChoice('keen-sense', 7, createSequenceRandom([0.5])))
+  state = addPassiveCard(state, createPassiveCardChoice('split-focus', 9, createSequenceRandom([0.2])))
 
   assert.ok(applyPassivePlayerSpeed(220, state) > 220)
   const lines = getPassiveSummaryLines(state)
-  assert.equal(lines.length, 2)
+  assert.equal(lines.length, 3)
   assert.match(lines[0], /런각 본능 × 2/)
   assert.match(lines[0], /이동속도 \+/)
-  assert.match(lines[1], /예리한 감각/)
-  assert.match(lines[1], /치명타 확률 \+/)
+  assert.ok(lines.some((line) => /예리한 감각/.test(line)))
+  assert.ok(lines.some((line) => /투사체 \+/.test(line)))
 })
 
 
