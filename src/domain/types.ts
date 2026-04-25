@@ -86,12 +86,40 @@ export interface WeaponBoomerangDefinition {
   returnHits?: number
 }
 
+export interface WeaponRicochetDefinition {
+  maxBounces: number
+  bounceRange: number
+  damageMultiplierPerBounce?: number
+  speedMultiplierPerBounce?: number
+}
+
+export interface WeaponSummonOnKillDefinition {
+  maxMinions: number
+  durationMs: number
+  speed: number
+  damage: number
+  attackIntervalMs: number
+  contactRadius: number
+}
+
+export interface WeaponTurretDefinition {
+  maxTurrets: number
+  durationMs: number
+  range: number
+  fireRateMs: number
+  projectileLifetimeMs: number
+  projectileSpeed: number
+  projectileDamage: number
+}
+
 export interface WeaponSingleBehavior {
   kind: 'single'
   projectileLifetimeMs: number
   distanceScaling?: WeaponDistanceScalingDefinition
   execute?: WeaponExecuteDefinition
   boomerang?: WeaponBoomerangDefinition
+  ricochet?: WeaponRicochetDefinition
+  summonOnKill?: WeaponSummonOnKillDefinition
 }
 
 export interface WeaponSplitShotBehavior {
@@ -184,6 +212,14 @@ export interface WeaponZoneControlBehavior {
   boomerang?: WeaponBoomerangDefinition
 }
 
+export interface WeaponDeployTurretBehavior {
+  kind: 'deploy-turret'
+  projectileLifetimeMs: number
+  speedMultiplier?: number
+  impactDamage?: number
+  deploy: WeaponTurretDefinition
+}
+
 export interface WeaponMeleeCleaveBehavior {
   kind: 'melee-cleave'
   range: number
@@ -191,6 +227,24 @@ export interface WeaponMeleeCleaveBehavior {
   visualDurationMs: number
   maxTargets: number
   execute?: WeaponExecuteDefinition
+  healOnHit?: number
+}
+
+export interface WeaponComboStepDefinition {
+  damageMultiplier: number
+  range: number
+  arcDegrees: number
+  visualDurationMs: number
+  maxTargets: number
+  knockbackMultiplier?: number
+  healOnHit?: number
+  execute?: WeaponExecuteDefinition
+}
+
+export interface WeaponComboMeleeBehavior {
+  kind: 'combo-melee'
+  stepIntervalMs: number
+  steps: WeaponComboStepDefinition[]
 }
 
 export type WeaponAttackBehavior =
@@ -204,7 +258,9 @@ export type WeaponAttackBehavior =
   | WeaponImpactBurstBehavior
   | WeaponImpactAoeBehavior
   | WeaponZoneControlBehavior
+  | WeaponDeployTurretBehavior
   | WeaponMeleeCleaveBehavior
+  | WeaponComboMeleeBehavior
 
 export interface WeaponDefinition {
   id: WeaponId

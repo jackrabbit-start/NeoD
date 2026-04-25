@@ -46,7 +46,7 @@ test('level-up passive choices are varied but deterministic from the injected ra
   assert.equal(weightedChoices.some((choice) => choice.id === 'rapid-trigger'), false)
 })
 
-test('passives modify hazard, burst, and melee behavior safely with rolled values', () => {
+test('passives modify hazard, deployable, split, and melee behavior safely with rolled values', () => {
   const rapidTrigger = createPassiveCardChoice('rapid-trigger', 8, createSequenceRandom([0.8]))
   const splitFocus = createPassiveCardChoice('split-focus', 12, createSequenceRandom([0.9]))
   const wideZone = createPassiveCardChoice('wide-zone', 10, createSequenceRandom([0.7, 0.6]))
@@ -63,11 +63,11 @@ test('passives modify hazard, burst, and melee behavior safely with rolled value
   assert.ok(modifiedSprayer.attackBehavior.projectileCount > baseSprayer.attackBehavior.projectileCount)
   assert.ok(modifiedSprayer.attackBehavior.hazardRadius > baseSprayer.attackBehavior.hazardRadius)
 
-  const baseBurst = WEAPON_DEFINITIONS['spark-carbine']
-  const modifiedBurst = applyPassiveWeaponEffects(baseBurst, state)
-  assert.equal(modifiedBurst.attackBehavior.kind, 'burst-fire')
-  assert.ok(modifiedBurst.attackBehavior.shotsPerBurst > baseBurst.attackBehavior.shotsPerBurst)
-  assert.equal(modifiedBurst.attackBehavior.spreadDegrees, baseBurst.attackBehavior.spreadDegrees)
+  const baseTurret = WEAPON_DEFINITIONS['spark-carbine']
+  const modifiedTurret = applyPassiveWeaponEffects(baseTurret, state)
+  assert.equal(modifiedTurret.attackBehavior.kind, 'deploy-turret')
+  assert.ok(modifiedTurret.attackBehavior.deploy.maxTurrets > baseTurret.attackBehavior.deploy.maxTurrets)
+  assert.ok(modifiedTurret.attackBehavior.deploy.range > baseTurret.attackBehavior.deploy.range)
 
   const glaiveState = addPassiveCard({}, createPassiveCardChoice('wide-zone', 6, createSequenceRandom([0.4, 0.9])))
   const baseGlaive = WEAPON_DEFINITIONS['slime-glaive']
@@ -77,8 +77,8 @@ test('passives modify hazard, burst, and melee behavior safely with rolled value
 
   const baseStorm = WEAPON_DEFINITIONS['storm-cannon']
   const modifiedStorm = applyPassiveWeaponEffects(baseStorm, state)
-  assert.equal(modifiedStorm.attackBehavior.kind, 'impact-aoe')
-  assert.equal(modifiedStorm.attackBehavior.explosionRadius, baseStorm.attackBehavior.explosionRadius)
+  assert.equal(modifiedStorm.attackBehavior.kind, 'split-shot')
+  assert.ok(modifiedStorm.attackBehavior.projectileCount > baseStorm.attackBehavior.projectileCount)
 })
 
 test('critical-hit resolution stays deterministic from rolled passive state', () => {

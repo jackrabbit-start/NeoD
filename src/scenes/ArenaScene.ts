@@ -377,6 +377,9 @@ interface ProjectileEntity {
   distanceScaling?: ProjectileSpawnSpec['distanceScaling']
   execute?: ProjectileSpawnSpec['execute']
   boomerang?: ProjectileSpawnSpec['boomerang']
+  ricochet?: ProjectileSpawnSpec['ricochet']
+  summonOnKill?: ProjectileSpawnSpec['summonOnKill']
+  deployTurret?: ProjectileSpawnSpec['deployTurret']
   isReturning: boolean
   baseMaxHits: number
   visualPowerTier: number
@@ -401,6 +404,34 @@ interface HazardZoneEntity {
   tickCountdownMs: number
   tint: number
   visualPowerTier?: number
+}
+
+interface DeployedTurretEntity {
+  runtimeId: number
+  core: Phaser.GameObjects.Arc
+  ring: Phaser.GameObjects.Arc
+  x: number
+  y: number
+  range: number
+  damage: number
+  projectileSpeed: number
+  projectileLifetimeMs: number
+  fireRateMs: number
+  remainingLifetimeMs: number
+  nextFireAt: number
+  tint: number
+  visualPowerTier: number
+}
+
+interface AlliedMinionEntity {
+  runtimeId: number
+  sprite: PhysicsSprite
+  damage: number
+  speed: number
+  remainingLifetimeMs: number
+  attackIntervalMs: number
+  attackCooldownMs: number
+  contactRadius: number
 }
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
@@ -474,6 +505,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private hazardZones: HazardZoneEntity[] = []
 
+  private deployedTurrets: DeployedTurretEntity[] = []
+
+  private alliedMinions: AlliedMinionEntity[] = []
+
   private weaponStacks: WeaponStack[] = []
 
   private activeWeaponKey: WeaponStackKey = 'starter-blaster:1'
@@ -536,6 +571,8 @@ export class ArenaScene extends Phaser.Scene {
   private lastPlayerHitAt = 0
 
   private nextEnemyRuntimeId = 1
+
+  private nextFriendlyRuntimeId = 1
 
   private pachinkoTokenXp = 0
 
@@ -685,6 +722,16 @@ export class ArenaScene extends Phaser.Scene {
     this.syncEquippedWeaponVisual(time)
     this.handleFiring(time)
     this.updateEnemies(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
+    this.updateAlliedMinions(delta)
+    if (this.isRunEnding) {
+      return
+    }
+
+    this.updateDeployedTurrets(time, delta)
     if (this.isRunEnding) {
       return
     }
@@ -1295,6 +1342,146 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private findNearestEnemyInRange(origin: Point, range: number): EnemyEntity | null {
+    let selected: EnemyEntity | null = null
+    let selectedDistance = range
+
+    for (const enemy of this.enemies) {
+      if (!enemy.sprite.active) {
+        continue
+      }
+
+      const distance = Phaser.Math.Distance.Between(origin.x, origin.y, enemy.sprite.x, enemy.sprite.y)
+      if (distance > selectedDistance) {
+        continue
+      }
+
+      selected = enemy
+      selectedDistance = distance
+    }
+
+    return selected
+  }
+
+  private updateAlliedMinions(delta: number): void {
+    if (this.isInteractionBlocked()) {
+      for (const minion of this.alliedMinions) {
+        if (minion.sprite.active) {
+          minion.sprite.setVelocity(0, 0)
+        }
+      }
+      return
+    }
+
+    for (const minion of this.alliedMinions) {
+      if (!minion.sprite.active) {
+        continue
+      }
+
+      minion.remainingLifetimeMs -= delta
+      minion.attackCooldownMs = Math.max(0, minion.attackCooldownMs - delta)
+      if (minion.remainingLifetimeMs <= 0) {
+        this.destroyAlliedMinion(minion)
+        continue
+      }
+
+      const target = this.findNearestEnemyInRange({ x: minion.sprite.x, y: minion.sprite.y }, 320)
+      if (!target) {
+        minion.sprite.setVelocity(0, 0)
+        continue
+      }
+
+      const direction = new Phaser.Math.Vector2(target.sprite.x - minion.sprite.x, target.sprite.y - minion.sprite.y).normalize()
+      minion.sprite.setVelocity(direction.x * minion.speed, direction.y * minion.speed)
+      minion.sprite.setFlipX(direction.x < 0)
+
+      const contactDistance = target.config.size / 2 + minion.contactRadius
+      if (
+        minion.attackCooldownMs <= 0 &&
+        Phaser.Math.Distance.Between(minion.sprite.x, minion.sprite.y, target.sprite.x, target.sprite.y) <= contactDistance
+      ) {
+        const didDamage = this.damageEnemy(target, minion.damage, {
+          ignoreRecentHit: true,
+          baseDamage: minion.damage,
+        })
+        if (this.isRunEnding || this.isInteractionBlocked()) {
+          return
+        }
+
+        if (didDamage && target.sprite.active) {
+          const result = resolveKnockbackHit({
+            source: 'melee-swing',
+            direction: {
+              x: target.sprite.x - minion.sprite.x,
+              y: target.sprite.y - minion.sprite.y,
+            },
+            weapon: { force: 48, durationMs: 70 },
+            enemy: target.config.knockback,
+            activeState: target.knockback,
+            targetIsTelegraphing: Boolean(target.telegraph),
+            hitTimeMs: this.time.now,
+          })
+          target.knockback = result.state
+        }
+
+        minion.attackCooldownMs = minion.attackIntervalMs
+      }
+    }
+  }
+
+  private updateDeployedTurrets(time: number, delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    for (const turret of this.deployedTurrets) {
+      if (!turret.core.active || !turret.ring.active) {
+        continue
+      }
+
+      turret.remainingLifetimeMs -= delta
+      if (turret.remainingLifetimeMs <= 0) {
+        this.destroyDeployedTurret(turret)
+        continue
+      }
+
+      const pulse = 0.78 + 0.12 * Math.sin((time + turret.runtimeId * 53) / 180)
+      turret.ring.setAlpha(Math.max(0.16, pulse * 0.32))
+
+      if (time < turret.nextFireAt) {
+        continue
+      }
+
+      const target = this.findNearestEnemyInRange({ x: turret.x, y: turret.y }, turret.range)
+      if (!target) {
+        continue
+      }
+
+      const direction = new Phaser.Math.Vector2(target.sprite.x - turret.x, target.sprite.y - turret.y).normalize()
+      this.spawnProjectile({
+        origin: { x: turret.x, y: turret.y },
+        direction: { x: direction.x, y: direction.y },
+        speed: turret.projectileSpeed,
+        damage: turret.damage,
+        tint: turret.tint,
+        radius: 4 + turret.visualPowerTier,
+        lifetimeMs: turret.projectileLifetimeMs,
+        maxTravelDistance: turret.range,
+        maxHits: 1,
+        knockback: { force: 42, durationMs: 68 },
+        visualPowerTier: turret.visualPowerTier,
+      }, 'spark-projectile')
+      turret.nextFireAt = time + turret.fireRateMs
+      this.tweens.add({
+        targets: [turret.core, turret.ring],
+        scaleX: 1.14,
+        scaleY: 1.14,
+        duration: 70,
+        yoyo: true,
+      })
+    }
+  }
+
   private updateProjectiles(delta: number): void {
     if (this.isInteractionBlocked()) {
       return
@@ -1346,7 +1533,7 @@ export class ArenaScene extends Phaser.Scene {
 
       projectile.remainingLifetimeMs -= delta
       if (projectile.remainingLifetimeMs <= 0) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire, projectile.deployTurret)
         continue
       }
 
@@ -1356,7 +1543,7 @@ export class ArenaScene extends Phaser.Scene {
           this.mapLayout.worldBounds,
         )
       ) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire, projectile.deployTurret)
         continue
       }
 
@@ -1388,6 +1575,7 @@ export class ArenaScene extends Phaser.Scene {
           const didDamage = this.damageEnemy(enemy, damageProfile.damage, {
             canCrit: true,
             baseDamage: damageProfile.baseDamage,
+            summonOnKill: projectile.summonOnKill,
           })
           if (this.isRunEnding || this.isInteractionBlocked()) {
             return
@@ -1413,6 +1601,15 @@ export class ArenaScene extends Phaser.Scene {
             this.spawnHazardZone(projectile.sprite.x, projectile.sprite.y, projectile.hazardOnHit)
           }
 
+          if (projectile.deployTurret) {
+            this.spawnDeployedTurret(projectile.sprite.x, projectile.sprite.y, projectile.deployTurret)
+          }
+
+          if (projectile.ricochet && this.bounceProjectile(projectile)) {
+            projectile.remainingHits = Math.max(1, projectile.remainingHits)
+            break
+          }
+
           if (hitStep.destroyed) {
             this.destroyProjectile(projectile)
             break
@@ -1432,7 +1629,7 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       if (didExpireAtRange && projectile.sprite.active) {
-        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire)
+        this.destroyProjectile(projectile, projectile.hazardOnExpire, projectile.explosionOnExpire, projectile.deployTurret)
       }
     }
   }
@@ -1559,6 +1756,91 @@ export class ArenaScene extends Phaser.Scene {
   private destroyEnemyProjectile(projectile: EnemyProjectileEntity): void {
     if (projectile.sprite.active) {
       projectile.sprite.destroy()
+    }
+  }
+
+  private spawnAlliedMinion(
+    defeatedEnemy: EnemyEntity,
+    summon: NonNullable<ProjectileSpawnSpec['summonOnKill']>,
+  ): void {
+    const activeMinions = this.alliedMinions.filter((candidate) => candidate.sprite.active)
+    if (activeMinions.length >= summon.maxMinions) {
+      const oldest = activeMinions[0]
+      if (oldest) {
+        this.destroyAlliedMinion(oldest)
+      }
+    }
+
+    const sprite = this.physics.add.sprite(
+      defeatedEnemy.sprite.x,
+      defeatedEnemy.sprite.y,
+      defeatedEnemy.config.textureKey,
+    )
+    sprite.setScale(0.82)
+    sprite.setAlpha(0.78)
+    sprite.setTint(0x8cffbf)
+    sprite.setDepth(defeatedEnemy.sprite.depth)
+    sprite.setCircle(Math.max(10, summon.contactRadius - 4))
+    sprite.play(defeatedEnemy.config.animationKey, true)
+
+    this.alliedMinions.push({
+      runtimeId: this.nextFriendlyRuntimeId,
+      sprite,
+      damage: summon.damage,
+      speed: summon.speed,
+      remainingLifetimeMs: summon.durationMs,
+      attackIntervalMs: summon.attackIntervalMs,
+      attackCooldownMs: 120,
+      contactRadius: summon.contactRadius,
+    })
+    this.nextFriendlyRuntimeId += 1
+  }
+
+  private destroyAlliedMinion(minion: AlliedMinionEntity): void {
+    if (minion.sprite.active) {
+      minion.sprite.destroy()
+    }
+  }
+
+  private spawnDeployedTurret(x: number, y: number, deploy: NonNullable<ProjectileSpawnSpec['deployTurret']>): void {
+    const activeTurrets = this.deployedTurrets.filter((candidate) => candidate.core.active)
+    if (activeTurrets.length >= deploy.maxTurrets) {
+      const oldest = activeTurrets[0]
+      if (oldest) {
+        this.destroyDeployedTurret(oldest)
+      }
+    }
+
+    const core = this.add.circle(x, y, 10 + Math.max(0, deploy.visualPowerTier ?? 0), deploy.tint, 0.9).setDepth(2.6)
+    const ring = this.add.circle(x, y, 18 + Math.max(0, deploy.visualPowerTier ?? 0) * 2, deploy.tint, 0.18)
+      .setStrokeStyle(2, deploy.tint, 0.58)
+      .setDepth(2.4)
+
+    this.deployedTurrets.push({
+      runtimeId: this.nextFriendlyRuntimeId,
+      core,
+      ring,
+      x,
+      y,
+      range: deploy.range,
+      damage: deploy.projectileDamage,
+      projectileSpeed: deploy.projectileSpeed,
+      projectileLifetimeMs: deploy.projectileLifetimeMs,
+      fireRateMs: deploy.fireRateMs,
+      remainingLifetimeMs: deploy.durationMs,
+      nextFireAt: this.time.now + 120,
+      tint: deploy.tint,
+      visualPowerTier: Math.max(0, deploy.visualPowerTier ?? 0),
+    })
+    this.nextFriendlyRuntimeId += 1
+  }
+
+  private destroyDeployedTurret(turret: DeployedTurretEntity): void {
+    if (turret.core.active) {
+      turret.core.destroy()
+    }
+    if (turret.ring.active) {
+      turret.ring.destroy()
     }
   }
 
@@ -2105,6 +2387,20 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.pachinkoTokenPickups = this.pachinkoTokenPickups.filter((pickup) => pickup.sprite.active)
 
+    for (const minion of this.alliedMinions) {
+      if (!minion.sprite.active) {
+        this.destroyAlliedMinion(minion)
+      }
+    }
+    this.alliedMinions = this.alliedMinions.filter((minion) => minion.sprite.active)
+
+    for (const turret of this.deployedTurrets) {
+      if (!turret.core.active || !turret.ring.active) {
+        this.destroyDeployedTurret(turret)
+      }
+    }
+    this.deployedTurrets = this.deployedTurrets.filter((turret) => turret.core.active && turret.ring.active)
+
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
     this.enemyProjectiles = this.enemyProjectiles.filter((projectile) => projectile.sprite.active)
     this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
@@ -2184,6 +2480,7 @@ export class ArenaScene extends Phaser.Scene {
       ignoreRecentHit?: boolean
       canCrit?: boolean
       baseDamage?: number
+      summonOnKill?: ProjectileSpawnSpec['summonOnKill']
     },
   ): boolean {
     const now = this.time.now
@@ -2216,6 +2513,10 @@ export class ArenaScene extends Phaser.Scene {
     if (enemy.currentHealth > 0) {
       this.playEnemyHitMotion(enemy)
       return true
+    }
+
+    if (options?.summonOnKill) {
+      this.spawnAlliedMinion(enemy, options.summonOnKill)
     }
 
     const defeatOutcome = getDefeatedEnemyRunOutcome(enemy.config.id)
@@ -2286,10 +2587,45 @@ export class ArenaScene extends Phaser.Scene {
       multiplier *= projectile.boomerang.returnDamageMultiplier ?? 1
     }
 
+    if (projectile.ricochet) {
+      const consumedBounces = Math.max(0, projectile.baseMaxHits - projectile.remainingHits)
+      multiplier *= (projectile.ricochet.damageMultiplierPerBounce ?? 1) ** consumedBounces
+    }
+
     return {
       damage: Math.max(1, Math.round(projectile.damage * multiplier)),
       baseDamage: Math.max(1, Math.round(projectile.baseDamage * multiplier)),
     }
+  }
+
+  private bounceProjectile(projectile: ProjectileEntity): boolean {
+    if (!projectile.sprite.active || !projectile.ricochet) {
+      return false
+    }
+
+    const candidate = this.enemies
+      .filter((enemy) => enemy.sprite.active && !projectile.hitEnemyIds.has(enemy.runtimeId))
+      .map((enemy) => ({
+        enemy,
+        distance: Phaser.Math.Distance.Between(projectile.sprite.x, projectile.sprite.y, enemy.sprite.x, enemy.sprite.y),
+      }))
+      .filter(({ distance }) => distance <= projectile.ricochet!.bounceRange)
+      .sort((left, right) => left.distance - right.distance)[0]
+
+    if (!candidate) {
+      return false
+    }
+
+    const direction = new Phaser.Math.Vector2(
+      candidate.enemy.sprite.x - projectile.sprite.x,
+      candidate.enemy.sprite.y - projectile.sprite.y,
+    ).normalize()
+    const speedMultiplier = projectile.ricochet.speedMultiplierPerBounce ?? 1
+    projectile.direction = { x: direction.x, y: direction.y }
+    projectile.speed = Math.max(1, Math.round(projectile.speed * speedMultiplier))
+    projectile.sprite.setVelocity(projectile.direction.x * projectile.speed, projectile.direction.y * projectile.speed)
+    projectile.sprite.setRotation(Math.atan2(projectile.direction.y, projectile.direction.x))
+    return true
   }
 
   private startBoomerangReturn(projectile: ProjectileEntity): void {
@@ -3106,6 +3442,7 @@ export class ArenaScene extends Phaser.Scene {
     this.statusMessage = initialState.statusMessage
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
+    this.nextFriendlyRuntimeId = 1
     this.nextHeartPickupAt = 0
     this.nextMagnetPickupAt = 0
     this.magnetizedUntil = 0
@@ -3168,6 +3505,14 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
 
+    for (const minion of this.alliedMinions) {
+      this.destroyAlliedMinion(minion)
+    }
+
+    for (const turret of this.deployedTurrets) {
+      this.destroyDeployedTurret(turret)
+    }
+
     for (const hazard of this.hazardZones) {
       if (hazard.visual.active) {
         destroyHazardZoneEffect(hazard.effect)
@@ -3195,6 +3540,8 @@ export class ArenaScene extends Phaser.Scene {
     this.projectiles = []
     this.enemyProjectiles = []
     this.hazardZones = []
+    this.alliedMinions = []
+    this.deployedTurrets = []
     this.mapVisuals = []
   }
 
@@ -4043,6 +4390,9 @@ export class ArenaScene extends Phaser.Scene {
       distanceScaling: projectileSpec.distanceScaling,
       execute: projectileSpec.execute,
       boomerang: projectileSpec.boomerang,
+      ricochet: projectileSpec.ricochet,
+      summonOnKill: projectileSpec.summonOnKill,
+      deployTurret: projectileSpec.deployTurret,
       isReturning: false,
       visualPowerTier: visualTier,
       trailCooldownMs: 0,
@@ -4101,6 +4451,11 @@ export class ArenaScene extends Phaser.Scene {
 
       if (didDamage && enemy.sprite.active) {
         this.applyMeleeSwingKnockback(enemy, swing)
+      }
+
+      if (didDamage && swing.healOnHit && swing.healOnHit > 0) {
+        this.playerHealth = Math.min(this.playerMaxHealth, this.playerHealth + swing.healOnHit)
+        this.syncPlayerHealthBar()
       }
     }
   }
@@ -4242,6 +4597,7 @@ export class ArenaScene extends Phaser.Scene {
     projectile: ProjectileEntity,
     hazard?: HazardSpawnSpec,
     explosion?: HazardSpawnSpec,
+    deployTurret?: ProjectileSpawnSpec['deployTurret'],
   ): void {
     if (!projectile.sprite.active) {
       return
@@ -4253,6 +4609,10 @@ export class ArenaScene extends Phaser.Scene {
 
     if (hazard) {
       this.spawnHazardZone(projectile.sprite.x, projectile.sprite.y, hazard)
+    }
+
+    if (deployTurret) {
+      this.spawnDeployedTurret(projectile.sprite.x, projectile.sprite.y, deployTurret)
     }
 
     projectile.sprite.destroy()

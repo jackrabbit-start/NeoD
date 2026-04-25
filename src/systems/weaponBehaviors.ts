@@ -2,6 +2,8 @@ import type {
   WeaponBoomerangDefinition,
   WeaponBurstFireBehavior,
   WeaponChainBehavior,
+  WeaponComboMeleeBehavior,
+  WeaponDeployTurretBehavior,
   WeaponDistanceScalingDefinition,
   WeaponDefinition,
   WeaponExecuteDefinition,
@@ -10,8 +12,11 @@ import type {
   WeaponKnockbackDefinition,
   WeaponMeleeCleaveBehavior,
   WeaponPierceBehavior,
+  WeaponRicochetDefinition,
   WeaponSplitShotBehavior,
   WeaponSprayHazardBehavior,
+  WeaponSummonOnKillDefinition,
+  WeaponTurretDefinition,
   WeaponVolleyBehavior,
   WeaponZoneControlBehavior,
 } from '../domain/types.js'
@@ -52,6 +57,11 @@ export interface ImpactBurstSpec {
   knockbackMultiplier: number
 }
 
+export interface TurretDeploySpec extends WeaponTurretDefinition {
+  tint: number
+  visualPowerTier?: number
+}
+
 export interface ProjectileSpawnSpec {
   delayMs?: number
   origin?: Point
@@ -73,6 +83,9 @@ export interface ProjectileSpawnSpec {
   distanceScaling?: WeaponDistanceScalingDefinition
   execute?: WeaponExecuteDefinition
   boomerang?: WeaponBoomerangDefinition
+  ricochet?: WeaponRicochetDefinition
+  summonOnKill?: WeaponSummonOnKillDefinition
+  deployTurret?: TurretDeploySpec
   visualPowerTier?: number
 }
 
@@ -88,6 +101,7 @@ export interface MeleeSwingSpec {
   maxTargets: number
   knockback: WeaponKnockbackDefinition
   execute?: WeaponExecuteDefinition
+  healOnHit?: number
   visualPowerTier?: number
 }
 
@@ -153,7 +167,10 @@ export type WeaponOutputGeometry =
   | 'chain-hit'
   | 'wide-cleave'
   | 'narrow-cleave'
+  | 'combo-melee'
   | 'hazard-zone'
+  | 'deployable-node'
+  | 'ricochet-shot'
   | 'execute-sweep'
 export type WeaponSpecialEffectProfile =
   | 'none'
@@ -163,6 +180,10 @@ export type WeaponSpecialEffectProfile =
   | 'chain-bounce'
   | 'distance-ramp'
   | 'return-pass'
+  | 'summon-ally'
+  | 'deploy-turret'
+  | 'life-steal'
+  | 'ricochet'
   | 'execute-finisher'
 
 const BASE_PROJECTILE_RADIUS = 5
@@ -411,6 +432,22 @@ const createZoneControlProjectile = (
   })
 }
 
+const createDeployTurretProjectile = (
+  weapon: WeaponDefinition,
+  origin: Point,
+  direction: Point,
+  behavior: WeaponDeployTurretBehavior,
+): ProjectileSpawnSpec =>
+  createBaseProjectile(weapon, origin, direction, behavior.projectileLifetimeMs, {
+    damage: Math.max(1, behavior.impactDamage ?? weapon.damage),
+    speed: Math.max(1, Math.round(weapon.projectileSpeed * (behavior.speedMultiplier ?? 1))),
+    deployTurret: {
+      ...behavior.deploy,
+      tint: weapon.projectileTint,
+      visualPowerTier: weapon.visualPowerTier,
+    },
+  })
+
 const createMeleeSwing = (
   weapon: WeaponDefinition,
   origin: Point,
@@ -427,8 +464,34 @@ const createMeleeSwing = (
   maxTargets: behavior.maxTargets,
   knockback: weapon.knockback,
   execute: behavior.execute,
+  healOnHit: behavior.healOnHit,
   visualPowerTier: weapon.visualPowerTier,
 })
+
+const createComboMeleeSwings = (
+  weapon: WeaponDefinition,
+  origin: Point,
+  direction: Point,
+  behavior: WeaponComboMeleeBehavior,
+): MeleeSwingSpec[] =>
+  behavior.steps.map((step, index) => ({
+    delayMs: index * behavior.stepIntervalMs,
+    origin,
+    direction,
+    damage: Math.max(1, Math.round(weapon.damage * step.damageMultiplier)),
+    tint: weapon.projectileTint,
+    range: step.range,
+    arcDegrees: step.arcDegrees,
+    visualDurationMs: step.visualDurationMs,
+    maxTargets: step.maxTargets,
+    knockback: {
+      force: Math.max(1, Math.round(weapon.knockback.force * (step.knockbackMultiplier ?? 1))),
+      durationMs: Math.max(40, Math.round(weapon.knockback.durationMs * (step.knockbackMultiplier ?? 1))),
+    },
+    execute: step.execute,
+    healOnHit: step.healOnHit,
+    visualPowerTier: weapon.visualPowerTier,
+  }))
 
 export function buildAttackPlan(
   weapon: WeaponDefinition,
@@ -457,6 +520,8 @@ export function buildAttackPlan(
             distanceScaling: weapon.attackBehavior.distanceScaling,
             execute: weapon.attackBehavior.execute,
             boomerang: weapon.attackBehavior.boomerang,
+            ricochet: weapon.attackBehavior.ricochet,
+            summonOnKill: weapon.attackBehavior.summonOnKill,
           }),
         ],
         meleeSwings: [],
@@ -509,6 +574,12 @@ export function buildAttackPlan(
         projectiles: [createZoneControlProjectile(weapon, origin, direction, weapon.attackBehavior)],
         meleeSwings: [],
       }
+    case 'deploy-turret':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: [createDeployTurretProjectile(weapon, origin, direction, weapon.attackBehavior)],
+        meleeSwings: [],
+      }
     case 'impact-burst':
       return {
         cooldownMs: weapon.fireRateMs,
@@ -520,6 +591,12 @@ export function buildAttackPlan(
         cooldownMs: weapon.fireRateMs,
         projectiles: [],
         meleeSwings: [createMeleeSwing(weapon, origin, direction, weapon.attackBehavior)],
+      }
+    case 'combo-melee':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: [],
+        meleeSwings: createComboMeleeSwings(weapon, origin, direction, weapon.attackBehavior),
       }
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in buildAttackPlan')
@@ -535,6 +612,12 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
     return weapon.identityLabel
   }
 
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
+    return '연쇄 리바운드'
+  }
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.summonOnKill) {
+    return '처치 재기동'
+  }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
     return '귀환 사격'
   }
@@ -565,8 +648,12 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
       return '충격 폭발'
     case 'zone-control':
       return '제어 지대'
+    case 'deploy-turret':
+      return '감시 노드'
     case 'melee-cleave':
-      return '전방 참격'
+      return weapon.attackBehavior.healOnHit ? '흡혈 참격' : '전방 참격'
+    case 'combo-melee':
+      return '격투 콤보'
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponIdentityLabel')
   }
@@ -575,6 +662,12 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
 export function getWeaponAttackRange(weapon: WeaponDefinition): number {
   if (weapon.attackBehavior.kind === 'melee-cleave') {
     return weapon.attackBehavior.range
+  }
+  if (weapon.attackBehavior.kind === 'combo-melee') {
+    return Math.max(...weapon.attackBehavior.steps.map((step) => step.range))
+  }
+  if (weapon.attackBehavior.kind === 'deploy-turret') {
+    return typeof weapon.range === 'number' ? weapon.range : weapon.attackBehavior.deploy.range
   }
 
   if (typeof weapon.range === 'number') {
@@ -596,6 +689,9 @@ export function getWeaponRangeBand(weapon: WeaponDefinition): WeaponRangeBand {
 }
 
 export function getWeaponOutputGeometry(weapon: WeaponDefinition): WeaponOutputGeometry {
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
+    return 'ricochet-shot'
+  }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
     return 'return-shot'
   }
@@ -627,14 +723,24 @@ export function getWeaponOutputGeometry(weapon: WeaponDefinition): WeaponOutputG
       return 'line-pierce'
     case 'chain':
       return 'chain-hit'
+    case 'deploy-turret':
+      return 'deployable-node'
     case 'melee-cleave':
       return weapon.attackBehavior.arcDegrees >= 90 ? 'wide-cleave' : 'narrow-cleave'
+    case 'combo-melee':
+      return 'combo-melee'
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponOutputGeometry')
   }
 }
 
 export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponSpecialEffectProfile {
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
+    return 'ricochet'
+  }
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.summonOnKill) {
+    return 'summon-ally'
+  }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
     return 'return-pass'
   }
@@ -664,11 +770,18 @@ export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponS
       return 'hazard-linger'
     case 'chain':
       return 'chain-bounce'
+    case 'deploy-turret':
+      return 'deploy-turret'
     case 'impact-burst':
     case 'impact-aoe':
       return 'impact-splash'
     case 'melee-cleave':
+      if (weapon.attackBehavior.healOnHit) {
+        return 'life-steal'
+      }
       return weapon.knockback.force >= 110 ? 'high-knockback' : 'none'
+    case 'combo-melee':
+      return 'high-knockback'
     case 'split-shot':
     case 'burst-fire':
     case 'volley':
@@ -684,6 +797,12 @@ export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponS
 export function getWeaponSummary(weapon: WeaponDefinition): string {
   const range = getWeaponAttackRange(weapon)
 
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
+    return `피해 ${weapon.damage} · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+  }
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.summonOnKill) {
+    return `피해 ${weapon.damage} · 처치 시 아군화 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+  }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
     return `피해 ${weapon.damage} · 귀환 재타격 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
   }
@@ -712,14 +831,34 @@ export function getWeaponSummary(weapon: WeaponDefinition): string {
       return `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.explosionDamage} · 반경 ${weapon.attackBehavior.explosionRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'zone-control':
       return `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'deploy-turret':
+      return `배치 ${weapon.attackBehavior.deploy.maxTurrets}기 · 포탑당 ${weapon.attackBehavior.deploy.projectileDamage} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'melee-cleave':
-      return `피해 ${weapon.damage} · ${weapon.attackBehavior.execute ? '빈사 수확' : `전방 ${weapon.attackBehavior.arcDegrees}°`} · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.healOnHit ? `흡혈 ${weapon.attackBehavior.healOnHit}` : weapon.attackBehavior.execute ? '빈사 수확' : `전방 ${weapon.attackBehavior.arcDegrees}°`} · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    case 'combo-melee':
+      return `탄당 ${weapon.damage} · ${weapon.attackBehavior.steps.length}연 콤보 · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponSummary')
   }
 }
 
 export function getWeaponAttackContract(weapon: WeaponDefinition): WeaponAttackContract {
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
+    return {
+      family: 'ricochet-single',
+      geometry: `bounce:${weapon.attackBehavior.ricochet.maxBounces}:range:${weapon.attackBehavior.ricochet.bounceRange}`,
+      cadence: `cooldown:${weapon.fireRateMs}`,
+      followUp: 'target-hop',
+    }
+  }
+  if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.summonOnKill) {
+    return {
+      family: 'summon-on-kill',
+      geometry: `single-line:minions:${weapon.attackBehavior.summonOnKill.maxMinions}`,
+      cadence: `cooldown:${weapon.fireRateMs}`,
+      followUp: 'corpse-ally',
+    }
+  }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
     return {
       family: 'boomerang-single',
@@ -805,12 +944,26 @@ export function getWeaponAttackContract(weapon: WeaponDefinition): WeaponAttackC
         cadence: `cooldown:${weapon.fireRateMs}`,
         followUp: weapon.attackBehavior.boomerang ? 'return-anchor' : 'linger-zone',
       }
+    case 'deploy-turret':
+      return {
+        family: 'deploy-turret',
+        geometry: `deploy:${weapon.attackBehavior.deploy.maxTurrets}:range:${weapon.attackBehavior.deploy.range}`,
+        cadence: `cooldown:${weapon.fireRateMs}:turret:${weapon.attackBehavior.deploy.fireRateMs}`,
+        followUp: 'autonomous-fire',
+      }
     case 'melee-cleave':
       return {
-        family: weapon.attackBehavior.execute ? 'execute-cleave' : 'melee-cleave',
+        family: weapon.attackBehavior.healOnHit ? 'lifesteal-cleave' : weapon.attackBehavior.execute ? 'execute-cleave' : 'melee-cleave',
         geometry: `arc:${weapon.attackBehavior.arcDegrees}:range:${weapon.attackBehavior.range}`,
         cadence: `cooldown:${weapon.fireRateMs}`,
-        followUp: weapon.attackBehavior.execute ? 'finisher-window' : 'none',
+        followUp: weapon.attackBehavior.healOnHit ? 'sustain-hit' : weapon.attackBehavior.execute ? 'finisher-window' : 'none',
+      }
+    case 'combo-melee':
+      return {
+        family: 'combo-melee',
+        geometry: `steps:${weapon.attackBehavior.steps.length}:range:${getWeaponAttackRange(weapon)}`,
+        cadence: `cooldown:${weapon.fireRateMs}:interval:${weapon.attackBehavior.stepIntervalMs}`,
+        followUp: 'combo-finisher',
       }
     case 'single':
       return {

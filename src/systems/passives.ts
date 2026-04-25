@@ -960,6 +960,15 @@ function applyAttackBehaviorPassives(
         ...behavior,
         range: Math.max(1, Math.round(behavior.range + totals.rangeDelta)),
       }
+    case 'combo-melee':
+      return {
+        ...behavior,
+        steps: behavior.steps.map((step, index) => ({
+          ...step,
+          range: Math.max(1, Math.round(step.range + totals.rangeDelta)),
+          maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? Math.max(0, totals.projectileCountDelta) : 0),
+        })),
+      }
     case 'spray-hazard':
       return {
         ...behavior,
@@ -985,6 +994,15 @@ function applyAttackBehaviorPassives(
       return {
         ...behavior,
         zoneRadius: Math.max(1, Math.round(behavior.zoneRadius * totals.hazardRadiusMultiplier)),
+      }
+    case 'deploy-turret':
+      return {
+        ...behavior,
+        deploy: {
+          ...behavior.deploy,
+          range: Math.max(1, Math.round(behavior.deploy.range + totals.rangeDelta)),
+          maxTurrets: Math.max(1, behavior.deploy.maxTurrets + Math.max(0, totals.projectileCountDelta)),
+        },
       }
     case 'single':
     case 'pierce':

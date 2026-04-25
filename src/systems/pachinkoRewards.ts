@@ -224,16 +224,16 @@ export function resolveWeightedWeaponReward(
 }
 
 const WEAPON_FAMILY_BY_ID: Record<WeaponId, PachinkoWeaponFamily> = {
-  'starter-blaster': 'starter',
+  'starter-blaster': 'rapid',
   'acid-sprayer': 'spray',
-  'frost-lance': 'pierce',
-  'storm-cannon': 'heavy',
+  'frost-lance': 'heavy',
+  'storm-cannon': 'spray',
   'arc-loom': 'chain',
-  'spark-carbine': 'rapid',
+  'spark-carbine': 'zone',
   'mist-vortex': 'zone',
   'slime-glaive': 'melee',
-  'prism-cutter': 'precision',
-  'needle-fan': 'spray',
+  'prism-cutter': 'melee',
+  'needle-fan': 'chain',
 }
 
 const PACHINKO_FAMILY_LABELS: Record<PachinkoWeaponFamily, string> = {

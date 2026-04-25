@@ -125,11 +125,21 @@ export function deriveEffectiveWeaponStats(
     weapon.fireRateMs * (effect && 'fireRateMultiplier' in effect ? effect.fireRateMultiplier : 1),
   )
   const tunedProjectileSpeed = weapon.projectileSpeed + (effect && 'projectileSpeedDelta' in effect ? effect.projectileSpeedDelta : 0)
-  const baseAttackBehavior = effect && weapon.attackBehavior.kind === 'melee-cleave' && 'meleeRangeDelta' in effect
-    ? {
-        ...weapon.attackBehavior,
-        range: weapon.attackBehavior.range + effect.meleeRangeDelta,
-      }
+  const baseAttackBehavior = effect && 'meleeRangeDelta' in effect
+    ? weapon.attackBehavior.kind === 'melee-cleave'
+      ? {
+          ...weapon.attackBehavior,
+          range: weapon.attackBehavior.range + effect.meleeRangeDelta,
+        }
+      : weapon.attackBehavior.kind === 'combo-melee'
+        ? {
+            ...weapon.attackBehavior,
+            steps: weapon.attackBehavior.steps.map((step) => ({
+              ...step,
+              range: step.range + effect.meleeRangeDelta,
+            })),
+          }
+        : weapon.attackBehavior
     : weapon.attackBehavior
   const attackBehavior = applyPlayerLevelWeaponMilestones(
     baseAttackBehavior.kind === 'melee-cleave' && starBonusSteps > 0
@@ -137,7 +147,15 @@ export function deriveEffectiveWeaponStats(
           ...baseAttackBehavior,
           range: baseAttackBehavior.range + STAR_MELEE_RANGE_STEP * starBonusSteps,
         }
-      : baseAttackBehavior,
+      : baseAttackBehavior.kind === 'combo-melee' && starBonusSteps > 0
+        ? {
+            ...baseAttackBehavior,
+            steps: baseAttackBehavior.steps.map((step) => ({
+              ...step,
+              range: step.range + STAR_MELEE_RANGE_STEP * starBonusSteps,
+            })),
+          }
+        : baseAttackBehavior,
     playerStats,
   )
   const baseRange = typeof weapon.range === 'number'
@@ -214,8 +232,12 @@ function getWeaponLevelUpgradeLabel(
       return `Lv.${playerStats.level} 공명 · 폭심 확대 · ${rangeLabel}`
     case 'zone-control':
       return `Lv.${playerStats.level} 공명 · 포드 지속 · 장판 강화`
+    case 'deploy-turret':
+      return `Lv.${playerStats.level} 공명 · 포탑 증설 · ${rangeLabel}`
     case 'melee-cleave':
       return `Lv.${playerStats.level} 공명 · 범위/타깃 강화 · ${rangeLabel}`
+    case 'combo-melee':
+      return `Lv.${playerStats.level} 공명 · 콤보 강화 · ${rangeLabel}`
     default:
       return `Lv.${playerStats.level} 공명 · ${rangeLabel}`
   }
@@ -250,8 +272,12 @@ function getWeaponLevelUpgradeDescription(
       return '캐릭터 레벨 공명으로 폭심지 반경과 폭발 피해가 동시에 커졌습니다.'
     case 'zone-control':
       return '캐릭터 레벨 공명으로 감시 구역이 더 오래 남고 틱 피해가 더 단단해졌습니다.'
+    case 'deploy-turret':
+      return '캐릭터 레벨 공명으로 포탑 유지 시간과 자동 사격 화력이 함께 강화됐습니다.'
     case 'melee-cleave':
       return '캐릭터 레벨 공명으로 휘두르는 각도와 타깃 수가 확장됐습니다.'
+    case 'combo-melee':
+      return '캐릭터 레벨 공명으로 콤보 마지막 피니시 범위와 마무리 화력이 커졌습니다.'
     default:
       return `캐릭터 레벨 공명으로 무기 성능이 ${Math.round((playerStats.damageMultiplier - 1) * 100)}%만큼 증폭됐습니다.`
   }
@@ -339,12 +365,33 @@ function applyPlayerLevelWeaponMilestones(
         zoneDurationMs: behavior.zoneDurationMs + 220 * specialTier,
         zoneDamage: Math.max(1, Math.round(behavior.zoneDamage * playerStats.damageMultiplier)),
       }
+    case 'deploy-turret':
+      return {
+        ...behavior,
+        deploy: {
+          ...behavior.deploy,
+          maxTurrets: behavior.deploy.maxTurrets + Math.floor((specialTier + 1) / 2),
+          durationMs: behavior.deploy.durationMs + 260 * specialTier,
+          range: Math.round(behavior.deploy.range * playerStats.weaponRangeMultiplier),
+          projectileDamage: Math.max(1, Math.round(behavior.deploy.projectileDamage * playerStats.damageMultiplier)),
+        },
+      }
     case 'melee-cleave':
       return {
         ...behavior,
         range: Math.round(behavior.range * playerStats.weaponRangeMultiplier),
         arcDegrees: Math.min(160, behavior.arcDegrees + 6 * specialTier),
         maxTargets: behavior.maxTargets + specialTier,
+      }
+    case 'combo-melee':
+      return {
+        ...behavior,
+        steps: behavior.steps.map((step, index) => ({
+          ...step,
+          range: Math.round(step.range * playerStats.weaponRangeMultiplier),
+          maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? specialTier : 0),
+          damageMultiplier: step.damageMultiplier + (index === behavior.steps.length - 1 ? 0.08 * specialTier : 0.03 * specialTier),
+        })),
       }
     default:
       return behavior
