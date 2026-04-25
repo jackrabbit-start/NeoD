@@ -15,6 +15,8 @@ export const WEAPON_IDS = [
   'frost-lance',
   'storm-cannon',
   'arc-loom',
+  'spark-carbine',
+  'mist-vortex',
 ] as const
 
 export type WeaponId = (typeof WEAPON_IDS)[number]
@@ -24,6 +26,8 @@ export const RECIPE_IDS = [
   'frost-lance-recipe',
   'storm-cannon-recipe',
   'arc-loom-recipe',
+  'spark-carbine-recipe',
+  'mist-vortex-recipe',
 ] as const
 
 export type RecipeId = (typeof RECIPE_IDS)[number]

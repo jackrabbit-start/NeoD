@@ -78,21 +78,84 @@ jobs:
         run: |
           set -euo pipefail
 
-          attempts=3
+          prebuilt_attempts=3
+          source_attempts=2
           delay_seconds=10
+          inspect_timeout=5m
+          promote_timeout=5m
 
-          for attempt in $(seq 1 "$attempts"); do
-            echo "Vercel deploy attempt ${attempt}/${attempts}"
+          deploy_and_promote() {
+            local label="$1"
+            shift
 
-            if vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}; then
+            local deploy_stdout_file
+            local deploy_stderr_file
+            local deploy_exit_code=0
+            local deployment_url=""
+
+            deploy_stdout_file="$(mktemp)"
+            deploy_stderr_file="$(mktemp)"
+
+            if ! vercel deploy "$@" >"${deploy_stdout_file}" 2>"${deploy_stderr_file}"; then
+              deploy_exit_code=$?
+            fi
+
+            cat "${deploy_stderr_file}"
+
+            deployment_url="$(tr -d '\r' < "${deploy_stdout_file}" | awk 'NF { last = $0 } END { print last }')"
+
+            if [ -n "${deployment_url}" ]; then
+              echo "Captured ${label} deployment URL: ${deployment_url}"
+
+              if vercel inspect "${deployment_url}" --wait --timeout="${inspect_timeout}" --token=${{ secrets.VERCEL_TOKEN }}; then
+                echo "${label} deployment is ready. Promoting it to current production..."
+
+                if vercel promote "${deployment_url}" --yes --timeout="${promote_timeout}" --token=${{ secrets.VERCEL_TOKEN }}; then
+                  return 0
+                fi
+
+                echo "${label} promotion did not complete cleanly. Checking promotion status before retry..."
+                vercel promote status --timeout="${promote_timeout}" --token=${{ secrets.VERCEL_TOKEN }} || true
+              fi
+
+              echo "${label} deployment did not become ready through the inspect wait path. Printing available Vercel logs..."
+              vercel inspect "${deployment_url}" --logs --token=${{ secrets.VERCEL_TOKEN }} || true
+            fi
+
+            if [ "${deploy_exit_code}" -ne 0 ]; then
+              echo "vercel deploy exited with code ${deploy_exit_code} before ${label} deployment readiness succeeded."
+            fi
+
+            return 1
+          }
+
+          for attempt in $(seq 1 "${prebuilt_attempts}"); do
+            echo "Vercel staged prebuilt deploy attempt ${attempt}/${prebuilt_attempts}"
+
+            if deploy_and_promote "staged prebuilt" --prebuilt --archive=tgz --prod --skip-domain --no-wait --token=${{ secrets.VERCEL_TOKEN }}; then
               exit 0
             fi
 
-            if [ "$attempt" -lt "$attempts" ]; then
-              echo "Vercel deploy failed with a non-zero exit code. Retrying in ${delay_seconds}s..."
+            if [ "${attempt}" -lt "${prebuilt_attempts}" ]; then
+              echo "Vercel staged prebuilt deploy/promote attempt failed. Retrying in ${delay_seconds}s..."
               sleep "$delay_seconds"
             fi
           done
 
-          echo "Vercel deploy failed after ${attempts} attempts."
+          echo "Prebuilt deployment path failed after ${prebuilt_attempts} attempts. Falling back to source deployment."
+
+          for attempt in $(seq 1 "${source_attempts}"); do
+            echo "Vercel staged source deploy attempt ${attempt}/${source_attempts}"
+
+            if deploy_and_promote "staged source" --archive=tgz --prod --skip-domain --no-wait --token=${{ secrets.VERCEL_TOKEN }}; then
+              exit 0
+            fi
+
+            if [ "${attempt}" -lt "${source_attempts}" ]; then
+              echo "Vercel staged source deploy/promote attempt failed. Retrying in ${delay_seconds}s..."
+              sleep "$delay_seconds"
+            fi
+          done
+
+          echo "Vercel staged deploy/promote failed after exhausting both prebuilt and source deployment paths."
           exit 1

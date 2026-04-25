@@ -18,6 +18,8 @@ export function getCodexState(isOpen: boolean): CodexState {
       return {
         id: recipe.id,
         name: recipe.name,
+        identityLabel: recipe.identityLabel,
+        identityHint: recipe.identityHint,
         note: recipe.note,
         inputs: recipe.inputs.map((itemId) => {
           const item = ITEM_DEFINITIONS[itemId]

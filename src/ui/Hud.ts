@@ -351,7 +351,9 @@ export class HudController {
       title.textContent = recipe.name
       const inputs = document.createElement('small')
       inputs.textContent = recipe.inputs.join(' + ')
-      textGroup.append(title, inputs)
+      const identity = document.createElement('small')
+      identity.textContent = `${recipe.identityLabel}: ${recipe.identityHint}`
+      textGroup.append(title, identity, inputs)
 
       const left = document.createElement('div')
       left.className = 'hud-modal__left'
