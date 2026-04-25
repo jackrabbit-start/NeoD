@@ -22,17 +22,19 @@ app.innerHTML = `
         <span></span>
       </div>
     </header>
-    <section class="game-frame">
-      <div class="hud-panel" id="hud"></div>
-      <div class="codex-panel" id="codex" hidden></div>
-      <div id="game-root"></div>
+    <section class="game-stage-shell">
+      <section class="game-frame">
+        <div class="codex-panel" id="codex" hidden></div>
+        <div id="game-root"></div>
+      </section>
+      <section class="hud-panel" id="hud"></section>
     </section>
   </main>
 `
 
 const hudElement = document.querySelector<HTMLElement>('#hud')
 if (!hudElement) {
-  throw new Error('Expected #hud overlay element.')
+  throw new Error('Expected #hud root element.')
 }
 
 const codexElement = document.querySelector<HTMLElement>('#codex')

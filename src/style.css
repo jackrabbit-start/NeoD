@@ -41,14 +41,19 @@ button {
 
 #app {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 16px;
+  padding: 6px 12px 8px;
 }
 
 .game-shell {
+  width: min(960px, calc(100vw - 32px));
+  margin: 0 auto;
   display: grid;
   gap: 18px;
+}
+
+.game-stage-shell {
+  display: grid;
+  gap: 10px;
 }
 
 .game-header {
@@ -110,7 +115,7 @@ button {
 
 .game-frame {
   position: relative;
-  width: min(960px, calc(100vw - 32px));
+  width: 100%;
   aspect-ratio: 16 / 9;
   border: 1px solid rgba(151, 191, 255, 0.32);
   border-radius: 24px;
@@ -151,10 +156,13 @@ button {
 }
 
 .hud-panel {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
+  position: relative;
+  padding: 6px 8px;
+  border: 1px solid rgba(156, 181, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(5, 8, 22, 0.78);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  color: #ecf2ff;
 }
 
 .codex-panel {
@@ -176,10 +184,7 @@ button {
 }
 
 .hud-summary {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  width: min(360px, calc(100% - 36px));
+  width: 100%;
   padding: 16px;
   border: 1px solid var(--ui-border);
   border-radius: 24px;
@@ -193,21 +198,10 @@ button {
   color: #ecf2ff;
   font-size: 13px;
   line-height: 1.45;
-  pointer-events: auto;
-}
-
-.hud-summary::before {
-  content: "";
-  position: absolute;
-  inset: 12px;
-  border: 1px solid rgba(151, 191, 255, 0.12);
-  border-radius: 18px;
-  pointer-events: none;
 }
 
 .hud-summary h1,
 .hud-summary h2,
-.hud-summary h3,
 .hud-summary p,
 .codex-panel h2,
 .codex-panel h3,
@@ -339,7 +333,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .hud-summary__inventory-header h2 {
@@ -351,14 +345,13 @@ button {
 }
 
 .hud-button {
-  border: 1px solid var(--ui-border-strong);
+  border: 1px solid rgba(151, 191, 255, 0.28);
   border-radius: 999px;
   background:
-    linear-gradient(135deg, rgba(143, 228, 255, 0.2), rgba(143, 228, 255, 0) 58%),
-    rgba(18, 36, 70, 0.94);
+    linear-gradient(135deg, rgba(143, 228, 255, 0.14), rgba(143, 228, 255, 0.02) 72%),
+    rgba(13, 28, 54, 0.96);
   color: #f8fbff;
-  padding: 8px 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 7px 12px;
   cursor: pointer;
   transition:
     transform 140ms ease,
@@ -367,17 +360,13 @@ button {
     box-shadow 140ms ease;
 }
 
-.hud-button:hover,
-.hud-button:focus-visible {
+.hud-button:hover {
   transform: translateY(-1px);
   background:
-    linear-gradient(135deg, rgba(143, 228, 255, 0.26), rgba(143, 228, 255, 0.04) 62%),
-    rgba(27, 52, 100, 0.96);
+    linear-gradient(135deg, rgba(143, 228, 255, 0.2), rgba(166, 255, 208, 0.06)),
+    rgba(18, 35, 66, 0.98);
   border-color: rgba(166, 255, 208, 0.55);
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  outline: none;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
 .hud-button:disabled {
@@ -387,14 +376,13 @@ button {
 }
 
 .hud-button--secondary {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 56%),
-    rgba(8, 16, 31, 0.94);
+  background: rgba(11, 18, 38, 0.92);
 }
 
 .hud-modal-layer {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 12;
   display: none;
 }
 
@@ -406,10 +394,8 @@ button {
 .hud-modal__backdrop {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at top, rgba(143, 228, 255, 0.12), rgba(143, 228, 255, 0) 34%),
-    rgba(2, 6, 18, 0.74);
-  backdrop-filter: blur(5px);
+  background: rgba(2, 6, 18, 0.72);
+  backdrop-filter: blur(3px);
 }
 
 .hud-modal {
@@ -420,15 +406,13 @@ button {
   max-height: calc(100% - 48px);
   overflow: auto;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(151, 191, 255, 0.26);
-  border-radius: 28px;
+  border: 1px solid rgba(151, 191, 255, 0.3);
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(143, 228, 255, 0.08), rgba(143, 228, 255, 0) 26%),
-    rgba(7, 14, 31, 0.97);
-  box-shadow:
-    0 40px 90px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  padding: 24px;
+    linear-gradient(180deg, rgba(143, 228, 255, 0.08), rgba(143, 228, 255, 0) 22%),
+    rgba(7, 14, 31, 0.96);
+  box-shadow: var(--ui-shadow);
+  padding: 20px;
 }
 
 .hud-modal__header {
@@ -452,7 +436,7 @@ button {
   color: #9bb5ff;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 12px;
+  font-size: 11px;
   margin-bottom: 4px;
 }
 
@@ -486,9 +470,9 @@ button {
 .hud-modal__item {
   position: relative;
   display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  align-items: flex-start;
   width: 100%;
   padding: 12px 14px 12px 16px;
   border: 1px solid rgba(151, 191, 255, 0.16);
@@ -566,9 +550,9 @@ button {
 
 .hud-modal__recipe-output,
 .hud-modal__weapon-meta,
-.hud-modal__detail-meta {
-  color: #a6ffd0;
-  font-size: 12px;
+.hud-modal__detail-meta,
+.hud-empty {
+  color: #b9c7ff;
 }
 
 .hud-modal__detail-card {
@@ -578,10 +562,6 @@ button {
   border: 1px solid rgba(151, 191, 255, 0.12);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.02);
-}
-
-.hud-empty {
-  color: #b9c7ff;
 }
 
 .hud-summary .hud-empty {
@@ -612,12 +592,12 @@ button {
 
 .codex-section {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .codex-grid {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .codex-entry {
@@ -680,21 +660,15 @@ button {
     min-width: 0;
   }
 
+  .hud-summary__grid,
   .hud-modal__grid {
     grid-template-columns: 1fr;
   }
 
   .hud-modal {
-    width: calc(100% - 24px);
+    width: min(760px, calc(100% - 24px));
     max-height: calc(100% - 24px);
     padding: 16px;
-  }
-
-  .hud-summary {
-    top: 12px;
-    left: 12px;
-    width: min(360px, calc(100% - 24px));
-    padding: 14px;
   }
 
   .codex-panel {
@@ -702,5 +676,15 @@ button {
     max-height: calc(100% - 24px);
     top: 12px;
     right: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  #app {
+    padding-inline: 12px;
+  }
+
+  .game-shell {
+    width: min(960px, calc(100vw - 24px));
   }
 }

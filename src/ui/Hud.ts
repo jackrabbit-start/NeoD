@@ -54,7 +54,6 @@ export class HudController {
 
   private readonly weaponList: HTMLDivElement
 
-
   private modalState: HudModalState | null = null
 
   private hoveredItemId: string | null = null
