@@ -4,6 +4,9 @@ import type { WeaponStar } from '../domain/types.js'
 export type RandomSource = () => number
 
 export const MAX_WEAPON_STAR = 5 as const
+export const MAX_ACTIVE_PACHINKO_TOKENS = 15 as const
+export const PACHINKO_SLOT_COUNT = 10 as const
+export const PACHINKO_TOKEN_LAUNCH_INTERVAL_MS = 110 as const
 
 export const PACHINKO_LEVEL_THRESHOLDS = [0, 6, 14, 26, 42] as const
 
@@ -28,6 +31,15 @@ export const STAR_ODDS_BY_LEVEL: Record<number, readonly [number, number, number
 export interface PachinkoRewardResult {
   weaponId: WeaponId
   star: WeaponStar
+}
+
+export interface PachinkoSlotReward extends PachinkoRewardResult {
+  slotIndex: number
+  slotCount: number
+  ratioStart: number
+  ratioEnd: number
+  sampleRatio: number
+  iconKey: string
 }
 
 export interface PachinkoTokenProgressState {
@@ -93,6 +105,75 @@ export function resolvePachinkoReward(
   }
 }
 
+export function resolvePachinkoSlotIndex(
+  landingRatio: number,
+  slotCount: number = PACHINKO_SLOT_COUNT,
+): number {
+  const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
+  const clampedRatio = Math.max(0, Math.min(0.999, landingRatio))
+  return Math.min(normalizedSlotCount - 1, Math.floor(clampedRatio * normalizedSlotCount))
+}
+
+export function buildPachinkoSlotRewards(
+  totalTokenXp: number,
+  slotCount: number = PACHINKO_SLOT_COUNT,
+): PachinkoSlotReward[] {
+  const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
+  const level = getPachinkoRewardLevel(totalTokenXp)
+
+  return Array.from({ length: normalizedSlotCount }, (_, slotIndex) => {
+    const ratioStart = slotIndex / normalizedSlotCount
+    const ratioEnd = (slotIndex + 1) / normalizedSlotCount
+    const sampleRatio = Math.min(0.999, Math.max(0, ratioEnd - Number.EPSILON))
+    const reward = resolvePachinkoReward(level, () => sampleRatio)
+
+    return {
+      ...reward,
+      slotIndex,
+      slotCount: normalizedSlotCount,
+      ratioStart,
+      ratioEnd,
+      sampleRatio,
+      iconKey: `weapon-${reward.weaponId}`,
+    }
+  })
+}
+
+export function resolvePachinkoSlotReward(
+  totalTokenXp: number,
+  landingRatio: number,
+  slotCount: number = PACHINKO_SLOT_COUNT,
+): PachinkoSlotReward {
+  const slotRewards = buildPachinkoSlotRewards(totalTokenXp, slotCount)
+  return slotRewards[resolvePachinkoSlotIndex(landingRatio, slotRewards.length)] ?? slotRewards[0]
+}
+
+export function canLaunchPachinkoToken({
+  activeTokenCount,
+  queuedTokenCount,
+  now,
+  lastLaunchAt,
+  maxActiveTokens = MAX_ACTIVE_PACHINKO_TOKENS,
+  launchIntervalMs = PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
+}: {
+  activeTokenCount: number
+  queuedTokenCount: number
+  now: number
+  lastLaunchAt: number
+  maxActiveTokens?: number
+  launchIntervalMs?: number
+}): boolean {
+  if (activeTokenCount >= maxActiveTokens || queuedTokenCount <= 0) {
+    return false
+  }
+
+  if (lastLaunchAt <= 0) {
+    return true
+  }
+
+  return now - lastLaunchAt >= launchIntervalMs
+}
+
 export function getEnemyTokenSummary(enemyId: EnemyId): string {
   const xp = getTokenXpForEnemy(enemyId)
   if (xp <= 0) {
@@ -134,6 +215,6 @@ export function resolvePachinkoLandingReward(
   totalTokenXp: number,
   landingRatio: number,
 ): PachinkoRewardResult {
-  const clampedRatio = Math.max(0, Math.min(0.999, landingRatio))
-  return resolvePachinkoReward(getPachinkoRewardLevel(totalTokenXp), () => clampedRatio)
+  const { weaponId, star } = resolvePachinkoSlotReward(totalTokenXp, landingRatio)
+  return { weaponId, star }
 }
