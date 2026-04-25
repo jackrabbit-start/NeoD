@@ -67,6 +67,30 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
       { itemId: 'frost-mote', weight: 2 },
     ],
   },
+  'prism-slime': {
+    id: 'prism-slime',
+    name: '프리즘 슬라임',
+    description: '쓰러뜨리면 튜닝 캡슐을 결정화하는 엘리트 슬라임입니다.',
+    maxHealth: 88,
+    speed: 62,
+    contactDamage: 13,
+    score: 60,
+    tint: 0xff9df3,
+    size: 30,
+    textureKey: 'spark-slime',
+    animationKey: 'spark-slime-idle',
+    movementBehavior: {
+      kind: 'direct-chase',
+    },
+    attackBehavior: {
+      kind: 'contact',
+    },
+    behaviorSummary: '빠르게 추적하며 튜닝 캡슐을 노리는 엘리트 압박 역할입니다.',
+    visual: {
+      portraitKey: 'spark-slime',
+    },
+    drops: [{ itemId: 'tuning-capsule', weight: 1 }],
+  },
   'slime-boss': {
     id: 'slime-boss',
     name: '크라운 슬라임',

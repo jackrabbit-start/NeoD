@@ -43,6 +43,13 @@ import {
 } from '../systems/weaponBehaviors.js'
 import type { ChainSpec, HazardSpawnSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
 import {
+  deriveEffectiveWeaponStats,
+  getTuningEffectLabel,
+  getWeaponTuningBlockReason,
+  resolveTuningSelection,
+  type WeaponTuningState,
+} from '../systems/tuning.js'
+import {
   equipOwnedWeapon,
   getActionableRecipes,
   seedOwnedWeapons,
@@ -148,6 +155,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private inventory: InventoryState = {}
 
+  private tuningState: WeaponTuningState = {}
+
   private isInventoryOpen = false
 
   private isCodexOpen = false
@@ -190,6 +199,7 @@ export class ArenaScene extends Phaser.Scene {
       onInventoryClose: () => this.closeInventory(),
       onRecipeSelect: (recipeId) => this.handleRecipeSelection(recipeId),
       onWeaponEquip: (weaponId) => this.handleWeaponEquip(weaponId),
+      onWeaponTune: (weaponId) => this.handleWeaponTune(weaponId),
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
@@ -298,7 +308,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleFiring(time: number): void {
-    const weapon = WEAPON_DEFINITIONS[this.activeWeaponId]
+    const weapon = deriveEffectiveWeaponStats(this.activeWeaponId, this.tuningState)
     const target = resolveAutoAttackShot(
       {
         x: this.player.x,
@@ -863,6 +873,35 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
+  private handleWeaponTune(weaponId: WeaponId): void {
+    if (!this.isInventoryOpen) {
+      return
+    }
+
+    const result = resolveTuningSelection({
+      inventory: this.inventory,
+      ownedWeaponIds: this.ownedWeaponIds,
+      tuningState: this.tuningState,
+    }, weaponId)
+
+    if (!result) {
+      const reason = getWeaponTuningBlockReason({
+        inventory: this.inventory,
+        ownedWeaponIds: this.ownedWeaponIds,
+        tuningState: this.tuningState,
+      }, weaponId)
+      this.statusMessage = reason ?? 'That weapon cannot be tuned right now.'
+      this.updateHud()
+      return
+    }
+
+    const effectLabel = getTuningEffectLabel(result.effectId) ?? result.effectId
+    this.inventory = result.nextInventory
+    this.tuningState = result.nextTuningState
+    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} tuned: ${effectLabel}.`
+    this.updateHud()
+  }
+
   private freezeCombat(shouldFreeze: boolean): void {
     if (this.enemySpacingCollider) {
       this.enemySpacingCollider.active = !shouldFreeze
@@ -970,15 +1009,16 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private updateHud(): void {
-    const weapon = WEAPON_DEFINITIONS[this.activeWeaponId]
+    const weapon = deriveEffectiveWeaponStats(this.activeWeaponId, this.tuningState)
     const actionableRecipes = getActionableRecipes(this.inventory, this.ownedWeaponIds)
+    const tuningText = weapon.tuningLabel ? ` · ${weapon.tuningLabel}` : ''
 
     this.hud.update({
       title: 'NeoD Prototype',
       subtitle: this.activeWaveLabel || 'Preparing arena',
       stats: [
         `Health: ${this.playerHealth}/${this.playerMaxHealth}`,
-        `Weapon: ${weapon.name} · ${getWeaponSummary(weapon)}`,
+        `Weapon: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
         `Enemies alive: ${this.enemies.length}`,
         `Remaining spawns: ${this.remainingSpawns}`,
       ],
@@ -1029,13 +1069,24 @@ export class ArenaScene extends Phaser.Scene {
   private getOwnedWeaponViews(): HudOwnedWeaponView[] {
     return this.ownedWeaponIds.map((weaponId) => {
       const ownedWeapon = WEAPON_DEFINITIONS[weaponId]
+      const effectiveWeapon = deriveEffectiveWeaponStats(weaponId, this.tuningState)
+      const tuningBlockReason = getWeaponTuningBlockReason({
+        inventory: this.inventory,
+        ownedWeaponIds: this.ownedWeaponIds,
+        tuningState: this.tuningState,
+      }, weaponId)
 
       return {
         id: weaponId,
         name: ownedWeapon.name,
         description: ownedWeapon.description,
-        damage: ownedWeapon.damage,
+        damage: effectiveWeapon.damage,
+        fireRateMs: effectiveWeapon.fireRateMs,
+        projectileSpeed: effectiveWeapon.projectileSpeed,
         isEquipped: weaponId === this.activeWeaponId,
+        tuningLabel: effectiveWeapon.tuningLabel ?? null,
+        canTune: tuningBlockReason === null,
+        tuneDisabledReason: tuningBlockReason,
         hudIconKey: ownedWeapon.visual.hudIconKey,
         accentColor: ownedWeapon.visual.accentColor,
       }

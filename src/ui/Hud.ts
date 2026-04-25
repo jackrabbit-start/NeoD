@@ -14,6 +14,7 @@ export interface HudControllerHandlers {
   onInventoryClose: () => void
   onRecipeSelect: (recipeId: RecipeId) => void
   onWeaponEquip: (weaponId: WeaponId) => void
+  onWeaponTune: (weaponId: WeaponId) => void
 }
 
 const escapeHtml = (value: string) =>
@@ -65,6 +66,7 @@ export class HudController {
     onInventoryClose: () => undefined,
     onRecipeSelect: () => undefined,
     onWeaponEquip: () => undefined,
+    onWeaponTune: () => undefined,
   }
 
   constructor(private readonly element: HTMLElement) {
@@ -174,6 +176,13 @@ export class HudController {
         const weaponId = actionTarget.dataset.weaponId as WeaponId | undefined
         if (weaponId) {
           this.handlers.onWeaponEquip(weaponId)
+        }
+        break
+      }
+      case 'weapon-tune': {
+        const weaponId = actionTarget.dataset.weaponId as WeaponId | undefined
+        if (weaponId) {
+          this.handlers.onWeaponTune(weaponId)
         }
         break
       }
@@ -370,11 +379,8 @@ export class HudController {
     }
 
     return weapons.map((weapon) => {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.className = `hud-modal__item hud-modal__item--weapon${weapon.isEquipped ? ' is-equipped' : ''}`
-      button.dataset.action = 'weapon-equip'
-      button.dataset.weaponId = weapon.id
+      const row = document.createElement('div')
+      row.className = `hud-modal__item hud-modal__item--weapon${weapon.isEquipped ? ' is-equipped' : ''}`
 
       const textGroup = document.createElement('span')
       textGroup.className = 'hud-modal__content'
@@ -382,7 +388,9 @@ export class HudController {
       title.textContent = weapon.name
       const description = document.createElement('small')
       description.textContent = weapon.description
-      textGroup.append(title, description)
+      const tuning = document.createElement('small')
+      tuning.textContent = weapon.tuningLabel ? `Tuning: ${weapon.tuningLabel}` : 'Tuning: none'
+      textGroup.append(title, description, tuning)
 
       const left = document.createElement('div')
       left.className = 'hud-modal__left'
@@ -392,15 +400,36 @@ export class HudController {
       }
       left.append(textGroup)
 
-      const meta = document.createElement('span')
+      const actions = document.createElement('span')
+      actions.className = 'hud-modal__weapon-actions'
+
+      const meta = document.createElement('small')
       meta.className = 'hud-modal__weapon-meta'
-      meta.textContent = `${weapon.isEquipped ? 'Equipped' : 'Equip'} · ${weapon.damage} dmg`
+      meta.textContent = `${weapon.damage} dmg · ${Math.round(1000 / weapon.fireRateMs)} shots/s`
       if (weapon.accentColor != null) {
         meta.style.color = `#${weapon.accentColor.toString(16).padStart(6, '0')}`
       }
 
-      button.append(left, meta)
-      return button
+      const equipButton = document.createElement('button')
+      equipButton.type = 'button'
+      equipButton.className = 'hud-button hud-button--compact'
+      equipButton.dataset.action = 'weapon-equip'
+      equipButton.dataset.weaponId = weapon.id
+      equipButton.disabled = weapon.isEquipped
+      equipButton.textContent = weapon.isEquipped ? 'Equipped' : 'Equip'
+
+      const tuneButton = document.createElement('button')
+      tuneButton.type = 'button'
+      tuneButton.className = 'hud-button hud-button--compact'
+      tuneButton.dataset.action = 'weapon-tune'
+      tuneButton.dataset.weaponId = weapon.id
+      tuneButton.disabled = !weapon.canTune
+      tuneButton.title = weapon.tuneDisabledReason ?? 'Tune with a capsule'
+      tuneButton.textContent = weapon.canTune ? 'Tune' : 'Tune locked'
+
+      actions.append(meta, equipButton, tuneButton)
+      row.append(left, actions)
+      return row
     })
   }
 
