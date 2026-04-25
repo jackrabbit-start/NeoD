@@ -2,8 +2,8 @@ import type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
 export type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
-export type WeaponStar = 1 | 2 | 3 | 4 | 5
-export type WeaponStackKey = `${WeaponId}:${WeaponStar}`
+export type WeaponStar = number
+export type WeaponStackKey = `${WeaponId}:${number}`
 
 export interface WeaponStack {
   weaponId: WeaponId

@@ -134,6 +134,7 @@ import {
   addWeaponStack,
   canFuseWeaponStack,
   equipWeaponStack,
+  formatWeaponStarLabel,
   fuseWeaponStack,
   getStackKey,
   getWeaponIdFromStackKey,
@@ -1935,7 +1936,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.weaponStacks = result.weaponStacks
     this.activeWeaponKey = result.activeWeaponKey
-    this.statusMessage = `${WEAPON_DEFINITIONS[result.weaponId].name} ${'★'.repeat(result.resultStar)} 합성 완료.`
+    this.statusMessage = `${WEAPON_DEFINITIONS[result.weaponId].name} ${formatWeaponStarLabel(result.resultStar)} 합성 완료.`
     this.updateHud()
   }
 
@@ -2451,7 +2452,7 @@ export class ArenaScene extends Phaser.Scene {
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel}`,
-        `무기: ${weapon.name} ${'★'.repeat(activeStar)} · ${getWeaponSummary(weapon)}`,
+        `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
@@ -2508,9 +2509,7 @@ export class ArenaScene extends Phaser.Scene {
       const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
       const stackKey = getStackKey(stack)
       const canFuse = canFuseWeaponStack(this.weaponStacks, stackKey)
-      const fuseDisabledReason = stack.star >= 5
-        ? '5★가 최대 등급입니다.'
-        : '같은 무기와 같은 별 2개가 필요합니다.'
+      const fuseDisabledReason = '같은 무기와 같은 별 2개가 필요합니다.'
 
       return {
         id: stack.weaponId,
@@ -2540,13 +2539,13 @@ export class ArenaScene extends Phaser.Scene {
       return ['같은 무기와 같은 별 2개를 모으면 합성 가능']
     }
 
-    return eligible.map((stack) => `${WEAPON_DEFINITIONS[stack.weaponId].name} ${'★'.repeat(stack.star)} 합성 가능`)
+    return eligible.map((stack) => `${WEAPON_DEFINITIONS[stack.weaponId].name} ${formatWeaponStarLabel(stack.star)} 합성 가능`)
   }
 
   private getActiveWeaponLabel(): string {
     const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
     const stack = this.weaponStacks.find((candidate) => getStackKey(candidate) === this.activeWeaponKey)
-    return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${'★'.repeat(stack.star)}` : ''}`
+    return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${formatWeaponStarLabel(stack.star)}` : ''}`
   }
 
   private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): void {
@@ -2659,7 +2658,7 @@ export class ArenaScene extends Phaser.Scene {
     const slotIndex = resolvePachinkoSlotIndex(laneRatio)
     const reward = resolvePachinkoSlotReward(this.pachinkoTokenXp, laneRatio)
     this.weaponStacks = addWeaponStack(this.weaponStacks, reward.weaponId, reward.star, 1)
-    const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${'★'.repeat(reward.star)}`
+    const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${formatWeaponStarLabel(reward.star)}`
     this.latestPachinkoReward = rewardLabel
     this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}`
     this.destroyActivePachinkoToken(token)
@@ -2880,10 +2879,10 @@ export class ArenaScene extends Phaser.Scene {
         fontSize: '8px',
         fontStyle: '800',
       }).setOrigin(0.5).setDepth(63)
-      const starLabel = this.add.text(centerX, centerY + 18, '★'.repeat(reward.star), {
+      const starLabel = this.add.text(centerX, centerY + 18, formatWeaponStarLabel(reward.star), {
         color: '#ffd866',
         fontFamily: 'Inter, system-ui, sans-serif',
-        fontSize: reward.star >= 4 ? '7px' : '8px',
+        fontSize: '8px',
         fontStyle: '900',
       }).setOrigin(0.5).setDepth(63)
       this.pachinkoSlotVisuals.push({
@@ -2921,8 +2920,8 @@ export class ArenaScene extends Phaser.Scene {
         .setText(`${reward.slotIndex + 1}`)
       visual.starLabel
         .setPosition(centerX, centerY + 18)
-        .setText('★'.repeat(reward.star))
-        .setFontSize(reward.star >= 4 ? 7 : 8)
+        .setText(formatWeaponStarLabel(reward.star))
+        .setFontSize(8)
     }
   }
 
