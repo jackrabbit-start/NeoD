@@ -71,8 +71,13 @@ const renderStatusPanel = (state: HudState) => `
       <span>상태</span>
       <strong>${escapeHtml(state.status)}</strong>
     </div>
+    ${state.currentTimeLabel ? `
+      <div class="hud-summary__status-line hud-summary__status-line--time">
+        <span>현재 시간</span>
+        <strong>${escapeHtml(state.currentTimeLabel)}</strong>
+      </div>
+    ` : ''}
     <div class="hud-summary__status-meta">
-      ${state.currentTimeLabel ? `<p><span>현재 시간</span>${escapeHtml(state.currentTimeLabel)}</p>` : ''}
       <p><span>목표</span>${escapeHtml(state.objective)}</p>
       <p><span>팁</span>${escapeHtml(state.tip)}</p>
     </div>
