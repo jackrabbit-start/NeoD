@@ -8,6 +8,7 @@ Content-oriented catalog for the repo documentation wiki.
 - [wiki/game-requirements.md](wiki/game-requirements.md): canonical gameplay, scope, and verification baseline for NeoD V1.
 - [wiki/stack-foundation.md](wiki/stack-foundation.md): locked stack decision for the browser-first Phaser prototype.
 - [wiki/parallel-ai-worktrees.md](wiki/parallel-ai-worktrees.md): branch, worktree, Ralph, and PR workflow for parallel AI execution.
+- [wiki/post-interview-context-workflow.md](wiki/post-interview-context-workflow.md): manual post-deep-interview context capture workflow for lessons, changed files, and durable wiki synthesis.
 
 ## Schema Pages
 
