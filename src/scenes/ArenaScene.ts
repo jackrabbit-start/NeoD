@@ -155,6 +155,7 @@ import {
   advanceHazardState,
   applyProjectileHitState,
   buildAttackPlan,
+  collectTargetsInBox,
   collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
@@ -992,7 +993,14 @@ export class ArenaScene extends Phaser.Scene {
 
     this.rememberWeaponTargetDirection(target.directionX, target.directionY)
     const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
-    const attackPlan = buildAttackPlan(weapon, origin, new Phaser.Math.Vector2(target.x, target.y))
+    const attackTarget =
+      weapon.attackBehavior.kind === 'zone-control' && weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
+        ? new Phaser.Math.Vector2(
+            this.player.x + this.lastPlayerMoveDirection.x * Math.max(weapon.range ?? 0, 1),
+            this.player.y + this.lastPlayerMoveDirection.y * Math.max(weapon.range ?? 0, 1),
+          )
+        : new Phaser.Math.Vector2(target.x, target.y)
+    const attackPlan = buildAttackPlan(weapon, origin, attackTarget)
     if (!isAttackPlanActionable(attackPlan)) {
       return
     }
@@ -4063,21 +4071,37 @@ export class ArenaScene extends Phaser.Scene {
 
   private applyMeleeSwing(swing: MeleeSwingSpec): void {
     const affectedEnemyIds = new Set(
-      collectTargetsInCleave(
-        swing.origin ?? { x: this.player.x, y: this.player.y },
-        swing.direction,
-        swing.range,
-        swing.arcDegrees,
-        this.enemies
-          .filter((enemy) => enemy.sprite.active)
-          .map((enemy) => ({
-            id: enemy.runtimeId,
-            x: enemy.sprite.x,
-            y: enemy.sprite.y,
-            radius: enemy.config.size / 2,
-          })),
-        swing.maxTargets,
-      ),
+      (swing.hitShape === 'box'
+        ? collectTargetsInBox(
+            swing.origin ?? { x: this.player.x, y: this.player.y },
+            swing.direction,
+            swing.range,
+            swing.boxWidth ?? Math.max(18, swing.range * 0.45),
+            this.enemies
+              .filter((enemy) => enemy.sprite.active)
+              .map((enemy) => ({
+                id: enemy.runtimeId,
+                x: enemy.sprite.x,
+                y: enemy.sprite.y,
+                radius: enemy.config.size / 2,
+              })),
+            swing.maxTargets,
+          )
+        : collectTargetsInCleave(
+            swing.origin ?? { x: this.player.x, y: this.player.y },
+            swing.direction,
+            swing.range,
+            swing.arcDegrees,
+            this.enemies
+              .filter((enemy) => enemy.sprite.active)
+              .map((enemy) => ({
+                id: enemy.runtimeId,
+                x: enemy.sprite.x,
+                y: enemy.sprite.y,
+                radius: enemy.config.size / 2,
+              })),
+            swing.maxTargets,
+          )),
     )
 
     this.spawnMeleeSwingVisual(swing)

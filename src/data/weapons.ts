@@ -220,7 +220,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     damage: 24,
     fireRateMs: 620,
     projectileSpeed: 0,
-    projectileTint: 0x7dffb0,
+    projectileTint: 0xf4c542,
     projectileTextureKey: 'arc-projectile',
     knockback: {
       force: 110,
@@ -235,7 +235,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
     visual: {
       hudIconKey: 'weapon-slime-glaive',
-      accentColor: 0x7dffb0,
+      accentColor: 0xf4c542,
     },
   },
   'prism-cutter': {

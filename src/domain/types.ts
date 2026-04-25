@@ -237,6 +237,8 @@ export interface WeaponComboStepDefinition {
   damageMultiplier: number
   range: number
   arcDegrees: number
+  hitShape?: 'arc' | 'box'
+  boxWidth?: number
   visualDurationMs: number
   maxTargets: number
   knockbackMultiplier?: number

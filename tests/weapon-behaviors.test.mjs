@@ -8,6 +8,7 @@ import {
   applyProjectileHitState,
   buildAttackPlan,
   canProjectileHitEnemy,
+  collectTargetsInBox,
   collectTargetsInCleave,
   collectTargetsInRadius,
   getChainDamage,
@@ -358,6 +359,22 @@ test('radius and cleave helpers collect expected targets', () => {
         { id: 1, x: 40, y: 0, radius: 8 },
         { id: 2, x: 40, y: 30, radius: 8 },
         { id: 3, x: -20, y: 0, radius: 8 },
+      ],
+      2,
+    ),
+    [1],
+  )
+
+  assert.deepEqual(
+    collectTargetsInBox(
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      40,
+      20,
+      [
+        { id: 1, x: 18, y: 4, radius: 4 },
+        { id: 2, x: 18, y: 18, radius: 4 },
+        { id: 3, x: 55, y: 0, radius: 4 },
       ],
       2,
     ),
