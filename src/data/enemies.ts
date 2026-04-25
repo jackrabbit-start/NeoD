@@ -12,6 +12,10 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     tint: 0x7cff8f,
     size: 20,
     textureKey: 'slime',
+    animationKey: 'slime-idle',
+    visual: {
+      portraitKey: 'slime',
+    },
     drops: [
       { itemId: 'gel-shard', weight: 5 },
       { itemId: 'acid-core', weight: 3 },
@@ -28,7 +32,11 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     score: 18,
     tint: 0xffdb6e,
     size: 22,
-    textureKey: 'slime',
+    textureKey: 'spark-slime',
+    animationKey: 'spark-slime-idle',
+    visual: {
+      portraitKey: 'spark-slime',
+    },
     drops: [
       { itemId: 'spark-knot', weight: 4 },
       { itemId: 'mist-bead', weight: 4 },
@@ -45,6 +53,10 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     score: 150,
     tint: 0xd3a0ff,
     size: 44,
-    textureKey: 'boss',
+    textureKey: 'slime-boss',
+    animationKey: 'slime-boss-idle',
+    visual: {
+      portraitKey: 'slime-boss',
+    },
   },
 }

@@ -1,8 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/combine.js'
 import { getCodexState } from '../.tmp-test/src/systems/codex.js'
+import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
+import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RADIUS, PROJECTILE_HIT_PADDING } from '../.tmp-test/src/game/combatGeometry.js'
+import { ITEM_DEFINITIONS } from '../.tmp-test/src/data/items.js'
+import { WEAPON_DEFINITIONS } from '../.tmp-test/src/data/weapons.js'
+import { VECTOR_ASSETS } from '../.tmp-test/src/game/visualManifest.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
@@ -21,6 +29,8 @@ import {
   seedOwnedWeapons,
 } from '../.tmp-test/src/systems/weaponOwnership.js'
 import { getWaveByIndex, isBossWaveReady, shouldAdvanceWave } from '../.tmp-test/src/systems/waves.js'
+
+const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
 test('weighted drops only return configured loot ids', () => {
   const result = resolveWeightedDrop(
@@ -111,7 +121,7 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
     nextInventory: {},
     ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
     activeWeaponId: 'acid-sprayer',
-    statusMessage: '산성 분사기 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
+    statusMessage: 'Acid Sprayer 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
   })
 })
 
@@ -244,6 +254,88 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
   assert.deepEqual(
     voltSlime?.drops.map((drop) => drop.id),
     ['spark-knot', 'mist-bead', 'frost-mote'],
+  )
+})
+
+test('visual asset manifest paths exist for all external art assets', () => {
+  const missingAssets = VECTOR_ASSETS.filter((asset) => {
+    const assetPath = resolve(TEST_DIR, '..', 'public', asset.path)
+    return !existsSync(assetPath)
+  }).map((asset) => asset.path)
+
+  assert.deepEqual(missingAssets, [])
+})
+
+test('enemy visual metadata keeps immutable gameplay geometry while adding art hooks', () => {
+  assert.equal(PLAYER_COLLISION_RADIUS, 14)
+  assert.equal(PROJECTILE_COLLISION_RADIUS, 5)
+  assert.equal(ENEMY_CONTACT_PADDING, 16)
+  assert.equal(PROJECTILE_HIT_PADDING, 7)
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(ENEMY_DEFINITIONS).map(([enemyId, enemy]) => [
+        enemyId,
+        {
+          size: enemy.size,
+          textureKey: enemy.textureKey,
+          animationKey: enemy.animationKey,
+        },
+      ]),
+    ),
+    {
+      slime: { size: 20, textureKey: 'slime', animationKey: 'slime-idle' },
+      'spark-slime': { size: 22, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
+      'slime-boss': { size: 44, textureKey: 'slime-boss', animationKey: 'slime-boss-idle' },
+    },
+  )
+})
+
+test('item and weapon visual metadata stays aligned with the external asset pass', () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(ITEM_DEFINITIONS).map(([itemId, item]) => [itemId, item.textureKey]),
+    ),
+    {
+      'gel-shard': 'gel-shard',
+      'acid-core': 'acid-core',
+      'frost-mote': 'frost-mote',
+      'spark-knot': 'spark-knot',
+      'mist-bead': 'mist-bead',
+    },
+  )
+
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(WEAPON_DEFINITIONS).map(([weaponId, weapon]) => [
+        weaponId,
+        {
+          projectileTextureKey: weapon.projectileTextureKey,
+          hudIconKey: weapon.visual.hudIconKey,
+        },
+      ]),
+    ),
+    {
+      'starter-blaster': {
+        projectileTextureKey: 'starter-projectile',
+        hudIconKey: 'weapon-starter-blaster',
+      },
+      'acid-sprayer': {
+        projectileTextureKey: 'acid-projectile',
+        hudIconKey: 'weapon-acid-sprayer',
+      },
+      'frost-lance': {
+        projectileTextureKey: 'frost-projectile',
+        hudIconKey: 'weapon-frost-lance',
+      },
+      'storm-cannon': {
+        projectileTextureKey: 'storm-projectile',
+        hudIconKey: 'weapon-storm-cannon',
+      },
+      'arc-loom': {
+        projectileTextureKey: 'arc-projectile',
+        hudIconKey: 'weapon-arc-loom',
+      },
+    },
   )
 })
 
