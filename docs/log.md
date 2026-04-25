@@ -37,3 +37,42 @@
 - Added `docs/wiki/dropped-loot-pickup-ux.md` to preserve the current-loot-only interpretation, pickup radii, magnet feedback, and true-weapon-drop non-goal.
 - Updated `docs/index.md` so future agents can find the dropped loot pickup guidance.
 - Source artifacts: `.omx/specs/deep-interview-dropped-loot-pickup-design.md`, `.omx/interviews/dropped-loot-pickup-design-20260425T100726Z.md`, `.omx/context/post-interview-dropped-loot-pickup-design-20260425T111351Z.md`, and PR #30.
+
+## [2026-04-25] gameplay | Added run result flow rule
+
+- Added `docs/wiki/run-result-flow.md` to preserve the boss-clear result-screen fix and shared presentation boundary.
+- Updated `docs/index.md` so future agents can find the run-ending flow rules.
+- Source artifacts: `.omx/specs/deep-interview-boss-patterns-end-screen.md`, `.omx/context/post-interview-boss-result-screen-20260425T110444Z.md`, and PR #27.
+
+## [2026-04-25] gameplay | Captured enemy boss pressure experiment
+
+- Added `docs/wiki/enemy-boss-pressure.md` to preserve the 3x density extreme-experiment target, boss anti-sponge rule, and follow-up tuning boundaries.
+- Updated `docs/index.md` so future agents can find the enemy/boss pressure guidance.
+- Source artifacts: `.omx/specs/deep-interview-enemy-boss-pressure.md`, `.omx/interviews/enemy-boss-pressure-20260425T111248Z.md`, `.omx/context/post-interview-enemy-boss-pressure-20260425T112833Z.md`, and PR #31.
+
+## [2026-04-25] gameplay | Captured melee weapon line architecture lesson
+
+- Added `docs/wiki/melee-weapon-line.md` to synthesize the melee-first interview, PRD, test spec, and implementation verification.
+- Updated `docs/index.md` so future agents can find the melee architecture guidance.
+- Source artifacts: `.omx/specs/deep-interview-weapon-capsule-variety.md`, `.omx/plans/prd-melee-weapon-line.md`, `.omx/plans/test-spec-melee-weapon-line.md`, and `.omx/context/post-interview-melee-weapon-line-20260425T114954Z.md`.
+
+## [2026-04-25] gameplay | Captured map traversal and obstacle architecture
+
+- Added `docs/wiki/map-traversal-obstacles.md` to synthesize the larger scrolling map, sparse blocking obstacle, ambient item, and safe spawn rules.
+- Updated `docs/index.md` so future agents can find the traversal/obstacle guidance.
+- Source artifacts: `.omx/specs/deep-interview-map-traversal-obstacles-items.md`, `.omx/plans/prd-map-traversal-obstacles-items.md`, `.omx/plans/test-spec-map-traversal-obstacles-items.md`, and `.omx/context/post-interview-map-traversal-obstacles-items-20260425T123230Z.md`.
+
+## [2026-04-25] gameplay | Captured near-miss difficulty follow-up
+
+- Updated `docs/wiki/enemy-boss-pressure.md` with the low-clear-rate near-miss follow-up: burst/group spawns, harder dash/AOE reach, and explicit readability non-goals.
+- Source artifacts: `.omx/specs/deep-interview-difficulty-near-miss-pressure.md`, `.omx/interviews/difficulty-near-miss-pressure-20260425T114801Z.md`, and `.omx/context/post-interview-difficulty-near-miss-pressure-20260425T115729Z.md`.
+
+## [2026-04-25] gameplay | Captured boss dash dodge follow-up
+
+- Updated `docs/wiki/enemy-boss-pressure.md` with the Space dash + short i-frame rule for avoiding boss telegraphed AOE without reducing wave or boss pressure.
+- Source artifacts: `.omx/specs/deep-interview-boss-dash-dodge.md`, `.omx/interviews/boss-dash-dodge-20260425T121731Z.md`, and `.omx/context/post-interview-boss-dash-dodge-20260425T122704Z.md`.
+
+## [2026-04-25] gameplay-ui | Switched dash input away from Space
+
+- Updated the boss dash guidance and player-facing control copy from Space to J because Space can scroll the browser page in the web prototype.
+- Preserved the existing short i-frame dash behavior and boss-pressure constraints.

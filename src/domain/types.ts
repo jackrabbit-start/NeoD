@@ -58,11 +58,20 @@ export interface WeaponChainBehavior {
   chainFalloff: number
 }
 
+export interface WeaponMeleeCleaveBehavior {
+  kind: 'melee-cleave'
+  range: number
+  arcDegrees: number
+  visualDurationMs: number
+  maxTargets: number
+}
+
 export type WeaponAttackBehavior =
   | WeaponSingleBehavior
   | WeaponSprayHazardBehavior
   | WeaponPierceBehavior
   | WeaponChainBehavior
+  | WeaponMeleeCleaveBehavior
 
 export interface WeaponDefinition {
   id: WeaponId
@@ -193,6 +202,7 @@ export interface WaveDefinition {
   label: string
   entries: WaveEntryDefinition[]
   spawnIntervalMs: number
+  burstSize?: number
   isBossWave?: boolean
 }
 

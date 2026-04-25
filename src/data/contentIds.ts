@@ -18,6 +18,8 @@ export const WEAPON_IDS = [
   'arc-loom',
   'spark-carbine',
   'mist-vortex',
+  'slime-glaive',
+  'prism-cutter',
   'needle-fan',
 ] as const
 
@@ -30,6 +32,8 @@ export const RECIPE_IDS = [
   'arc-loom-recipe',
   'spark-carbine-recipe',
   'mist-vortex-recipe',
+  'slime-glaive-recipe',
+  'prism-cutter-recipe',
   'needle-fan-recipe',
 ] as const
 

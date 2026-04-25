@@ -266,6 +266,18 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     height: 96,
   },
   {
+    key: 'weapon-slime-glaive',
+    path: getHudWeaponAssetPath('weapon-slime-glaive'),
+    width: 96,
+    height: 96,
+  },
+  {
+    key: 'weapon-prism-cutter',
+    path: getHudWeaponAssetPath('weapon-prism-cutter'),
+    width: 96,
+    height: 96,
+  },
+  {
     key: 'weapon-needle-fan',
     path: getHudWeaponAssetPath('weapon-needle-fan'),
     width: 96,

@@ -3,7 +3,7 @@ import type {
   WeaponKnockbackDefinition,
 } from '../domain/types.js'
 
-export type KnockbackSource = 'direct-projectile' | 'hazard' | 'chain'
+export type KnockbackSource = 'direct-projectile' | 'melee-swing' | 'hazard' | 'chain'
 
 export interface Point {
   x: number
@@ -108,7 +108,7 @@ export function getEffectiveKnockbackForce(
 }
 
 export function shouldApplyKnockbackSource(source: KnockbackSource): boolean {
-  return source === 'direct-projectile'
+  return source === 'direct-projectile' || source === 'melee-swing'
 }
 
 export function clearKnockbackForTelegraph(): undefined {
