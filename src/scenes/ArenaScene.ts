@@ -3,6 +3,7 @@ import { ENEMY_DEFINITIONS } from '../data/enemies.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import type {
   EnemyDefinition,
+  HudCharacterStatView,
   HudOwnedWeaponView,
   RunEndReason,
   WeaponStack,
@@ -331,6 +332,10 @@ interface ArenaSceneStartData {
 }
 
 export class ArenaScene extends Phaser.Scene {
+  private static readonly BASE_CRIT_CHANCE = 0
+
+  private static readonly BASE_CRIT_MULTIPLIER = 1.5
+
   private hud!: HudController
 
   private codex!: CodexController
@@ -2630,6 +2635,7 @@ export class ArenaScene extends Phaser.Scene {
         items: [],
         recipes: [],
         weapons: this.getOwnedWeaponViews(),
+        characterStats: this.getCharacterStatViews(),
       },
     })
   }
@@ -2666,6 +2672,28 @@ export class ArenaScene extends Phaser.Scene {
         accentColor: ownedWeapon.visual.accentColor,
       }
     })
+  }
+
+  private getCharacterStatViews(): HudCharacterStatView[] {
+    const weaponId = this.getActiveWeaponId()
+    const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
+    const activeStar = activeStack?.star ?? 1
+    const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar, this.playerProgression.level)
+    const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
+    const attackRange = getWeaponAttackRange(weapon)
+
+    return [
+      { label: '이동 속도', value: `${this.playerSpeed}` },
+      { label: '공격력', value: `${weapon.damage}` },
+      { label: '기본 공속', value: `${(1000 / weapon.fireRateMs).toFixed(2)}/초` },
+      { label: '치명타 확률', value: `${ArenaScene.BASE_CRIT_CHANCE}%` },
+      { label: '치명타 배수', value: `×${ArenaScene.BASE_CRIT_MULTIPLIER.toFixed(2)}` },
+      { label: '최대 체력', value: `${this.playerMaxHealth}` },
+      { label: '공격 사거리', value: `${attackRange}` },
+      { label: '피해 배율', value: `×${playerStats.damageMultiplier.toFixed(2)}` },
+      { label: '사거리 배율', value: `×${playerStats.weaponRangeMultiplier.toFixed(2)}` },
+      { label: '특수 강화 단계', value: `${playerStats.weaponSpecialTier}` },
+    ]
   }
 
 

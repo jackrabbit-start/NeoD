@@ -598,7 +598,8 @@ button {
 }
 
 .hud-modal__grid--inventory {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr) minmax(220px, 0.85fr);
+  align-items: start;
 }
 
 .hud-modal__section {
@@ -620,6 +621,34 @@ button {
 .hud-modal__list {
   display: grid;
   gap: 8px;
+}
+
+.hud-modal__stats {
+  display: grid;
+  gap: 8px;
+}
+
+.hud-modal__stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(151, 191, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(14, 26, 54, 0.9);
+}
+
+.hud-modal__stat-label {
+  color: #b9c7ff;
+  font-size: 13px;
+}
+
+.hud-modal__stat-value {
+  color: #f4f7ff;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: right;
 }
 
 .hud-modal__list--stage {

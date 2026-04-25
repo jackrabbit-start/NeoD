@@ -319,11 +319,17 @@ export interface HudOwnedWeaponView {
   accentColor?: number
 }
 
+export interface HudCharacterStatView {
+  label: string
+  value: string
+}
+
 export interface HudModalState {
   isOpen: boolean
   items: HudOwnedItemView[]
   recipes: HudRecipeView[]
   weapons: HudOwnedWeaponView[]
+  characterStats: HudCharacterStatView[]
 }
 
 export interface HudStageView {
