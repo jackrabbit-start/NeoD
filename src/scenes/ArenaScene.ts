@@ -2609,8 +2609,6 @@ export class ArenaScene extends Phaser.Scene {
       inventory: [
         `파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`,
         `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`,
-        `현재 적 출현 확률 (${currentPhase.minuteIndex + 1}분차)`,
-        ...enemyChanceLines,
       ],
       recipes: ['같은 무기·같은 별 3개는 자동으로 다음 별 등급이 됩니다.'],
       objective: this.isFinaleActive
@@ -2635,6 +2633,7 @@ export class ArenaScene extends Phaser.Scene {
         isTokenInFlight: this.activePachinkoTokens.length > 0,
         latestReward: this.latestPachinkoReward,
         synergy: getPachinkoWeaponSynergySummary(weaponId),
+        enemyOdds: [`${currentPhase.minuteIndex + 1}분차`, ...enemyChanceLines],
       },
       modal: {
         isOpen: this.isInventoryOpen,

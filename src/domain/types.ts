@@ -20,6 +20,7 @@ export interface PachinkoHudState {
   isTokenInFlight: boolean
   latestReward: string | null
   synergy?: string
+  enemyOdds?: string[]
 }
 
 export type EnemyAnimationKey =

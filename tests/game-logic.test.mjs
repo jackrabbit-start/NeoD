@@ -697,15 +697,15 @@ test('pachinko slot index clamps boundaries and live table timing', () => {
 })
 
 test('pachinko launch capacity respects active cap, queue, and cadence', () => {
-  assert.equal(MAX_ACTIVE_PACHINKO_TOKENS, 15)
+  assert.equal(MAX_ACTIVE_PACHINKO_TOKENS, 30)
   assert.equal(canLaunchPachinkoToken({
-    activeTokenCount: 14,
+    activeTokenCount: 29,
     queuedTokenCount: 1,
     now: 1000,
     lastLaunchAt: 0,
   }), true)
   assert.equal(canLaunchPachinkoToken({
-    activeTokenCount: 15,
+    activeTokenCount: 30,
     queuedTokenCount: 10,
     now: 1000,
     lastLaunchAt: 0,
