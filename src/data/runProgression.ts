@@ -39,55 +39,46 @@ const pressureNames = [
 ]
 
 function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
-  if (minuteIndex < 2) {
-    return [{ enemyId: 'slime', count: 10 + minuteIndex * 2 }]
+  const clampedMinute = Math.max(0, Math.min(29, minuteIndex))
+  const lateRamp = Math.max(0, clampedMinute - 15)
+  const finaleRamp = Math.max(0, clampedMinute - 24)
+
+  const weights: RunSpawnEntryDefinition[] = [
+    { enemyId: 'slime', count: Math.max(2, 16 - clampedMinute) },
+  ]
+
+  if (clampedMinute >= 2) {
+    weights.push({ enemyId: 'dash-slime', count: 3 + Math.min(6, clampedMinute) })
   }
-  if (minuteIndex < 5) {
-    return [
-      { enemyId: 'slime', count: 10 },
-      { enemyId: 'dash-slime', count: 4 + minuteIndex },
-    ]
+  if (clampedMinute >= 5) {
+    weights.push({ enemyId: 'spark-slime', count: 4 + Math.floor(clampedMinute / 3) })
   }
-  if (minuteIndex < 10) {
-    return [
-      { enemyId: 'slime', count: 8 },
-      { enemyId: 'dash-slime', count: 8 },
-      { enemyId: 'spark-slime', count: 5 + Math.floor(minuteIndex / 2) },
-    ]
+  if (clampedMinute >= 7) {
+    weights.push({ enemyId: 'splitter-slime', count: 3 + Math.floor((clampedMinute - 7) / 2) })
   }
-  if (minuteIndex < 15) {
-    return [
-      { enemyId: 'dash-slime', count: 8 },
-      { enemyId: 'spark-slime', count: 8 },
-      { enemyId: 'orbit-slime', count: 6 },
-      { enemyId: 'needle-wasp', count: 3 },
-    ]
+  if (clampedMinute >= 10) {
+    weights.push({ enemyId: 'orbit-slime', count: 5 + Math.floor((clampedMinute - 10) / 3) })
   }
-  if (minuteIndex < 20) {
-    return [
-      { enemyId: 'spark-slime', count: 8 },
-      { enemyId: 'orbit-slime', count: 8 },
-      { enemyId: 'needle-wasp', count: 5 },
-      { enemyId: 'prism-slime', count: 2 },
-    ]
+  if (clampedMinute >= 12) {
+    weights.push({ enemyId: 'needle-wasp', count: 3 + Math.floor((clampedMinute - 12) / 3) })
   }
-  if (minuteIndex < 25) {
-    return [
-      { enemyId: 'dash-slime', count: 8 },
-      { enemyId: 'spark-slime', count: 9 },
-      { enemyId: 'orbit-slime', count: 9 },
-      { enemyId: 'needle-wasp', count: 7 },
-      { enemyId: 'prism-slime', count: 3 },
-    ]
+  if (clampedMinute >= 14) {
+    weights.push({ enemyId: 'mender-slime', count: 2 + Math.floor((clampedMinute - 14) / 4) })
+  }
+  if (clampedMinute >= 16) {
+    weights.push({ enemyId: 'shard-sentinel', count: 2 + Math.floor(lateRamp / 4) })
+  }
+  if (clampedMinute >= 18) {
+    weights.push({ enemyId: 'prism-slime', count: 2 + Math.floor((clampedMinute - 18) / 4) })
+  }
+  if (clampedMinute >= 20) {
+    weights.push({ enemyId: 'void-orb', count: 2 + Math.floor((clampedMinute - 20) / 3) })
+  }
+  if (clampedMinute >= 23) {
+    weights.push({ enemyId: 'crusher-slime', count: 1 + Math.floor((clampedMinute - 23) / 3) + Math.floor(finaleRamp / 2) })
   }
 
-  return [
-    { enemyId: 'dash-slime', count: 10 },
-    { enemyId: 'spark-slime', count: 10 },
-    { enemyId: 'orbit-slime', count: 10 },
-    { enemyId: 'needle-wasp', count: 8 },
-    { enemyId: 'prism-slime', count: 4 },
-  ]
+  return weights.filter((entry) => entry.count > 0)
 }
 
 function createPhase(minuteIndex: number): RunProgressionPhaseDefinition {

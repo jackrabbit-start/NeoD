@@ -8,11 +8,11 @@ import type {
   WeaponStar,
 } from '../domain/types.js'
 import { getAvailableRecipes, resolveCombine } from './combine.js'
-import { MAX_WEAPON_STAR } from './pachinkoRewards.js'
 
 export const STARTER_WEAPON_ID: WeaponId = 'starter-blaster'
 export const STARTER_WEAPON_STAR: WeaponStar = 1
 export const STARTER_WEAPON_STACK_KEY = createWeaponStackKey(STARTER_WEAPON_ID, STARTER_WEAPON_STAR)
+export const AUTO_FUSE_STACK_COUNT = 3
 
 export interface WeaponLoadoutState {
   inventory: InventoryState
@@ -40,6 +40,12 @@ export interface FusionResult {
   resultStar: WeaponStar
 }
 
+export interface AutoFusionResult {
+  weaponStacks: WeaponStack[]
+  activeWeaponKey: WeaponStackKey
+  fusions: FusionResult[]
+}
+
 export function createWeaponStackKey(weaponId: WeaponId, star: WeaponStar): WeaponStackKey {
   return `${weaponId}:${star}`
 }
@@ -47,11 +53,19 @@ export function createWeaponStackKey(weaponId: WeaponId, star: WeaponStar): Weap
 export function parseWeaponStackKey(key: WeaponStackKey): { weaponId: WeaponId; star: WeaponStar } | null {
   const [weaponId, starText] = key.split(':')
   const star = Number(starText)
-  if (!WEAPON_IDS.includes(weaponId as WeaponId) || !Number.isInteger(star) || star < 1 || star > MAX_WEAPON_STAR) {
+  if (!WEAPON_IDS.includes(weaponId as WeaponId) || !Number.isInteger(star) || star < 1) {
     return null
   }
 
   return { weaponId: weaponId as WeaponId, star: star as WeaponStar }
+}
+
+export function formatWeaponStarLabel(star: WeaponStar | undefined): string {
+  if (star === undefined || !Number.isInteger(star) || star < 1) {
+    return ''
+  }
+
+  return `★×${star}`
 }
 
 export function seedOwnedWeapons(): WeaponId[] {
@@ -149,6 +163,46 @@ export function addWeaponStack(
   return sortWeaponStacks(nextStacks)
 }
 
+export function addWeaponStackWithAutoFusion(
+  state: WeaponStackLoadoutState,
+  weaponId: WeaponId,
+  star: WeaponStar,
+  count = 1,
+): AutoFusionResult {
+  let weaponStacks = addWeaponStack(state.weaponStacks, weaponId, star, count)
+  let activeWeaponKey = normalizeActiveWeaponKey(weaponStacks, state.activeWeaponKey)
+  const fusions: FusionResult[] = []
+
+  let didFuse = true
+  while (didFuse) {
+    didFuse = false
+    const fusionSource = sortWeaponStacks(weaponStacks, activeWeaponKey)
+      .reverse()
+      .find((stack) => stack.count >= AUTO_FUSE_STACK_COUNT)
+
+    if (!fusionSource) {
+      break
+    }
+
+    const sourceKey = getStackKey(fusionSource)
+    const fusion = fuseWeaponStack({ weaponStacks, activeWeaponKey }, sourceKey)
+    if (!fusion) {
+      break
+    }
+
+    weaponStacks = fusion.weaponStacks
+    activeWeaponKey = fusion.activeWeaponKey
+    fusions.push(fusion)
+    didFuse = true
+  }
+
+  return {
+    weaponStacks,
+    activeWeaponKey: normalizeActiveWeaponKey(weaponStacks, activeWeaponKey),
+    fusions,
+  }
+}
+
 export function equipWeaponStack(
   weaponStacks: WeaponStack[],
   activeWeaponKey: WeaponStackKey,
@@ -159,11 +213,11 @@ export function equipWeaponStack(
 
 export function canFuseWeaponStack(weaponStacks: WeaponStack[], key: WeaponStackKey): boolean {
   const parsed = parseWeaponStackKey(key)
-  if (!parsed || parsed.star >= MAX_WEAPON_STAR) {
+  if (!parsed) {
     return false
   }
 
-  return getStackCount(weaponStacks, key) >= 2
+  return getStackCount(weaponStacks, key) >= AUTO_FUSE_STACK_COUNT
 }
 
 export function fuseWeaponStack(
@@ -183,7 +237,7 @@ export function fuseWeaponStack(
       if (getStackKey(stack) !== key) {
         return stack
       }
-      const nextCount = stack.count - 2
+      const nextCount = stack.count - AUTO_FUSE_STACK_COUNT
       sourceWasDepleted = nextCount <= 0
       return { ...stack, count: nextCount }
     })

@@ -46,6 +46,11 @@ export const ENEMY_IDS = [
   'dash-slime',
   'orbit-slime',
   'needle-wasp',
+  'splitter-slime',
+  'shard-sentinel',
+  'mender-slime',
+  'void-orb',
+  'crusher-slime',
   'slime-boss',
 ] as const
 

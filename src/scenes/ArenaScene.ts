@@ -21,14 +21,20 @@ import { GAMEPLAY_CONTROL_TIP, GAME_TITLE } from '../ui/controlCopy.js'
 import { getCodexState } from '../systems/codex.js'
 import {
   advanceEnemyCooldown,
+  createEnemyLineBeam,
+  createEnemyRadialBurstProjectiles,
   createEnemySpreadBurstProjectiles,
   createEnemyRuntimeState,
   createEnemyTelegraph,
   getDistanceBetween,
   isPointInsideCircle,
+  isPointInsideLineBeam,
   resolveEnemyVelocityStep,
+  shouldEnemyStartLineBeam,
+  shouldEnemyStartRadialBurst,
   shouldEnemyStartSpreadBurst,
   shouldEnemyStartTelegraph,
+  type EnemyLineBeamSpec,
   type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
 import {
@@ -102,6 +108,7 @@ import {
   applyEnemyPachinkoTokenProgress,
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
+  getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
   getTokenXpForEnemy,
   resolvePachinkoSlotIndex,
@@ -140,10 +147,9 @@ import {
 } from '../systems/weaponPresentation.js'
 import { deriveEffectiveWeaponStats } from '../systems/tuning.js'
 import {
-  addWeaponStack,
-  canFuseWeaponStack,
+  addWeaponStackWithAutoFusion,
   equipWeaponStack,
-  fuseWeaponStack,
+  formatWeaponStarLabel,
   getStackKey,
   getWeaponIdFromStackKey,
   parseWeaponStackKey,
@@ -218,6 +224,13 @@ interface EnemySpreadBurstCharge {
   totalMs: number
 }
 
+interface EnemyLineBeamCharge {
+  visual: Phaser.GameObjects.Graphics
+  beam: EnemyLineBeamSpec
+  remainingMs: number
+  totalMs: number
+}
+
 interface EnemyEntity {
   runtimeId: number
   sprite: PhysicsSprite
@@ -230,6 +243,7 @@ interface EnemyEntity {
   knockback?: KnockbackState
   telegraph?: EnemyTelegraph
   spreadBurst?: EnemySpreadBurstCharge
+  lineBeam?: EnemyLineBeamCharge
 }
 
 interface PachinkoTokenEntity {
@@ -445,6 +459,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private latestPachinkoReward: string | null = null
 
+  private pachinkoRewardTableSeed = 0
+
   private pachinkoPins?: Phaser.Physics.Arcade.StaticGroup
 
   private pachinkoVisuals: Phaser.GameObjects.GameObject[] = []
@@ -489,7 +505,6 @@ export class ArenaScene extends Phaser.Scene {
       onInventoryToggle: () => this.toggleInventory(),
       onInventoryClose: () => this.closeInventory(),
       onWeaponEquip: (weaponKey) => this.handleWeaponEquip(weaponKey as WeaponStackKey),
-      onWeaponFuse: (weaponKey) => this.handleWeaponFuse(weaponKey),
       onStageSelectionToggle: () => this.toggleStageSelection(),
       onStageSelectionClose: () => this.closeStageSelection(),
       onStageSelect: (stageIndex) => this.handleStageSelection(stageIndex),
@@ -948,7 +963,42 @@ export class ArenaScene extends Phaser.Scene {
 
           enemy.spreadBurst.visual.destroy()
           enemy.spreadBurst = undefined
-          if (enemy.config.attackBehavior.kind === 'spread-burst') {
+          if (
+            enemy.config.attackBehavior.kind === 'spread-burst' ||
+            enemy.config.attackBehavior.kind === 'radial-burst'
+          ) {
+            enemy.attackCooldownMs = enemy.config.attackBehavior.cooldownMs
+          }
+        }
+
+        enemy.sprite.setVelocity(0, 0)
+        this.syncEnemyHealthBar(enemy)
+        continue
+      }
+
+      if (enemy.lineBeam) {
+        enemy.knockback = clearKnockbackForTelegraph()
+        enemy.lineBeam.remainingMs -= delta
+        enemy.lineBeam.visual.setAlpha(
+          Math.max(0.24, 0.9 * (1 - enemy.lineBeam.remainingMs / enemy.lineBeam.totalMs)),
+        )
+
+        if (enemy.lineBeam.remainingMs <= 0) {
+          if (
+            isPointInsideLineBeam(
+              { x: this.player.x, y: this.player.y },
+              enemy.lineBeam.beam,
+            )
+          ) {
+            this.damagePlayer(enemy.lineBeam.beam.damage)
+            if (this.isRunEnding) {
+              return
+            }
+          }
+
+          enemy.lineBeam.visual.destroy()
+          enemy.lineBeam = undefined
+          if (enemy.config.attackBehavior.kind === 'line-beam') {
             enemy.attackCooldownMs = enemy.config.attackBehavior.cooldownMs
           }
         }
@@ -1016,6 +1066,58 @@ export class ArenaScene extends Phaser.Scene {
         if (projectiles.length > 0) {
           enemy.spreadBurst = {
             visual: this.createSpreadBurstWarning(enemy, projectiles),
+            projectiles,
+            remainingMs: attackBehavior.windupMs,
+            totalMs: attackBehavior.windupMs,
+          }
+          enemy.knockback = clearKnockbackForTelegraph()
+          enemy.sprite.setVelocity(0, 0)
+          this.syncEnemyHealthBar(enemy)
+          continue
+        }
+      }
+
+      if (
+        attackBehavior.kind === 'line-beam' &&
+        shouldEnemyStartLineBeam(
+          attackBehavior,
+          distanceToPlayer,
+          enemy.attackCooldownMs,
+        )
+      ) {
+        const beam = createEnemyLineBeam(
+          { x: enemy.sprite.x, y: enemy.sprite.y },
+          { x: this.player.x, y: this.player.y },
+          attackBehavior,
+        )
+
+        if (beam) {
+          enemy.lineBeam = {
+            visual: this.createLineBeamWarning(beam),
+            beam,
+            remainingMs: beam.durationMs,
+            totalMs: beam.durationMs,
+          }
+          enemy.knockback = clearKnockbackForTelegraph()
+          enemy.sprite.setVelocity(0, 0)
+          this.syncEnemyHealthBar(enemy)
+          continue
+        }
+      }
+
+      if (
+        attackBehavior.kind === 'radial-burst' &&
+        shouldEnemyStartRadialBurst(
+          attackBehavior,
+          distanceToPlayer,
+          enemy.attackCooldownMs,
+        )
+      ) {
+        const projectiles = createEnemyRadialBurstProjectiles(attackBehavior)
+
+        if (projectiles.length > 0) {
+          enemy.spreadBurst = {
+            visual: this.createRadialBurstWarning(enemy, projectiles),
             projectiles,
             remainingMs: attackBehavior.windupMs,
             totalMs: attackBehavior.windupMs,
@@ -1174,6 +1276,44 @@ export class ArenaScene extends Phaser.Scene {
     visual.fillStyle(enemy.config.tint, 0.12)
     visual.fillCircle(enemy.sprite.x, enemy.sprite.y, enemy.config.size * 0.62)
     visual.setAlpha(0.28)
+    return visual
+  }
+
+  private createRadialBurstWarning(
+    enemy: EnemyEntity,
+    projectiles: EnemyProjectileSpawnSpec[],
+  ): Phaser.GameObjects.Graphics {
+    const visual = this.add.graphics().setDepth(0.65)
+    const behavior = enemy.config.attackBehavior
+    const range = behavior.kind === 'radial-burst'
+      ? Math.min(behavior.range, behavior.projectileSpeed * (behavior.projectileLifetimeMs / 1000))
+      : 120
+
+    visual.lineStyle(2, enemy.config.tint, 0.76)
+    visual.strokeCircle(enemy.sprite.x, enemy.sprite.y, range)
+    for (const projectile of projectiles) {
+      visual.lineBetween(
+        enemy.sprite.x,
+        enemy.sprite.y,
+        enemy.sprite.x + projectile.direction.x * range,
+        enemy.sprite.y + projectile.direction.y * range,
+      )
+    }
+    visual.fillStyle(enemy.config.tint, 0.1)
+    visual.fillCircle(enemy.sprite.x, enemy.sprite.y, Math.max(enemy.config.size, range * 0.16))
+    visual.setAlpha(0.32)
+    return visual
+  }
+
+  private createLineBeamWarning(beam: EnemyLineBeamSpec): Phaser.GameObjects.Graphics {
+    const visual = this.add.graphics().setDepth(0.66)
+    visual.lineStyle(beam.width, beam.tint, 0.18)
+    visual.lineBetween(beam.start.x, beam.start.y, beam.end.x, beam.end.y)
+    visual.lineStyle(2, beam.tint, 0.88)
+    visual.lineBetween(beam.start.x, beam.start.y, beam.end.x, beam.end.y)
+    visual.fillStyle(beam.tint, 0.12)
+    visual.fillCircle(beam.start.x, beam.start.y, Math.max(10, beam.width * 0.5))
+    visual.setAlpha(0.36)
     return visual
   }
 
@@ -1470,7 +1610,7 @@ export class ArenaScene extends Phaser.Scene {
       repeat: -1,
     })
 
-    const sprite = this.physics.add.image(x, y, 'spark-knot')
+    const sprite = this.physics.add.image(x, y, 'tuning-capsule')
     sprite.setCircle(9)
     sprite.setDepth(4)
     sprite.setScale(0.74)
@@ -1735,6 +1875,10 @@ export class ArenaScene extends Phaser.Scene {
       enemy.spreadBurst.visual.destroy()
       enemy.spreadBurst = undefined
     }
+    if (enemy.lineBeam?.visual.active) {
+      enemy.lineBeam.visual.destroy()
+      enemy.lineBeam = undefined
+    }
     enemy.knockback = undefined
     this.destroyEnemyHealthBar(enemy)
     enemy.sprite.destroy()
@@ -1857,7 +2001,7 @@ export class ArenaScene extends Phaser.Scene {
   private openInventory(): void {
     this.isInventoryOpen = true
     this.applyInteractionPause(true)
-    this.statusMessage = '인벤토리가 열렸습니다. 살펴보고 조합하는 동안 전투가 일시정지됩니다.'
+    this.statusMessage = '인벤토리가 열렸습니다. 장착 무기와 보유 무기를 확인하세요.'
     this.updateHud()
   }
 
@@ -2005,27 +2149,8 @@ export class ArenaScene extends Phaser.Scene {
     this.updateHud()
   }
 
-  private handleWeaponFuse(weaponKey: WeaponStackKey): void {
-    if (!this.isInventoryOpen) {
-      return
-    }
 
-    const result = fuseWeaponStack({
-      weaponStacks: this.weaponStacks,
-      activeWeaponKey: this.activeWeaponKey,
-    }, weaponKey)
 
-    if (!result) {
-      this.statusMessage = '같은 무기와 같은 별 2개가 있어야 합성할 수 있습니다.'
-      this.updateHud()
-      return
-    }
-
-    this.weaponStacks = result.weaponStacks
-    this.activeWeaponKey = result.activeWeaponKey
-    this.statusMessage = `${WEAPON_DEFINITIONS[result.weaponId].name} ${'★'.repeat(result.resultStar)} 합성 완료.`
-    this.updateHud()
-  }
 
   private freezeCombat(shouldFreeze: boolean): void {
     if (this.enemySpacingCollider) {
@@ -2412,6 +2537,9 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
     this.nextHeartPickupAt = 0
+    this.pachinkoTokenXp = initialState.pachinkoTokenXp
+    this.latestPachinkoReward = null
+    this.pachinkoRewardTableSeed = 0
   }
 
   private destroyRunEntities(): void {
@@ -2431,6 +2559,9 @@ export class ArenaScene extends Phaser.Scene {
       }
       if (enemy.spreadBurst?.visual.active) {
         enemy.spreadBurst.visual.destroy()
+      }
+      if (enemy.lineBeam?.visual.active) {
+        enemy.lineBeam.visual.destroy()
       }
       this.destroyEnemyHealthBar(enemy)
       if (enemy.sprite.active) {
@@ -2539,7 +2670,7 @@ export class ArenaScene extends Phaser.Scene {
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
         `플레이어 레벨: Lv.${playerProgression.level} · XP ${playerProgression.xpIntoLevel}/${playerProgression.xpToNextLevel}`,
-        `무기: ${weapon.name} ${'★'.repeat(activeStar)} · ${getWeaponSummary(weapon)}`,
+        `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
         `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
@@ -2547,7 +2678,7 @@ export class ArenaScene extends Phaser.Scene {
       ],
       passives: getPassiveSummaryLines(this.passiveState),
       inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`],
-      recipes: this.getFusionSummaryLines(),
+      recipes: ['같은 무기·같은 별 3개는 자동으로 다음 별 등급이 됩니다.'],
       objective: this.isFinaleActive
         ? '크라운 슬라임을 30:00 전에 격파하고 네온 아레나를 장악하세요.'
         : '30분 생존 압박을 버티며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
@@ -2609,11 +2740,6 @@ export class ArenaScene extends Phaser.Scene {
         this.passiveState,
       )
       const stackKey = getStackKey(stack)
-      const canFuse = canFuseWeaponStack(this.weaponStacks, stackKey)
-      const fuseDisabledReason = stack.star >= 5
-        ? '5★가 최대 등급입니다.'
-        : '같은 무기와 같은 별 2개가 필요합니다.'
-
       return {
         id: stack.weaponId,
         stackKey,
@@ -2625,27 +2751,17 @@ export class ArenaScene extends Phaser.Scene {
         fireRateMs: effectiveWeapon.fireRateMs,
         projectileSpeed: effectiveWeapon.projectileSpeed,
         isEquipped: stackKey === this.activeWeaponKey,
-        canFuse,
-        fuseDisabledReason: canFuse ? null : fuseDisabledReason,
         hudIconKey: ownedWeapon.visual.hudIconKey,
         accentColor: ownedWeapon.visual.accentColor,
       }
     })
   }
 
-  private getFusionSummaryLines(): string[] {
-    const eligible = sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).filter((stack) => canFuseWeaponStack(this.weaponStacks, getStackKey(stack)))
-    if (eligible.length === 0) {
-      return ['같은 무기와 같은 별 2개를 모으면 합성 가능']
-    }
-
-    return eligible.map((stack) => `${WEAPON_DEFINITIONS[stack.weaponId].name} ${'★'.repeat(stack.star)} 합성 가능`)
-  }
 
   private getActiveWeaponLabel(): string {
     const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
     const stack = this.weaponStacks.find((candidate) => getStackKey(candidate) === this.activeWeaponKey)
-    return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${'★'.repeat(stack.star)}` : ''}`
+    return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${formatWeaponStarLabel(stack.star)}` : ''}`
   }
 
   private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): void {
@@ -2672,6 +2788,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
+    this.pachinkoRewardTableSeed = getPachinkoRewardTableSeed(this.time.now)
     const rect = this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
 
@@ -2756,11 +2873,28 @@ export class ArenaScene extends Phaser.Scene {
     const rect = this.syncPachinkoBoard()
     const laneRatio = Phaser.Math.Clamp((token.sprite.x - rect.x) / rect.width, 0, 0.999)
     const slotIndex = resolvePachinkoSlotIndex(laneRatio)
-    const reward = resolvePachinkoSlotReward(this.pachinkoTokenXp, laneRatio)
-    this.weaponStacks = addWeaponStack(this.weaponStacks, reward.weaponId, reward.star, 1)
-    const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${'★'.repeat(reward.star)}`
-    this.latestPachinkoReward = rewardLabel
-    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}`
+    const reward = resolvePachinkoSlotReward(
+      this.pachinkoTokenXp,
+      laneRatio,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )
+    const fusionResult = addWeaponStackWithAutoFusion(
+      { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
+      reward.weaponId,
+      reward.star,
+      1,
+    )
+    this.weaponStacks = fusionResult.weaponStacks
+    this.activeWeaponKey = fusionResult.activeWeaponKey
+    const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${formatWeaponStarLabel(reward.star)}`
+    const lastFusion = fusionResult.fusions.at(-1)
+    const fusionLabel = lastFusion
+      ? ` · 자동 합성: ${WEAPON_DEFINITIONS[lastFusion.weaponId].name} ${formatWeaponStarLabel(lastFusion.resultStar)}`
+      : ''
+    this.latestPachinkoReward = `${rewardLabel}${fusionLabel}`
+    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}${fusionLabel}`
     this.destroyActivePachinkoToken(token)
     this.launchAvailablePachinkoTokens()
   }
@@ -2834,7 +2968,7 @@ export class ArenaScene extends Phaser.Scene {
       .setDisplaySize(rect.width - 16, 4)
     this.pachinkoLevelBadge
       ?.setPosition(rect.x + rect.width - 12, rect.y + 14)
-      .setText(`Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`)
+      .setText(`Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)} · LIVE`)
     const queueBadgeX = this.getPachinkoQueueBadgeX(rect)
     this.pachinkoQueueBadge
       ?.setPosition(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET)
@@ -2897,7 +3031,7 @@ export class ArenaScene extends Phaser.Scene {
       fontStyle: '700',
       align: 'left',
     }).setDepth(63)
-    const levelBadge = this.add.text(rect.x + rect.width - 12, rect.y + 14, `Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, {
+    const levelBadge = this.add.text(rect.x + rect.width - 12, rect.y + 14, `Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)} · LIVE`, {
       color: '#101a32',
       backgroundColor: '#ffd866',
       fontFamily: 'Inter, system-ui, sans-serif',
@@ -2964,7 +3098,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private createPachinkoSlotVisuals(rect: RectBounds): void {
-    for (const reward of buildPachinkoSlotRewards(this.pachinkoTokenXp)) {
+    for (const reward of buildPachinkoSlotRewards(
+      this.pachinkoTokenXp,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )) {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
       const frame = this.add.rectangle(centerX, centerY, rect.width / reward.slotCount - 3, PACHINKO_SLOT_VISUAL_HEIGHT - 8, 0x07111f, 0.96)
@@ -2979,10 +3118,10 @@ export class ArenaScene extends Phaser.Scene {
         fontSize: '8px',
         fontStyle: '800',
       }).setOrigin(0.5).setDepth(63)
-      const starLabel = this.add.text(centerX, centerY + 18, '★'.repeat(reward.star), {
+      const starLabel = this.add.text(centerX, centerY + 18, formatWeaponStarLabel(reward.star), {
         color: '#ffd866',
         fontFamily: 'Inter, system-ui, sans-serif',
-        fontSize: reward.star >= 4 ? '7px' : '8px',
+        fontSize: '8px',
         fontStyle: '900',
       }).setOrigin(0.5).setDepth(63)
       this.pachinkoSlotVisuals.push({
@@ -2996,7 +3135,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private syncPachinkoSlotVisuals(rect: RectBounds): void {
-    const rewards = buildPachinkoSlotRewards(this.pachinkoTokenXp)
+    const rewards = buildPachinkoSlotRewards(
+      this.pachinkoTokenXp,
+      PACHINKO_SLOT_COUNT,
+      this.pachinkoRewardTableSeed,
+      this.playerProgression.level,
+    )
     for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
       const visual = this.pachinkoSlotVisuals[index]
       const reward = rewards[index]
@@ -3020,8 +3164,8 @@ export class ArenaScene extends Phaser.Scene {
         .setText(`${reward.slotIndex + 1}`)
       visual.starLabel
         .setPosition(centerX, centerY + 18)
-        .setText('★'.repeat(reward.star))
-        .setFontSize(reward.star >= 4 ? 7 : 8)
+        .setText(formatWeaponStarLabel(reward.star))
+        .setFontSize(8)
     }
   }
 

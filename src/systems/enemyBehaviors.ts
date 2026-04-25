@@ -1,7 +1,9 @@
 import type {
   EnemyAttackBehavior,
   EnemyDefinition,
+  EnemyLineBeamAttackBehavior,
   EnemyMovementBehavior,
+  EnemyRadialBurstAttackBehavior,
   EnemySpreadBurstAttackBehavior,
 } from '../domain/types.js'
 import type { EnemyProjectileSpawnSpec } from './enemyProjectiles.js'
@@ -19,6 +21,15 @@ export interface EnemyTelegraphSpec {
   x: number
   y: number
   radius: number
+  damage: number
+  durationMs: number
+  tint: number
+}
+
+export interface EnemyLineBeamSpec {
+  start: Point
+  end: Point
+  width: number
   damage: number
   durationMs: number
   tint: number
@@ -265,6 +276,30 @@ export function shouldEnemyStartSpreadBurst(
   )
 }
 
+export function shouldEnemyStartLineBeam(
+  attackBehavior: EnemyAttackBehavior,
+  distanceToPlayer: number,
+  cooldownRemainingMs: number,
+): boolean {
+  return (
+    attackBehavior.kind === 'line-beam' &&
+    cooldownRemainingMs <= 0 &&
+    distanceToPlayer <= attackBehavior.range
+  )
+}
+
+export function shouldEnemyStartRadialBurst(
+  attackBehavior: EnemyAttackBehavior,
+  distanceToPlayer: number,
+  cooldownRemainingMs: number,
+): boolean {
+  return (
+    attackBehavior.kind === 'radial-burst' &&
+    cooldownRemainingMs <= 0 &&
+    distanceToPlayer <= attackBehavior.range
+  )
+}
+
 export function createEnemyTelegraph(
   enemyPosition: Point,
   playerPosition: Point,
@@ -324,4 +359,76 @@ export function isPointInsideCircle(point: Point, center: Point, radius: number)
 
 export function getEnemyBehaviorSummary(enemy: EnemyDefinition): string {
   return enemy.behaviorSummary
+}
+
+
+export function createEnemyLineBeam(
+  enemyPosition: Point,
+  playerPosition: Point,
+  attackBehavior: EnemyLineBeamAttackBehavior,
+): EnemyLineBeamSpec | undefined {
+  const direction = normalize({
+    x: playerPosition.x - enemyPosition.x,
+    y: playerPosition.y - enemyPosition.y,
+  })
+
+  if (direction.x === 0 && direction.y === 0) {
+    return undefined
+  }
+
+  return {
+    start: enemyPosition,
+    end: add(enemyPosition, scale(direction, attackBehavior.range)),
+    width: attackBehavior.width,
+    damage: attackBehavior.damage,
+    durationMs: attackBehavior.windupMs,
+    tint: attackBehavior.tint,
+  }
+}
+
+export function isPointInsideLineBeam(
+  point: Point,
+  beam: Pick<EnemyLineBeamSpec, 'start' | 'end' | 'width'>,
+): boolean {
+  const segmentX = beam.end.x - beam.start.x
+  const segmentY = beam.end.y - beam.start.y
+  const segmentLengthSq = segmentX * segmentX + segmentY * segmentY
+  if (segmentLengthSq <= 0) {
+    return getDistanceBetween(point, beam.start) <= beam.width / 2
+  }
+
+  const projection = Math.max(
+    0,
+    Math.min(
+      1,
+      ((point.x - beam.start.x) * segmentX + (point.y - beam.start.y) * segmentY) / segmentLengthSq,
+    ),
+  )
+  const closest = {
+    x: beam.start.x + segmentX * projection,
+    y: beam.start.y + segmentY * projection,
+  }
+  return getDistanceBetween(point, closest) <= beam.width / 2
+}
+
+export function createEnemyRadialBurstProjectiles(
+  attackBehavior: EnemyRadialBurstAttackBehavior,
+): EnemyProjectileSpawnSpec[] {
+  const projectileCount = Math.max(0, Math.floor(attackBehavior.projectileCount))
+  if (projectileCount <= 0) {
+    return []
+  }
+
+  return Array.from({ length: projectileCount }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / projectileCount
+    return {
+      direction: { x: Math.cos(angle), y: Math.sin(angle) },
+      speed: attackBehavior.projectileSpeed,
+      damage: attackBehavior.damage,
+      radius: attackBehavior.projectileRadius,
+      lifetimeMs: attackBehavior.projectileLifetimeMs,
+      tint: attackBehavior.tint,
+      textureKey: attackBehavior.projectileTextureKey,
+    }
+  })
 }

@@ -4,12 +4,17 @@ import assert from 'node:assert/strict'
 import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
 import {
   advanceEnemyCooldown,
+  createEnemyLineBeam,
+  createEnemyRadialBurstProjectiles,
   createEnemySpreadBurstProjectiles,
   createEnemyTelegraph,
   getEnemyBehaviorSummary,
   isPointInsideCircle,
+  isPointInsideLineBeam,
   resolveEnemyVelocity,
   selectAutoFireTarget,
+  shouldEnemyStartLineBeam,
+  shouldEnemyStartRadialBurst,
   shouldEnemyStartSpreadBurst,
   shouldEnemyStartTelegraph,
 } from '../.tmp-test/src/systems/enemyBehaviors.js'
@@ -46,6 +51,11 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   const prism = ENEMY_DEFINITIONS['prism-slime']
   const dash = ENEMY_DEFINITIONS['dash-slime']
   const orbit = ENEMY_DEFINITIONS['orbit-slime']
+  const splitter = ENEMY_DEFINITIONS['splitter-slime']
+  const sentinel = ENEMY_DEFINITIONS['shard-sentinel']
+  const mender = ENEMY_DEFINITIONS['mender-slime']
+  const voidOrb = ENEMY_DEFINITIONS['void-orb']
+  const crusher = ENEMY_DEFINITIONS['crusher-slime']
   const boss = ENEMY_DEFINITIONS['slime-boss']
 
   assert.equal(slime.maxHealth, 30)
@@ -84,6 +94,18 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   assert.equal(orbit.movementBehavior.kind, 'orbit')
   assert.equal(orbit.movementBehavior.preferredDistance, 86)
   assert.equal(orbit.movementBehavior.distanceTolerance, 28)
+
+  assert.equal(splitter.attackBehavior.kind, 'radial-burst')
+  assert.equal(splitter.attackBehavior.projectileCount, 8)
+  assert.equal(splitter.attackBehavior.damage, 10)
+  assert.equal(sentinel.attackBehavior.kind, 'line-beam')
+  assert.equal(sentinel.attackBehavior.width, 34)
+  assert.equal(mender.attackBehavior.kind, 'telegraphed-aoe')
+  assert.equal(mender.attackBehavior.anchor, 'self')
+  assert.equal(voidOrb.attackBehavior.kind, 'line-beam')
+  assert.equal(crusher.attackBehavior.kind, 'telegraphed-aoe')
+  assert.equal(crusher.attackBehavior.anchor, 'self')
+  assert.ok(crusher.maxHealth > prism.maxHealth)
 
   assert.equal(boss.maxHealth, 720)
   assert.equal(boss.speed, 64)
@@ -185,6 +207,47 @@ test('spread-burst helper avoids unsafe zero-distance directions', () => {
   )
 })
 
+test('line-beam helpers keep linear threats deterministic and range-bound', () => {
+  const attackBehavior = ENEMY_DEFINITIONS['shard-sentinel'].attackBehavior
+  assert.equal(attackBehavior.kind, 'line-beam')
+
+  const beam = createEnemyLineBeam(
+    { x: 10, y: 20 },
+    { x: 110, y: 20 },
+    attackBehavior,
+  )
+
+  assert.equal(shouldEnemyStartLineBeam(attackBehavior, attackBehavior.range, 0), true)
+  assert.equal(shouldEnemyStartLineBeam(attackBehavior, attackBehavior.range + 1, 0), false)
+  assert.equal(shouldEnemyStartLineBeam(attackBehavior, attackBehavior.range, 1), false)
+  assert.deepEqual(beam && beam.start, { x: 10, y: 20 })
+  assert.equal(beam?.end.y, 20)
+  assert.equal(Math.round((beam?.end.x ?? 0) - 10), attackBehavior.range)
+  assert.equal(isPointInsideLineBeam({ x: 80, y: 30 }, beam ?? { start: { x: 0, y: 0 }, end: { x: 0, y: 0 }, width: 0 }), true)
+  assert.equal(isPointInsideLineBeam({ x: 80, y: 80 }, beam ?? { start: { x: 0, y: 0 }, end: { x: 0, y: 0 }, width: 0 }), false)
+})
+
+test('radial-burst helper emits evenly distributed danger around the caster', () => {
+  const attackBehavior = ENEMY_DEFINITIONS['splitter-slime'].attackBehavior
+  assert.equal(attackBehavior.kind, 'radial-burst')
+
+  const projectiles = createEnemyRadialBurstProjectiles(attackBehavior)
+
+  assert.equal(shouldEnemyStartRadialBurst(attackBehavior, attackBehavior.range, 0), true)
+  assert.equal(shouldEnemyStartRadialBurst(attackBehavior, attackBehavior.range + 1, 0), false)
+  assert.equal(shouldEnemyStartRadialBurst(attackBehavior, attackBehavior.range, 1), false)
+  assert.equal(projectiles.length, attackBehavior.projectileCount)
+  assert.deepEqual(projectiles[0]?.direction, { x: 1, y: 0 })
+  assert.deepEqual(projectiles[2] && {
+    x: Math.round(projectiles[2].direction.x),
+    y: Math.round(projectiles[2].direction.y),
+  }, { x: 0, y: 1 })
+  assert.deepEqual(projectiles[4] && {
+    x: Math.round(projectiles[4].direction.x),
+    y: Math.round(projectiles[4].direction.y),
+  }, { x: -1, y: 0 })
+})
+
 test('circle hit test and codex enemy summary expose the new enemy identities', () => {
   assert.equal(isPointInsideCircle({ x: 108, y: 100 }, { x: 100, y: 100 }, 10), true)
   assert.equal(isPointInsideCircle({ x: 120, y: 100 }, { x: 100, y: 100 }, 10), false)
@@ -196,4 +259,8 @@ test('circle hit test and codex enemy summary expose the new enemy identities', 
 
   const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
   assert.ok(needleWasp?.stats.some((entry) => /부채꼴/.test(entry)))
+  const shardSentinel = codex.enemies.find((enemy) => enemy.id === 'shard-sentinel')
+  assert.ok(shardSentinel?.stats.some((entry) => /직선 광선/.test(entry)))
+  const splitterSlime = codex.enemies.find((enemy) => enemy.id === 'splitter-slime')
+  assert.ok(splitterSlime?.stats.some((entry) => /전방위/.test(entry)))
 })

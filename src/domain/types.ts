@@ -2,8 +2,8 @@ import type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
 export type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
-export type WeaponStar = 1 | 2 | 3 | 4 | 5
-export type WeaponStackKey = `${WeaponId}:${WeaponStar}`
+export type WeaponStar = number
+export type WeaponStackKey = `${WeaponId}:${number}`
 
 export interface WeaponStack {
   weaponId: WeaponId
@@ -178,10 +178,36 @@ export interface EnemySpreadBurstAttackBehavior {
   projectileTextureKey: string
 }
 
+export interface EnemyLineBeamAttackBehavior {
+  kind: 'line-beam'
+  cooldownMs: number
+  windupMs: number
+  range: number
+  width: number
+  damage: number
+  tint: number
+}
+
+export interface EnemyRadialBurstAttackBehavior {
+  kind: 'radial-burst'
+  cooldownMs: number
+  windupMs: number
+  range: number
+  projectileCount: number
+  projectileSpeed: number
+  projectileLifetimeMs: number
+  projectileRadius: number
+  damage: number
+  tint: number
+  projectileTextureKey: string
+}
+
 export type EnemyAttackBehavior =
   | EnemyContactAttackBehavior
   | EnemyTelegraphedAoeAttackBehavior
   | EnemySpreadBurstAttackBehavior
+  | EnemyLineBeamAttackBehavior
+  | EnemyRadialBurstAttackBehavior
 
 export interface EnemyVisualDefinition {
   portraitKey?: string
@@ -288,8 +314,6 @@ export interface HudOwnedWeaponView {
   fireRateMs: number
   projectileSpeed: number
   isEquipped: boolean
-  canFuse?: boolean
-  fuseDisabledReason?: string | null
   hudIconKey?: string
   accentColor?: number
 }
