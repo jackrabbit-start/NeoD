@@ -5,6 +5,7 @@ import { getPlayerLevelCombatStats, type PlayerLevelCombatStats } from './player
 
 export const TUNING_CAPSULE_ITEM_ID = 'tuning-capsule'
 export const STARTER_TUNING_INELIGIBLE_WEAPON_ID: WeaponId = 'starter-blaster'
+const MAX_RICOCHET_BOUNCES = 2
 
 export const TUNING_EFFECT_DEFINITIONS = [
   {
@@ -205,7 +206,7 @@ function applyStarWeaponScaling(
           projectileLifetimeMs: behavior.projectileLifetimeMs + 60 * milestoneBonus + 80 * overdriveBonus,
           ricochet: {
             ...behavior.ricochet,
-            maxBounces: behavior.ricochet.maxBounces + milestoneBonus,
+            maxBounces: Math.min(MAX_RICOCHET_BOUNCES, behavior.ricochet.maxBounces + milestoneBonus),
             bounceRange: behavior.ricochet.bounceRange + 24 * milestoneBonus + 28 * overdriveBonus,
             damageMultiplierPerBounce: Math.min(1, (behavior.ricochet.damageMultiplierPerBounce ?? 1) + 0.01 * overdriveBonus),
             speedMultiplierPerBounce: Math.min(1, (behavior.ricochet.speedMultiplierPerBounce ?? 1) + 0.01 * overdriveBonus),

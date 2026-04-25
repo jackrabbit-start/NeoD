@@ -89,6 +89,8 @@ const roundPercent = (value: number): number => Math.round(value * 100)
 
 const getLevelTier = (level: number): number => Math.max(0, Math.floor((Math.max(1, level) - 1) / 5))
 
+const MAX_RICOCHET_BOUNCES = 2
+
 const createLevelScaledPercentRange = (
   baseMin: number,
   baseMax: number,
@@ -1597,7 +1599,10 @@ function applyAttackBehaviorPassives(
         ricochet: behavior.ricochet
           ? {
               ...behavior.ricochet,
-              maxBounces: Math.max(0, behavior.ricochet.maxBounces + totals.ricochetBouncesDelta),
+              maxBounces: Math.max(
+                0,
+                Math.min(MAX_RICOCHET_BOUNCES, behavior.ricochet.maxBounces + totals.ricochetBouncesDelta),
+              ),
               bounceRange: Math.max(40, Math.round(behavior.ricochet.bounceRange * totals.ricochetRangeMultiplier)),
             }
           : behavior.ricochet,

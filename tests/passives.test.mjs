@@ -145,6 +145,18 @@ test('duration, ricochet, summon, turret, and lifesteal card stats all feed weap
   assert.ok(kickoff.attackBehavior.ricochet.maxBounces > WEAPON_DEFINITIONS['arc-loom'].attackBehavior.ricochet.maxBounces)
   assert.ok(kickoff.attackBehavior.ricochet.bounceRange > WEAPON_DEFINITIONS['arc-loom'].attackBehavior.ricochet.bounceRange)
 
+  let cappedRicochetState = state
+  cappedRicochetState = addPassiveCard(
+    cappedRicochetState,
+    createPassiveCardChoice('arc-loom-special', 12, createSequenceRandom([0.95, 0.85]), 'arc-loom'),
+  )
+  cappedRicochetState = addPassiveCard(
+    cappedRicochetState,
+    createPassiveCardChoice('arc-loom-special', 12, createSequenceRandom([0.9, 0.8]), 'arc-loom'),
+  )
+  const cappedArc = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['arc-loom'], cappedRicochetState)
+  assert.equal(cappedArc.attackBehavior.ricochet.maxBounces, 2)
+
   const sentry = applyPassiveWeaponEffects(WEAPON_DEFINITIONS['spark-carbine'], state)
   assert.equal(sentry.attackBehavior.kind, 'deploy-turret')
   assert.ok(sentry.attackBehavior.deploy.durationMs > WEAPON_DEFINITIONS['spark-carbine'].attackBehavior.deploy.durationMs)
