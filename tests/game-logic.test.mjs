@@ -126,13 +126,20 @@ import {
   createRunResultPresentation,
 } from '../.tmp-test/src/systems/runResult.js'
 import {
+  MAX_ACTIVE_PACHINKO_TOKENS,
+  PACHINKO_SLOT_COUNT,
   PACHINKO_LEVEL_THRESHOLDS,
+  PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
   STAR_ODDS_BY_LEVEL,
   applyEnemyPachinkoTokenProgress,
+  buildPachinkoSlotRewards,
+  canLaunchPachinkoToken,
   getPachinkoRewardLevel,
   getTokenXpForEnemy,
   resolvePachinkoLandingReward,
   resolvePachinkoReward,
+  resolvePachinkoSlotIndex,
+  resolvePachinkoSlotReward,
   resolveStarForLevel,
   resolveWeaponReward,
   shouldEnemyGrantPachinkoToken,
@@ -515,6 +522,108 @@ test('player progression view clamps invalid and max-level xp', () => {
   })
 })
 
+test('pachinko slot table makes displayed bottom rewards exact', () => {
+  const levelOneSlots = buildPachinkoSlotRewards(0)
+  assert.equal(levelOneSlots.length, PACHINKO_SLOT_COUNT)
+  assert.deepEqual(levelOneSlots.map((slot) => slot.weaponId), [
+    'starter-blaster',
+    'acid-sprayer',
+    'frost-lance',
+    'storm-cannon',
+    'arc-loom',
+    'spark-carbine',
+    'mist-vortex',
+    'slime-glaive',
+    'prism-cutter',
+    'needle-fan',
+  ])
+  assert.deepEqual(levelOneSlots[0], {
+    slotIndex: 0,
+    slotCount: 10,
+    ratioStart: 0,
+    ratioEnd: 0.1,
+    sampleRatio: 0.09999999999999978,
+    weaponId: 'starter-blaster',
+    star: 1,
+    iconKey: 'weapon-starter-blaster',
+  })
+
+  for (const slot of levelOneSlots) {
+    const landingRatio = slot.ratioStart + 0.001
+    assert.deepEqual(resolvePachinkoSlotReward(0, landingRatio), slot)
+    assert.deepEqual(resolvePachinkoLandingReward(0, landingRatio), {
+      weaponId: slot.weaponId,
+      star: slot.star,
+    })
+  }
+
+  const levelFiveSlots = buildPachinkoSlotRewards(42)
+  assert.equal(levelFiveSlots.at(-1)?.weaponId, 'needle-fan')
+  assert.equal(levelFiveSlots.at(-1)?.star, 5)
+  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999), {
+    weaponId: 'needle-fan',
+    star: 5,
+  })
+})
+
+test('pachinko slot index clamps boundaries and live table timing', () => {
+  assert.equal(resolvePachinkoSlotIndex(-1), 0)
+  assert.equal(resolvePachinkoSlotIndex(0), 0)
+  assert.equal(resolvePachinkoSlotIndex(0.1), 1)
+  assert.equal(resolvePachinkoSlotIndex(0.999), 9)
+  assert.equal(resolvePachinkoSlotIndex(1), 9)
+
+  const launchedAtLevelOne = resolvePachinkoSlotReward(0, 0.95)
+  const resolvedAfterLevelUp = resolvePachinkoSlotReward(42, 0.95)
+  assert.deepEqual(launchedAtLevelOne, {
+    slotIndex: 9,
+    slotCount: 10,
+    ratioStart: 0.9,
+    ratioEnd: 1,
+    sampleRatio: 0.999,
+    weaponId: 'needle-fan',
+    star: 3,
+    iconKey: 'weapon-needle-fan',
+  })
+  assert.deepEqual(resolvedAfterLevelUp, {
+    ...launchedAtLevelOne,
+    star: 5,
+  })
+})
+
+test('pachinko launch capacity respects active cap, queue, and cadence', () => {
+  assert.equal(MAX_ACTIVE_PACHINKO_TOKENS, 15)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 14,
+    queuedTokenCount: 1,
+    now: 1000,
+    lastLaunchAt: 0,
+  }), true)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 15,
+    queuedTokenCount: 10,
+    now: 1000,
+    lastLaunchAt: 0,
+  }), false)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 3,
+    queuedTokenCount: 0,
+    now: 1000,
+    lastLaunchAt: 0,
+  }), false)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 3,
+    queuedTokenCount: 4,
+    now: 1000,
+    lastLaunchAt: 1000 - PACHINKO_TOKEN_LAUNCH_INTERVAL_MS + 1,
+  }), false)
+  assert.equal(canLaunchPachinkoToken({
+    activeTokenCount: 3,
+    queuedTokenCount: 4,
+    now: 1000,
+    lastLaunchAt: 1000 - PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
+  }), true)
+})
 test('weapon star stacks fuse only same weapon and same star into the next grade', () => {
   let stacks = seedWeaponStacks()
   stacks = addWeaponStack(stacks, 'starter-blaster', 1, 1)

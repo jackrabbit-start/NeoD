@@ -15,6 +15,7 @@ export interface PachinkoHudState {
   level: number
   totalTokenXp: number
   droppedTokens: number
+  activeTokens: number
   queuedTokens: number
   isTokenInFlight: boolean
   latestReward: string | null
