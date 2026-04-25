@@ -55,6 +55,7 @@ import {
 import {
   createMapLayout,
   selectHeartItemSpawnPoint,
+  selectMagnetItemSpawnPoint,
   selectEnemySpawnPoint,
   type MapLayout,
 } from '../systems/mapLayout.js'
@@ -67,6 +68,17 @@ import {
   getNextHeartPickupSpawnAt,
   shouldSpawnHeartPickup,
 } from '../systems/healthPickups.js'
+import {
+  MAGNET_PICKUP_ATTRACTION_RADIUS,
+  MAGNET_PICKUP_COLOR,
+  MAGNET_PICKUP_DURATION_MS,
+  MAGNET_PICKUP_TEXTURE_KEY,
+  getInitialMagnetPickupSpawnAt,
+  getMagnetizedUntil,
+  getNextMagnetPickupSpawnAt,
+  isMagnetActive,
+  shouldSpawnMagnetPickup,
+} from '../systems/magnetPickups.js'
 import {
   getTopRightMiniMapBounds,
   projectWorldPointToMiniMap,
@@ -124,6 +136,7 @@ import {
   getPachinkoWeaponOddsRows,
   getPachinkoWeaponSynergySummary,
   getTokenXpForEnemy,
+  type PachinkoTokenProgressResult,
   resolvePachinkoSlotIndex,
   resolvePachinkoSlotReward,
   shouldEnemyGrantPachinkoToken,
@@ -325,6 +338,13 @@ interface HealthPickupEntity {
   isAttracting: boolean
 }
 
+interface MagnetPickupEntity {
+  sprite: PhysicsImage
+  aura: Phaser.GameObjects.Arc
+  auraTween: Phaser.Tweens.Tween
+  isAttracting: boolean
+}
+
 interface ProjectileEntity {
   sprite: PhysicsImage
   tint: number
@@ -420,9 +440,15 @@ export class ArenaScene extends Phaser.Scene {
 
   private healthPickups: HealthPickupEntity[] = []
 
+  private magnetPickups: MagnetPickupEntity[] = []
+
   private pachinkoTokenPickups: PachinkoTokenPickupEntity[] = []
 
   private nextHeartPickupAt = 0
+
+  private nextMagnetPickupAt = 0
+
+  private magnetizedUntil = 0
 
   private projectiles: ProjectileEntity[] = []
 
@@ -591,6 +617,7 @@ export class ArenaScene extends Phaser.Scene {
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
     this.createMiniMap()
     this.nextHeartPickupAt = getInitialHeartPickupSpawnAt(this.time.now)
+    this.nextMagnetPickupAt = getInitialMagnetPickupSpawnAt(this.time.now)
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
@@ -643,7 +670,8 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.updateHealthPickups(time, delta)
-    this.updatePachinkoTokenPickups(delta)
+    this.updateMagnetPickups(time, delta)
+    this.updatePachinkoTokenPickups(time, delta)
     this.updatePachinko()
     this.updateHazards(delta)
     if (this.isRunEnding) {
@@ -795,6 +823,15 @@ export class ArenaScene extends Phaser.Scene {
       const dot = projectWorldPointToMiniMap(pickup.sprite, worldBounds, bounds)
       graphics.fillStyle(HEART_PICKUP_COLOR, 0.95)
       graphics.fillCircle(dot.x, dot.y, 2.4)
+    }
+
+    for (const pickup of this.magnetPickups) {
+      if (!pickup.sprite.active) {
+        continue
+      }
+      const dot = projectWorldPointToMiniMap(pickup.sprite, worldBounds, bounds)
+      graphics.fillStyle(MAGNET_PICKUP_COLOR, 0.95)
+      graphics.fillCircle(dot.x, dot.y, 2.5)
     }
 
     for (const pickup of this.pachinkoTokenPickups) {
@@ -1468,11 +1505,7 @@ export class ArenaScene extends Phaser.Scene {
         this.player.x,
         this.player.y,
       )
-      const pickupTuning = getPassiveLootPickupTuning(this.passiveState)
-      const pickupPhase = getLootPickupPhase(distance, {
-        attractionRadius: LOOT_ATTRACTION_RADIUS * pickupTuning.attractionRadiusMultiplier,
-        collectRadius: LOOT_COLLECT_RADIUS * pickupTuning.collectRadiusMultiplier,
-      })
+      const pickupPhase = getLootPickupPhase(distance, this.getLootPickupTuningAt(time))
 
       if (pickupPhase === 'collect') {
         this.collectHeartPickup(pickup)
@@ -1480,7 +1513,7 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       if (pickupPhase === 'attract') {
-        this.applyHealthPickupAttraction(pickup, distance, delta)
+        this.applyHealthPickupAttraction(pickup, distance, delta, time)
         continue
       }
 
@@ -1490,16 +1523,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
 
-  private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number): void {
+  private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number, time: number): void {
     this.setHealthPickupAttractionStyle(pickup, true)
 
-    const pickupTuning = getPassiveLootPickupTuning(this.passiveState)
-    const effectiveCollectRadius = LOOT_COLLECT_RADIUS * pickupTuning.collectRadiusMultiplier
-    const attractionStep = getLootAttractionStep(distance, delta, {
-      attractionRadius: LOOT_ATTRACTION_RADIUS * pickupTuning.attractionRadiusMultiplier,
-      collectRadius: effectiveCollectRadius,
-      attractionSpeedMultiplier: pickupTuning.attractionSpeedMultiplier,
-    })
+    const pickupTuning = this.getLootPickupTuningAt(time)
+    const effectiveCollectRadius = pickupTuning.collectRadius
+    const attractionStep = getLootAttractionStep(distance, delta, pickupTuning)
     const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
     if (distance <= 0 || travelDistance <= 0) {
       this.syncHealthPickupAura(pickup)
@@ -1568,7 +1597,126 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private updatePachinkoTokenPickups(delta: number): void {
+  private updateMagnetPickups(time: number, delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    const activePickups = this.magnetPickups.filter((pickup) => pickup.sprite.active).length
+    if (shouldSpawnMagnetPickup(time, this.nextMagnetPickupAt, activePickups)) {
+      this.spawnMagnetPickup()
+      this.nextMagnetPickupAt = getNextMagnetPickupSpawnAt(time)
+    }
+
+    for (const pickup of this.magnetPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyMagnetPickup(pickup)
+        continue
+      }
+
+      const distance = Phaser.Math.Distance.Between(
+        pickup.sprite.x,
+        pickup.sprite.y,
+        this.player.x,
+        this.player.y,
+      )
+      const pickupPhase = getLootPickupPhase(distance)
+
+      if (pickupPhase === 'collect') {
+        this.collectMagnetPickup(pickup, time)
+        continue
+      }
+
+      if (pickupPhase === 'attract') {
+        this.applyMagnetPickupAttraction(pickup, distance, delta)
+        continue
+      }
+
+      this.setMagnetPickupAttractionStyle(pickup, false)
+      this.syncMagnetPickupAura(pickup)
+    }
+  }
+
+  private applyMagnetPickupAttraction(pickup: MagnetPickupEntity, distance: number, delta: number): void {
+    this.setMagnetPickupAttractionStyle(pickup, true)
+
+    const attractionStep = getLootAttractionStep(distance, delta)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    if (distance <= 0 || travelDistance <= 0) {
+      this.syncMagnetPickupAura(pickup)
+      return
+    }
+
+    const travelRatio = travelDistance / distance
+    pickup.sprite.setPosition(
+      pickup.sprite.x + (this.player.x - pickup.sprite.x) * travelRatio,
+      pickup.sprite.y + (this.player.y - pickup.sprite.y) * travelRatio,
+    )
+    this.syncMagnetPickupAura(pickup)
+  }
+
+  private setMagnetPickupAttractionStyle(pickup: MagnetPickupEntity, isAttracting: boolean): void {
+    if (pickup.isAttracting === isAttracting) {
+      return
+    }
+
+    pickup.isAttracting = isAttracting
+
+    if (isAttracting) {
+      pickup.sprite.setScale(1.08)
+      pickup.sprite.setTint(0xffffff)
+      pickup.aura.setStrokeStyle(3, 0xffffff, 0.95)
+      return
+    }
+
+    pickup.sprite.setScale(0.9)
+    pickup.sprite.setTint(MAGNET_PICKUP_COLOR)
+    pickup.aura.setStrokeStyle(2, MAGNET_PICKUP_COLOR, 0.82)
+  }
+
+  private syncMagnetPickupAura(pickup: MagnetPickupEntity): void {
+    if (pickup.aura.active) {
+      pickup.aura.setPosition(pickup.sprite.x, pickup.sprite.y)
+    }
+  }
+
+  private collectMagnetPickup(pickup: MagnetPickupEntity, time: number): void {
+    this.magnetizedUntil = Math.max(this.magnetizedUntil, getMagnetizedUntil(time))
+    this.statusMessage = `자석 활성화: ${Math.round(MAGNET_PICKUP_DURATION_MS / 1000)}초 동안 주변 전리품을 끌어당깁니다.`
+    this.destroyMagnetPickup(pickup)
+  }
+
+  private destroyMagnetPickup(pickup: MagnetPickupEntity): void {
+    pickup.auraTween?.stop()
+
+    if (pickup.aura.active) {
+      pickup.aura.destroy()
+    }
+
+    if (pickup.sprite.active) {
+      pickup.sprite.destroy()
+    }
+  }
+
+  private getActiveLootAttractionRadius(time: number): number {
+    return isMagnetActive(time, this.magnetizedUntil)
+      ? MAGNET_PICKUP_ATTRACTION_RADIUS
+      : LOOT_ATTRACTION_RADIUS
+  }
+
+  private getLootPickupTuningAt(time: number) {
+    const passiveTuning = getPassiveLootPickupTuning(this.passiveState)
+    return {
+      attractionRadius: Math.max(
+        this.getActiveLootAttractionRadius(time),
+        LOOT_ATTRACTION_RADIUS * passiveTuning.attractionRadiusMultiplier,
+      ),
+      collectRadius: LOOT_COLLECT_RADIUS * passiveTuning.collectRadiusMultiplier,
+      attractionSpeedMultiplier: passiveTuning.attractionSpeedMultiplier,
+    }
+  }
+
+  private updatePachinkoTokenPickups(time: number, delta: number): void {
     if (this.isInteractionBlocked()) {
       return
     }
@@ -1585,11 +1733,7 @@ export class ArenaScene extends Phaser.Scene {
         this.player.x,
         this.player.y,
       )
-      const pickupTuning = getPassiveLootPickupTuning(this.passiveState)
-      const pickupPhase = getLootPickupPhase(distance, {
-        attractionRadius: LOOT_ATTRACTION_RADIUS * pickupTuning.attractionRadiusMultiplier,
-        collectRadius: LOOT_COLLECT_RADIUS * pickupTuning.collectRadiusMultiplier,
-      })
+      const pickupPhase = getLootPickupPhase(distance, this.getLootPickupTuningAt(time))
 
       if (pickupPhase === 'collect') {
         this.collectPachinkoTokenPickup(pickup)
@@ -1597,7 +1741,7 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       if (pickupPhase === 'attract') {
-        this.applyPachinkoTokenAttraction(pickup, distance, delta)
+        this.applyPachinkoTokenAttraction(pickup, distance, delta, time)
         continue
       }
 
@@ -1610,16 +1754,13 @@ export class ArenaScene extends Phaser.Scene {
     pickup: PachinkoTokenPickupEntity,
     distance: number,
     delta: number,
+    time: number,
   ): void {
     this.setPachinkoTokenAttractionStyle(pickup, true)
 
-    const pickupTuning = getPassiveLootPickupTuning(this.passiveState)
-    const effectiveCollectRadius = LOOT_COLLECT_RADIUS * pickupTuning.collectRadiusMultiplier
-    const attractionStep = getLootAttractionStep(distance, delta, {
-      attractionRadius: LOOT_ATTRACTION_RADIUS * pickupTuning.attractionRadiusMultiplier,
-      collectRadius: effectiveCollectRadius,
-      attractionSpeedMultiplier: pickupTuning.attractionSpeedMultiplier,
-    })
+    const pickupTuning = this.getLootPickupTuningAt(time)
+    const effectiveCollectRadius = pickupTuning.collectRadius
+    const attractionStep = getLootAttractionStep(distance, delta, pickupTuning)
     const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
     if (distance <= 0 || travelDistance <= 0) {
       this.syncPachinkoTokenAura(pickup)
@@ -1660,7 +1801,13 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private collectPachinkoTokenPickup(pickup: PachinkoTokenPickupEntity): void {
-    this.enqueuePachinkoToken(pickup.enemyId)
+    const playerXpResult = this.grantPlayerXpForEnemy(pickup.enemyId)
+    const tokenProgress = this.enqueuePachinkoToken(pickup.enemyId)
+    const xpMessage = playerXpResult.grantedXp > 0 ? ` · 캐릭터 XP +${playerXpResult.grantedXp}` : ''
+    const levelMessage = playerXpResult.didLevelUp ? ` · Lv.${playerXpResult.level}!` : ''
+    if (tokenProgress) {
+      this.statusMessage = `토큰 획득: 파친코 +${tokenProgress.grantedTokenXp} XP · 보상 Lv.${tokenProgress.rewardLevel}${xpMessage}${levelMessage}`
+    }
     this.destroyPachinkoTokenPickup(pickup)
   }
 
@@ -1750,6 +1897,40 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
+  private spawnMagnetPickup(): void {
+    const spawn = selectMagnetItemSpawnPoint(this.mapLayout.magnetItemSpawns, Math.random)
+    if (!spawn) {
+      return
+    }
+
+    const aura = this.add.circle(spawn.x, spawn.y, 18, MAGNET_PICKUP_COLOR, 0.2)
+    aura.setStrokeStyle(2, MAGNET_PICKUP_COLOR, 0.82)
+    aura.setBlendMode(Phaser.BlendModes.ADD)
+    aura.setDepth(3)
+    const auraTween = this.tweens.add({
+      targets: aura,
+      scale: { from: 0.82, to: 1.3 },
+      alpha: { from: 0.48, to: 0.9 },
+      duration: 620,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    })
+
+    const sprite = this.physics.add.image(spawn.x, spawn.y, MAGNET_PICKUP_TEXTURE_KEY)
+    sprite.setCircle(11)
+    sprite.setDepth(4)
+    sprite.setScale(0.9)
+    sprite.setTint(MAGNET_PICKUP_COLOR)
+    this.magnetPickups.push({
+      sprite,
+      aura,
+      auraTween,
+      isAttracting: false,
+    })
+  }
+
+
   private updateHazards(delta: number): void {
     if (this.isInteractionBlocked()) {
       return
@@ -1833,6 +2014,13 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
     this.healthPickups = this.healthPickups.filter((pickup) => pickup.sprite.active)
+
+    for (const pickup of this.magnetPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyMagnetPickup(pickup)
+      }
+    }
+    this.magnetPickups = this.magnetPickups.filter((pickup) => pickup.sprite.active)
 
     for (const pickup of this.pachinkoTokenPickups) {
       if (!pickup.sprite.active) {
@@ -1954,14 +2142,11 @@ export class ArenaScene extends Phaser.Scene {
       return true
     }
 
-    const playerXpResult = this.grantPlayerXpForEnemy(enemy.config.id)
     const defeatOutcome = getDefeatedEnemyRunOutcome(enemy.config.id)
     const didDropPachinkoToken = defeatOutcome === 'continue' && shouldEnemyGrantPachinkoToken(enemy.config.id)
-    const xpMessage = playerXpResult.grantedXp > 0 ? ` · XP +${playerXpResult.grantedXp}` : ''
-    const levelMessage = playerXpResult.didLevelUp ? ` · Lv.${playerXpResult.level}!` : ''
     if (didDropPachinkoToken) {
       this.spawnPachinkoTokenPickup(enemy.sprite.x, enemy.sprite.y, enemy.config.id)
-      this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 토큰이 떨어졌습니다. 캐릭터로 먹으면 파친코에 투입됩니다.`
+      this.statusMessage = `${enemy.config.name} 처치. 토큰이 떨어졌습니다. 캐릭터로 먹으면 XP와 파친코 보상이 적용됩니다.`
     }
     if (enemy.telegraph?.visual.active) {
       enemy.telegraph.visual.destroy()
@@ -1985,7 +2170,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     if (!didDropPachinkoToken) {
-      this.statusMessage = `${enemy.config.name} 처치${xpMessage}${levelMessage}. 드롭을 계속 모으세요.`
+      this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
     }
     return true
   }
@@ -2250,6 +2435,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.setHealthPickupPulsePaused(shouldPause)
+    this.setMagnetPickupPulsePaused(shouldPause)
     this.setPachinkoTokenPulsePaused(shouldPause)
 
     this.freezeCombat(shouldPause)
@@ -2258,6 +2444,21 @@ export class ArenaScene extends Phaser.Scene {
 
   private setHealthPickupPulsePaused(shouldPause: boolean): void {
     for (const pickup of this.healthPickups) {
+      if (!pickup.auraTween) {
+        continue
+      }
+
+      if (shouldPause) {
+        pickup.auraTween.pause()
+        continue
+      }
+
+      pickup.auraTween.resume()
+    }
+  }
+
+  private setMagnetPickupPulsePaused(shouldPause: boolean): void {
+    for (const pickup of this.magnetPickups) {
       if (!pickup.auraTween) {
         continue
       }
@@ -2747,6 +2948,8 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayerHitAt = initialState.lastPlayerHitAt
     this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
     this.nextHeartPickupAt = 0
+    this.nextMagnetPickupAt = 0
+    this.magnetizedUntil = 0
     this.pachinkoTokenXp = initialState.pachinkoTokenXp
     this.latestPachinkoReward = null
     this.pachinkoRewardTableSeed = 0
@@ -2786,6 +2989,10 @@ export class ArenaScene extends Phaser.Scene {
       this.destroyHealthPickup(pickup)
     }
 
+    for (const pickup of this.magnetPickups) {
+      this.destroyMagnetPickup(pickup)
+    }
+
     for (const pickup of this.pachinkoTokenPickups) {
       this.destroyPachinkoTokenPickup(pickup)
     }
@@ -2820,6 +3027,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.enemies = []
     this.healthPickups = []
+    this.magnetPickups = []
     this.pachinkoTokenPickups = []
     this.pachinkoTokenQueue = []
     this.activePachinkoTokens = []
@@ -2913,6 +3121,7 @@ export class ArenaScene extends Phaser.Scene {
       inventory: [
         `파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`,
         `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`,
+        isMagnetActive(this.time.now, this.magnetizedUntil) ? '자석 효과 활성화' : '자석 효과 대기',
       ],
       recipes: this.getFusionSummaryLines(),
       objective: this.isFinaleActive
@@ -3087,7 +3296,7 @@ export class ArenaScene extends Phaser.Scene {
     return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${formatWeaponStarLabel(stack.star)}` : ''}`
   }
 
-  private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): void {
+  private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): PachinkoTokenProgressResult | null {
     const tokenMultiplier = getPassiveTokenXpMultiplier(this.passiveState)
     const nextProgress = applyEnemyPachinkoTokenProgress(
       {
@@ -3098,14 +3307,14 @@ export class ArenaScene extends Phaser.Scene {
       tokenMultiplier,
     )
     if (!nextProgress.didEnqueue) {
-      return
+      return null
     }
 
     this.pachinkoTokenXp = nextProgress.totalTokenXp
     this.pachinkoTokenQueue = nextProgress.queuedTokenXp
-    this.statusMessage = `파친코 토큰 획득: +${nextProgress.grantedTokenXp} XP · 보상 Lv.${nextProgress.rewardLevel}`
     this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
+    return nextProgress
   }
 
   private updatePachinko(): void {

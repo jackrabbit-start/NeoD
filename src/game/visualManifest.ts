@@ -344,6 +344,13 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     fallback: { radius: 11, color: 0xff5c8a },
   },
   {
+    key: 'magnet-pickup',
+    path: 'assets/loot/magnet-pickup.svg',
+    width: 24,
+    height: 24,
+    fallback: { radius: 11, color: 0x66d9ef },
+  },
+  {
     key: 'weapon-starter-blaster',
     path: getHudWeaponAssetPath('weapon-starter-blaster'),
     width: 96,

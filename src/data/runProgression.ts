@@ -47,10 +47,10 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
     { enemyId: 'slime', count: Math.max(2, 16 - clampedMinute) },
   ]
 
-  if (clampedMinute >= 0) {
+  if (clampedMinute >= 1) {
     weights.push({ enemyId: 'dash-slime', count: 2 + Math.min(7, clampedMinute) })
   }
-  if (clampedMinute >= 1) {
+  if (clampedMinute >= 2) {
     weights.push({ enemyId: 'spark-slime', count: 2 + Math.floor(clampedMinute / 2) })
   }
   if (clampedMinute >= 3) {
@@ -93,6 +93,9 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
 function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
   const minuteIndex = Math.floor(phaseIndex / 2)
   const entries = entriesForMinute(minuteIndex).map((entry) => ({ ...entry }))
+  if (phaseIndex >= 1 && minuteIndex === 0) {
+    entries.push({ enemyId: 'dash-slime', count: 2 })
+  }
   if (entries.length <= 1) {
     return entries
   }
@@ -124,9 +127,9 @@ function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
     startMs,
     durationMs: RUN_PHASE_DURATION_MS,
     entries: entriesForPhase(phaseIndex),
-    spawnIntervalMs: Math.max(360, 980 - minuteIndex * 22),
-    burstSize: Math.min(12, 4 + Math.floor(minuteIndex / 3)),
-    softEnemyCap: Math.min(100, 28 + minuteIndex * 3),
+    spawnIntervalMs: Math.max(300, 880 - minuteIndex * 24),
+    burstSize: Math.min(16, 5 + Math.floor(minuteIndex / 3)),
+    softEnemyCap: Math.min(150, 36 + minuteIndex * 4),
     healthMultiplier: Number((1.15 + minuteIndex * 0.06).toFixed(2)),
     ...(oneTimeSpawns.length > 0 ? { oneTimeSpawns } : {}),
     ...(isFinale ? { isFinale } : {}),
