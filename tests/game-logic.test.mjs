@@ -1240,6 +1240,21 @@ test('run progression spawn sequence interleaves weighted enemies early', () => 
   assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
 })
 
+test('run progression gives enemy roles clear scheduled ambush moments', () => {
+  const dashAmbush = getRunPhaseByElapsedMs(90_000)
+  const splitterAmbush = getRunPhaseByElapsedMs(3 * 60_000 + 30_000)
+  const supportAmbush = getRunPhaseByElapsedMs(9 * 60_000 + 30_000)
+  const finaleAmbush = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
+  const lastStage = getRunPhaseByElapsedMs(RUN_DURATION_MS)
+
+  assert.equal(dashAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'dash-slime').length, 5)
+  assert.equal(splitterAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'splitter-slime').length, 6)
+  assert.equal(supportAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'mender-slime').length, 3)
+  assert.ok(finaleAmbush.oneTimeSpawns?.includes('slime-boss'))
+  assert.equal(finaleAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'siege-toad').length, 3)
+  assert.equal(lastStage.stageLabel, 'Stage 20')
+})
+
 test('hud places enemy spawn odds beside the game title for visibility', () => {
   const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
   const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')

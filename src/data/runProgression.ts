@@ -101,12 +101,36 @@ function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
   return entries
 }
 
+function repeatedEnemy(enemyId: EnemyId, count: number): EnemyId[] {
+  return Array.from({ length: Math.max(0, count) }, () => enemyId)
+}
+
+function oneTimeSpawnsForPhase(phaseIndex: number, startMs: number): EnemyId[] {
+  const ambushes: Record<number, EnemyId[]> = {
+    3: repeatedEnemy('dash-slime', 5),
+    7: repeatedEnemy('splitter-slime', 6),
+    12: repeatedEnemy('orbit-slime', 4),
+    16: repeatedEnemy('needle-wasp', 6),
+    19: [...repeatedEnemy('mender-slime', 3), ...repeatedEnemy('dash-slime', 3)],
+    24: repeatedEnemy('prism-slime', 4),
+    28: [...repeatedEnemy('void-orb', 3), ...repeatedEnemy('lantern-moth', 3)],
+    30: [...repeatedEnemy('crusher-slime', 3), ...repeatedEnemy('mirror-wisp', 3)],
+    32: [...repeatedEnemy('siege-toad', 3), ...repeatedEnemy('shard-sentinel', 4)],
+    38: [...repeatedEnemy('siege-toad', 4), ...repeatedEnemy('crusher-slime', 4)],
+  }
+
+  return [
+    ...(startMs === FINAL_STAGE_START_MS ? ['slime-boss' as EnemyId] : []),
+    ...(ambushes[phaseIndex] ?? []),
+  ]
+}
+
 function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
   const minuteIndex = Math.floor(phaseIndex / 2)
   const stageIndex = minuteIndex
   const startMs = phaseIndex * RUN_PHASE_DURATION_MS
   const isFinale = startMs >= FINAL_STAGE_START_MS
-  const oneTimeSpawns: EnemyId[] = startMs === FINAL_STAGE_START_MS ? ['slime-boss'] : []
+  const oneTimeSpawns = oneTimeSpawnsForPhase(phaseIndex, startMs)
   const phaseNumber = minuteIndex + 1
   const halfLabel = phaseIndex % 2 === 0 ? '전반' : '후반'
 

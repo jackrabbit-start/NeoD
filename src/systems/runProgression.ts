@@ -55,7 +55,8 @@ export function getRunStageStartElapsedMs(stageIndex: number): number | null {
 }
 
 export function getRunStageIndex(elapsedMs: number): number {
-  return Math.min(29, Math.floor(clampRunElapsedMs(elapsedMs) / RUN_STAGE_DURATION_MS))
+  const lastStageIndex = Math.max(0, RUN_DURATION_MS / RUN_STAGE_DURATION_MS - 1)
+  return Math.min(lastStageIndex, Math.floor(clampRunElapsedMs(elapsedMs) / RUN_STAGE_DURATION_MS))
 }
 
 export function getRunStageReachedLabel(elapsedMs: number): string {
