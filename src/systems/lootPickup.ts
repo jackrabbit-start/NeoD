@@ -4,38 +4,48 @@ export const LOOT_COLLECT_RADIUS = 32
 
 export type LootPickupPhase = 'idle' | 'attract' | 'collect'
 
-export function getLootPickupPhase(
-  distance: number,
-  attractionRadius = LOOT_ATTRACTION_RADIUS,
-): LootPickupPhase {
-  const safeAttractionRadius = Math.max(LOOT_COLLECT_RADIUS, attractionRadius)
-  if (!Number.isFinite(distance) || distance > safeAttractionRadius) {
+export interface LootPickupTuning {
+  attractionRadius?: number
+  collectRadius?: number
+  attractionSpeedMultiplier?: number
+}
+
+function getEffectiveAttractionRadius(tuning?: LootPickupTuning): number {
+  return Math.max(LOOT_COLLECT_RADIUS + 1, tuning?.attractionRadius ?? LOOT_ATTRACTION_RADIUS)
+}
+
+function getEffectiveCollectRadius(tuning?: LootPickupTuning): number {
+  return Math.max(1, tuning?.collectRadius ?? LOOT_COLLECT_RADIUS)
+}
+
+export function getLootPickupPhase(distance: number, tuning?: LootPickupTuning): LootPickupPhase {
+  const attractionRadius = getEffectiveAttractionRadius(tuning)
+  const collectRadius = getEffectiveCollectRadius(tuning)
+
+  if (!Number.isFinite(distance) || distance > attractionRadius) {
     return 'idle'
   }
 
-  if (distance <= LOOT_COLLECT_RADIUS) {
+  if (distance <= collectRadius) {
     return 'collect'
   }
 
   return 'attract'
 }
 
-export function getLootAttractionStep(
-  distance: number,
-  deltaMs: number,
-  attractionRadius = LOOT_ATTRACTION_RADIUS,
-): number {
-  if (getLootPickupPhase(distance, attractionRadius) !== 'attract') {
+export function getLootAttractionStep(distance: number, deltaMs: number, tuning?: LootPickupTuning): number {
+  const attractionRadius = getEffectiveAttractionRadius(tuning)
+  const collectRadius = getEffectiveCollectRadius(tuning)
+
+  if (getLootPickupPhase(distance, tuning) !== 'attract') {
     return 0
   }
 
   const safeDeltaSeconds = Math.max(0, deltaMs) / 1000
-  const safeAttractionRadius = Math.max(LOOT_COLLECT_RADIUS, attractionRadius)
-  const attractionBand = safeAttractionRadius - LOOT_COLLECT_RADIUS
-  const distanceIntoBand = safeAttractionRadius - distance
+  const attractionBand = attractionRadius - collectRadius
+  const distanceIntoBand = attractionRadius - distance
   const proximityRatio = distanceIntoBand / attractionBand
   const clampedRatio = Math.min(1, Math.max(0, proximityRatio))
-  const radiusBoost = safeAttractionRadius > LOOT_ATTRACTION_RADIUS ? 2.4 : 1
-  const attractionSpeed = (90 + clampedRatio * 150) * radiusBoost
+  const attractionSpeed = (90 + clampedRatio * 150) * Math.max(0.1, tuning?.attractionSpeedMultiplier ?? 1)
   return attractionSpeed * safeDeltaSeconds
 }

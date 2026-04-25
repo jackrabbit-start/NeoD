@@ -98,6 +98,9 @@ import {
   getPassiveIncomingDamageMultiplier,
   getPassiveCardChoices,
   getPassivePachinkoActiveWeaponWeightMultiplier,
+  getPassivePachinkoNonActiveWeaponWeightMultiplier,
+  getPassiveHeartHealMultiplier,
+  getPassiveLootPickupTuning,
   getPassiveSummaryLines,
   getPassiveTokenXpMultiplier,
   resolveCriticalHit,
@@ -529,6 +532,8 @@ export class ArenaScene extends Phaser.Scene {
   private latestPachinkoReward: string | null = null
 
   private pachinkoRewardTableSeed = 0
+
+  private pachinkoDisplayedOddsSeed = -1
 
   private pachinkoPins?: Phaser.Physics.Arcade.StaticGroup
 
@@ -1500,7 +1505,7 @@ export class ArenaScene extends Phaser.Scene {
         this.player.x,
         this.player.y,
       )
-      const pickupPhase = getLootPickupPhase(distance, this.getActiveLootAttractionRadius(time))
+      const pickupPhase = getLootPickupPhase(distance, this.getLootPickupTuningAt(time))
 
       if (pickupPhase === 'collect') {
         this.collectHeartPickup(pickup)
@@ -1521,8 +1526,10 @@ export class ArenaScene extends Phaser.Scene {
   private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number, time: number): void {
     this.setHealthPickupAttractionStyle(pickup, true)
 
-    const attractionStep = getLootAttractionStep(distance, delta, this.getActiveLootAttractionRadius(time))
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    const pickupTuning = this.getLootPickupTuningAt(time)
+    const effectiveCollectRadius = pickupTuning.collectRadius
+    const attractionStep = getLootAttractionStep(distance, delta, pickupTuning)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
     if (distance <= 0 || travelDistance <= 0) {
       this.syncHealthPickupAura(pickup)
       return
@@ -1568,7 +1575,7 @@ export class ArenaScene extends Phaser.Scene {
     this.playerHealth = getHealedPlayerHealth(
       this.playerHealth,
       this.playerMaxHealth,
-      HEART_PICKUP_HEAL_AMOUNT,
+      Math.round(HEART_PICKUP_HEAL_AMOUNT * getPassiveHeartHealMultiplier(this.passiveState)),
     )
     this.syncPlayerHealthBar()
     const healedAmount = this.playerHealth - previousHealth
@@ -1697,6 +1704,18 @@ export class ArenaScene extends Phaser.Scene {
       : LOOT_ATTRACTION_RADIUS
   }
 
+  private getLootPickupTuningAt(time: number) {
+    const passiveTuning = getPassiveLootPickupTuning(this.passiveState)
+    return {
+      attractionRadius: Math.max(
+        this.getActiveLootAttractionRadius(time),
+        LOOT_ATTRACTION_RADIUS * passiveTuning.attractionRadiusMultiplier,
+      ),
+      collectRadius: LOOT_COLLECT_RADIUS * passiveTuning.collectRadiusMultiplier,
+      attractionSpeedMultiplier: passiveTuning.attractionSpeedMultiplier,
+    }
+  }
+
   private updatePachinkoTokenPickups(time: number, delta: number): void {
     if (this.isInteractionBlocked()) {
       return
@@ -1714,7 +1733,7 @@ export class ArenaScene extends Phaser.Scene {
         this.player.x,
         this.player.y,
       )
-      const pickupPhase = getLootPickupPhase(distance, this.getActiveLootAttractionRadius(time))
+      const pickupPhase = getLootPickupPhase(distance, this.getLootPickupTuningAt(time))
 
       if (pickupPhase === 'collect') {
         this.collectPachinkoTokenPickup(pickup)
@@ -1739,8 +1758,10 @@ export class ArenaScene extends Phaser.Scene {
   ): void {
     this.setPachinkoTokenAttractionStyle(pickup, true)
 
-    const attractionStep = getLootAttractionStep(distance, delta, this.getActiveLootAttractionRadius(time))
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    const pickupTuning = this.getLootPickupTuningAt(time)
+    const effectiveCollectRadius = pickupTuning.collectRadius
+    const attractionStep = getLootAttractionStep(distance, delta, pickupTuning)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
     if (distance <= 0 || travelDistance <= 0) {
       this.syncPachinkoTokenAura(pickup)
       return
@@ -2936,6 +2957,7 @@ export class ArenaScene extends Phaser.Scene {
     this.pachinkoTokenXp = initialState.pachinkoTokenXp
     this.latestPachinkoReward = null
     this.pachinkoRewardTableSeed = 0
+    this.pachinkoDisplayedOddsSeed = -1
   }
 
   private destroyRunEntities(): void {
@@ -3061,6 +3083,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private getPachinkoActiveWeaponWeightMultiplier(): number {
     return getPassivePachinkoActiveWeaponWeightMultiplier(this.passiveState)
+  }
+
+  private getPachinkoNonActiveWeaponWeightMultiplier(): number {
+    return getPassivePachinkoNonActiveWeaponWeightMultiplier(this.passiveState)
   }
 
   private updateHud(): void {
@@ -3300,7 +3326,12 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    this.pachinkoRewardTableSeed = getPachinkoRewardTableSeed(this.time.now)
+    const nextSeed = getPachinkoRewardTableSeed(this.time.now)
+    const didRefreshTable = nextSeed !== this.pachinkoRewardTableSeed
+    this.pachinkoRewardTableSeed = nextSeed
+    if (didRefreshTable) {
+      this.pachinkoDisplayedOddsSeed = nextSeed
+    }
     const rect = this.syncPachinkoBoard()
     this.launchAvailablePachinkoTokens()
 
@@ -3393,6 +3424,7 @@ export class ArenaScene extends Phaser.Scene {
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )
     const fusionResult = addWeaponStackWithAutoFusion(
       { weaponStacks: this.weaponStacks, activeWeaponKey: this.activeWeaponKey },
@@ -3632,10 +3664,11 @@ export class ArenaScene extends Phaser.Scene {
     const rows = getPachinkoWeaponOddsRows(
       this.pachinkoTokenXp,
       PACHINKO_SLOT_COUNT,
-      this.pachinkoRewardTableSeed,
+      Math.max(0, this.pachinkoDisplayedOddsSeed),
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )
 
     for (let index = 0; index < rows.length; index += 1) {
@@ -3661,10 +3694,11 @@ export class ArenaScene extends Phaser.Scene {
     const rows = getPachinkoWeaponOddsRows(
       this.pachinkoTokenXp,
       PACHINKO_SLOT_COUNT,
-      this.pachinkoRewardTableSeed,
+      Math.max(0, this.pachinkoDisplayedOddsSeed),
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )
 
     for (let index = 0; index < this.pachinkoOddsVisuals.length; index += 1) {
@@ -3688,6 +3722,7 @@ export class ArenaScene extends Phaser.Scene {
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )) {
       const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
       const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
@@ -3735,6 +3770,7 @@ export class ArenaScene extends Phaser.Scene {
       this.playerProgression.level,
       this.getActiveWeaponId(),
       this.getPachinkoActiveWeaponWeightMultiplier(),
+      this.getPachinkoNonActiveWeaponWeightMultiplier(),
     )
     for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
       const visual = this.pachinkoSlotVisuals[index]

@@ -10,6 +10,8 @@ import {
   getPassiveCardChoices,
   getPassiveEnemyDamageMultiplier,
   getPassiveIncomingDamageMultiplier,
+  getPassivePachinkoActiveWeaponWeightMultiplier,
+  getPassivePachinkoNonActiveWeaponWeightMultiplier,
   getPassiveSummaryLines,
   getPassiveTokenXpMultiplier,
   resolveCriticalHit,
@@ -98,25 +100,54 @@ test('passive summaries and player speed reflect rolled and stacked run-local ch
   assert.match(lines[1], /치명타 확률 \+/)
 })
 
+
+
+test('pickup utility cards expose attraction, collect, speed, and heal scaling', () => {
+  const magnet = createPassiveCardChoice('magnet-array', 12, createSequenceRandom([0.9]))
+  const vacuum = createPassiveCardChoice('vacuum-pocket', 10, createSequenceRandom([0.8, 0.7]))
+  const recovery = createPassiveCardChoice('recovery-loop', 9, createSequenceRandom([0.6, 0.5]))
+  const scavenger = createPassiveCardChoice('scavenger-route', 11, createSequenceRandom([0.7, 0.8]))
+
+  let state = {}
+  state = addPassiveCard(state, magnet)
+  state = addPassiveCard(state, vacuum)
+  state = addPassiveCard(state, recovery)
+  state = addPassiveCard(state, scavenger)
+
+  const lines = getPassiveSummaryLines(state)
+  assert.ok(lines.some((line) => /흡입 범위/.test(line)))
+  assert.ok(lines.some((line) => /획득 범위/.test(line)))
+  assert.ok(lines.some((line) => /흡입 속도/.test(line)))
+  assert.ok(lines.some((line) => /하트 회복량/.test(line)))
+})
+
 test('new pachinko and enemy cards expose varied utility modifiers', () => {
   const jackpot = createPassiveCardChoice('jackpot-fever', 12, createSequenceRandom([0.9]))
+  const loaded = createPassiveCardChoice('loaded-reel', 12, createSequenceRandom([0.8]))
+  const wide = createPassiveCardChoice('wide-catalog', 12, createSequenceRandom([0.7]))
   const shield = createPassiveCardChoice('panic-shield', 9, createSequenceRandom([0.75]))
   const boss = createPassiveCardChoice('guard-breaker', 15, createSequenceRandom([0.8]))
   const crowd = createPassiveCardChoice('crowd-reaper', 15, createSequenceRandom([0.6]))
 
   let state = {}
   state = addPassiveCard(state, jackpot)
+  state = addPassiveCard(state, loaded)
+  state = addPassiveCard(state, wide)
   state = addPassiveCard(state, shield)
   state = addPassiveCard(state, boss)
   state = addPassiveCard(state, crowd)
 
   assert.ok(getPassiveTokenXpMultiplier(state) > 1)
+  assert.ok(getPassivePachinkoActiveWeaponWeightMultiplier(state) > 1)
+  assert.ok(getPassivePachinkoNonActiveWeaponWeightMultiplier(state) > 1)
   assert.ok(getPassiveIncomingDamageMultiplier(state) < 1)
   assert.ok(getPassiveEnemyDamageMultiplier(true, state) > 1)
   assert.ok(getPassiveEnemyDamageMultiplier(false, state) > 1)
 
   const lines = getPassiveSummaryLines(state)
   assert.ok(lines.some((line) => /토큰 XP/.test(line)))
+  assert.ok(lines.some((line) => /활성 무기 확률/.test(line)))
+  assert.ok(lines.some((line) => /다른 무기 확률/.test(line)))
   assert.ok(lines.some((line) => /받는 피해/.test(line)))
   assert.ok(lines.some((line) => /보스 피해/.test(line)))
   assert.ok(lines.some((line) => /일반 적 피해/.test(line)))
