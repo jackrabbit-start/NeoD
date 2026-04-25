@@ -46,6 +46,7 @@ export interface ProjectileSpawnSpec {
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
+  visualPowerTier?: number
 }
 
 export interface MeleeSwingSpec {
@@ -57,6 +58,7 @@ export interface MeleeSwingSpec {
   visualDurationMs: number
   maxTargets: number
   knockback: WeaponKnockbackDefinition
+  visualPowerTier?: number
 }
 
 export interface AttackPlan {
@@ -149,11 +151,12 @@ const createBaseProjectile = (
   speed: weapon.projectileSpeed,
   damage: weapon.damage,
   tint: weapon.projectileTint,
-  radius: BASE_PROJECTILE_RADIUS,
+  radius: BASE_PROJECTILE_RADIUS + Math.max(0, weapon.visualPowerTier ?? 0),
   lifetimeMs,
   maxTravelDistance: getWeaponAttackRange(weapon),
   maxHits: 1,
   knockback: weapon.knockback,
+  visualPowerTier: weapon.visualPowerTier,
   ...overrides,
 })
 
@@ -214,6 +217,7 @@ const createMeleeSwing = (
   visualDurationMs: behavior.visualDurationMs,
   maxTargets: behavior.maxTargets,
   knockback: weapon.knockback,
+  visualPowerTier: weapon.visualPowerTier,
 })
 
 export function buildAttackPlan(

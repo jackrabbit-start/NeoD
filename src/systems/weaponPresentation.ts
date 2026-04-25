@@ -128,6 +128,7 @@ export function resolveEquippedWeaponPresentation(
   const isMelee = weapon.attackBehavior.kind === 'melee-cleave'
   const forwardOffset = isMelee ? MELEE_FORWARD_OFFSET : RANGED_FORWARD_OFFSET
   const sideOffset = isMelee ? MELEE_SIDE_OFFSET : RANGED_SIDE_OFFSET
+  const powerScale = Math.min(0.12, Math.max(0, weapon.visualPowerTier ?? 0) * 0.03)
 
   return {
     textureKey: weapon.visual.hudIconKey,
@@ -137,7 +138,7 @@ export function resolveEquippedWeaponPresentation(
     },
     rotation: Math.atan2(direction.y, direction.x),
     flipY: direction.x < 0,
-    scale: isMelee ? 0.24 : 0.2,
+    scale: (isMelee ? 0.24 : 0.2) + powerScale,
     depth: HELD_WEAPON_DEPTH,
   }
 }

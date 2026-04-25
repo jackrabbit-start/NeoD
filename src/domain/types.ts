@@ -109,6 +109,9 @@ export interface WeaponDefinition {
   knockback: WeaponKnockbackDefinition
   attackBehavior: WeaponAttackBehavior
   visual: WeaponVisualDefinition
+  levelUpgradeLabel?: string
+  levelUpgradeDescription?: string
+  visualPowerTier?: number
 }
 
 export interface RecipeDefinition {
@@ -315,9 +318,23 @@ export interface HudOwnedWeaponView {
   damage: number
   fireRateMs: number
   projectileSpeed: number
+  levelUpgradeLabel?: string
+  levelUpgradeDescription?: string
   isEquipped: boolean
   hudIconKey?: string
   accentColor?: number
+}
+
+export interface HudCharacterStatView {
+  label: string
+  value: string
+}
+
+export interface HudPassiveChoiceView {
+  id: string
+  name: string
+  description: string
+  effectSummary: string
 }
 
 export interface HudModalState {
@@ -325,6 +342,13 @@ export interface HudModalState {
   items: HudOwnedItemView[]
   recipes: HudRecipeView[]
   weapons: HudOwnedWeaponView[]
+  characterStats: HudCharacterStatView[]
+}
+
+export interface HudPassiveSelectionState {
+  isOpen: boolean
+  level: number
+  choices: HudPassiveChoiceView[]
 }
 
 export interface HudStageView {
@@ -347,6 +371,7 @@ export interface HudState {
   stats: string[]
   inventory: string[]
   recipes: string[]
+  passives: string[]
   objective: string
   tip: string
   status: string
@@ -355,6 +380,7 @@ export interface HudState {
   stageButtonLabel: string
   stageButtonDisabled: boolean
   stageSelection: HudStageSelectionState
+  passiveSelection: HudPassiveSelectionState
   pachinko?: PachinkoHudState
   modal: HudModalState
 }

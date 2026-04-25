@@ -71,6 +71,7 @@ export function createRunResultHudState(payload: RunResultPayload): HudState {
     stats: presentation.statLines,
     inventory: presentation.inventoryLines,
     recipes: presentation.recipeLines,
+    passives: ['런 종료 후 패시브는 초기화됩니다.'],
     objective: presentation.objective,
     tip: presentation.restartPrompt,
     status: presentation.status,
@@ -82,11 +83,17 @@ export function createRunResultHudState(payload: RunResultPayload): HudState {
       isOpen: false,
       stages: [],
     },
+    passiveSelection: {
+      isOpen: false,
+      level: 1,
+      choices: [],
+    },
     modal: {
       isOpen: false,
       items: [],
       recipes: [],
       weapons: [],
+      characterStats: [],
     },
   }
 }
