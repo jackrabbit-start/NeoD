@@ -53,193 +53,174 @@ test('weapon refresh preserves protected gameplay fields and stable asset keys',
     ),
     {
       'starter-blaster': {
-        range: 420,
-        damage: 5,
-        fireRateMs: 250,
-        projectileSpeed: 760,
+        range: 340,
+        damage: 6,
+        fireRateMs: 420,
+        projectileSpeed: 430,
         projectileTextureKey: 'starter-projectile',
         hudIconKey: 'weapon-starter-blaster',
-        knockback: { force: 46, durationMs: 72 },
+        knockback: { force: 60, durationMs: 82 },
         attackBehavior: {
-          kind: 'burst-fire',
-          shotsPerBurst: 5,
-          shotIntervalMs: 28,
-          projectileLifetimeMs: 680,
-          damageMultiplier: 0.68,
-          speedMultiplier: 1.05,
-          spreadDegrees: 3,
+          kind: 'single',
+          projectileLifetimeMs: 760,
+          distanceScaling: { nearMultiplier: 0.62, farMultiplier: 1.35 },
         },
       },
       'acid-sprayer': {
-        range: 240,
-        damage: 11,
-        fireRateMs: 420,
+        range: 145,
+        damage: 10,
+        fireRateMs: 280,
         projectileSpeed: 460,
         projectileTextureKey: 'acid-projectile',
         hudIconKey: 'weapon-acid-sprayer',
-        knockback: { force: 58, durationMs: 86 },
+        knockback: { force: 54, durationMs: 84 },
         attackBehavior: {
           kind: 'spray-hazard',
-          projectileCount: 3,
-          spreadDegrees: 11,
-          projectileLifetimeMs: 360,
-          hazardRadius: 34,
-          hazardDurationMs: 1400,
+          projectileCount: 1,
+          spreadDegrees: 6,
+          projectileLifetimeMs: 220,
+          hazardRadius: 14,
+          hazardDurationMs: 760,
           hazardTickMs: 220,
-          hazardDamage: 6,
+          hazardDamage: 4,
+          execute: { thresholdRatio: 0.3, damageMultiplier: 1.85 },
         },
       },
       'frost-lance': {
-        range: 520,
-        damage: 16,
-        fireRateMs: 760,
-        projectileSpeed: 410,
+        range: 400,
+        damage: 12,
+        fireRateMs: 310,
+        projectileSpeed: 440,
         projectileTextureKey: 'frost-projectile',
         hudIconKey: 'weapon-frost-lance',
-        knockback: { force: 124, durationMs: 122 },
+        knockback: { force: 50, durationMs: 78 },
         attackBehavior: {
-          kind: 'impact-aoe',
-          projectileLifetimeMs: 1100,
-          explosionRadius: 88,
-          explosionDamage: 28,
+          kind: 'single',
+          projectileLifetimeMs: 1280,
+          boomerang: {
+            outboundDistance: 190,
+            returnSpeedMultiplier: 1.32,
+            returnDamageMultiplier: 1.1,
+            returnHits: 1,
+          },
         },
       },
       'storm-cannon': {
-        range: 180,
-        damage: 10,
-        fireRateMs: 520,
-        projectileSpeed: 620,
+        range: 360,
+        damage: 17,
+        fireRateMs: 470,
+        projectileSpeed: 420,
         projectileTextureKey: 'storm-projectile',
         hudIconKey: 'weapon-storm-cannon',
-        knockback: { force: 108, durationMs: 104 },
+        knockback: { force: 124, durationMs: 128 },
         attackBehavior: {
-          kind: 'split-shot',
-          projectileCount: 8,
-          spreadDegrees: 9,
-          projectileLifetimeMs: 260,
-          damageMultiplier: 0.84,
-          speedMultiplier: 0.96,
-          maxHits: 1,
+          kind: 'impact-aoe',
+          projectileLifetimeMs: 880,
+          explosionRadius: 56,
+          explosionDamage: 20,
         },
       },
       'arc-loom': {
-        range: 430,
-        damage: 12,
-        fireRateMs: 360,
-        projectileSpeed: 560,
+        range: 390,
+        damage: 14,
+        fireRateMs: 300,
+        projectileSpeed: 520,
         projectileTextureKey: 'arc-projectile',
         hudIconKey: 'weapon-arc-loom',
-        knockback: { force: 84, durationMs: 94 },
+        knockback: { force: 62, durationMs: 86 },
         attackBehavior: {
-          kind: 'single',
-          projectileLifetimeMs: 1600,
-          ricochet: {
-            maxBounces: 4,
-            bounceRange: 210,
-            damageMultiplierPerBounce: 0.94,
-            speedMultiplierPerBounce: 1.03,
-          },
+          kind: 'chain',
+          projectileLifetimeMs: 760,
+          maxChains: 1,
+          chainRange: 124,
+          chainFalloff: 0.76,
         },
       },
       'spark-carbine': {
-        range: 320,
-        damage: 3,
-        fireRateMs: 920,
-        projectileSpeed: 340,
+        range: 420,
+        damage: 7,
+        fireRateMs: 330,
+        projectileSpeed: 620,
         projectileTextureKey: 'spark-projectile',
         hudIconKey: 'weapon-spark-carbine',
-        knockback: { force: 44, durationMs: 70 },
+        knockback: { force: 48, durationMs: 70 },
         attackBehavior: {
-          kind: 'deploy-turret',
-          projectileLifetimeMs: 620,
-          impactDamage: 3,
-          speedMultiplier: 0.9,
-          deploy: {
-            maxTurrets: 2,
-            durationMs: 5200,
-            range: 250,
-            fireRateMs: 420,
-            projectileLifetimeMs: 700,
-            projectileSpeed: 620,
-            projectileDamage: 9,
-          },
+          kind: 'burst-fire',
+          shotsPerBurst: 1,
+          shotIntervalMs: 52,
+          projectileLifetimeMs: 680,
+          damageMultiplier: 0.76,
+          speedMultiplier: 1,
+          spreadDegrees: 0,
         },
       },
       'mist-vortex': {
-        range: 280,
+        range: 220,
         damage: 8,
-        fireRateMs: 440,
-        projectileSpeed: 290,
+        fireRateMs: 430,
+        projectileSpeed: 270,
         projectileTextureKey: 'mist-projectile',
         hudIconKey: 'weapon-mist-vortex',
-        knockback: { force: 36, durationMs: 82 },
+        knockback: { force: 30, durationMs: 76 },
         attackBehavior: {
           kind: 'zone-control',
-          projectileLifetimeMs: 520,
-          zoneRadius: 44,
-          zoneDurationMs: 1800,
-          zoneTickMs: 210,
-          zoneDamage: 24,
-          zoneTriggerMode: 'trigger-explode',
-          armingDelayMs: 140,
-          speedMultiplier: 0.52,
+          projectileLifetimeMs: 480,
+          zoneRadius: 46,
+          zoneDurationMs: 1900,
+          zoneTickMs: 240,
+          zoneDamage: 4,
+          speedMultiplier: 0.5,
         },
       },
       'slime-glaive': {
         range: undefined,
-        damage: 17,
-        fireRateMs: 560,
+        damage: 24,
+        fireRateMs: 620,
         projectileSpeed: 0,
         projectileTextureKey: 'arc-projectile',
         hudIconKey: 'weapon-slime-glaive',
-        knockback: { force: 118, durationMs: 118 },
+        knockback: { force: 110, durationMs: 118 },
         attackBehavior: {
           kind: 'melee-cleave',
-          range: 86,
-          arcDegrees: 360,
-          visualDurationMs: 170,
-          maxTargets: 6,
-          healOnHit: 2,
+          range: 74,
+          arcDegrees: 100,
+          visualDurationMs: 150,
+          maxTargets: 2,
         },
       },
       'prism-cutter': {
         range: undefined,
-        damage: 14,
-        fireRateMs: 560,
+        damage: 18,
+        fireRateMs: 290,
         projectileSpeed: 0,
         projectileTextureKey: 'frost-projectile',
         hudIconKey: 'weapon-prism-cutter',
-        knockback: { force: 84, durationMs: 88 },
+        knockback: { force: 78, durationMs: 82 },
         attackBehavior: {
-          kind: 'combo-melee',
-          stepIntervalMs: 68,
-          steps: [
-            { damageMultiplier: 0.75, range: 58, arcDegrees: 42, visualDurationMs: 82, maxTargets: 1 },
-            { damageMultiplier: 0.82, range: 60, arcDegrees: 46, visualDurationMs: 86, maxTargets: 1 },
-            { damageMultiplier: 0.92, range: 68, arcDegrees: 58, visualDurationMs: 94, maxTargets: 2, knockbackMultiplier: 1.1 },
-            { damageMultiplier: 1.55, range: 78, arcDegrees: 112, visualDurationMs: 118, maxTargets: 4, knockbackMultiplier: 1.6 },
-          ],
+          kind: 'melee-cleave',
+          range: 62,
+          arcDegrees: 36,
+          visualDurationMs: 108,
+          maxTargets: 1,
+          execute: { thresholdRatio: 0.4, damageMultiplier: 2.1 },
         },
       },
       'needle-fan': {
-        range: 380,
-        damage: 13,
-        fireRateMs: 360,
-        projectileSpeed: 560,
+        range: 200,
+        damage: 9,
+        fireRateMs: 340,
+        projectileSpeed: 500,
         projectileTextureKey: 'needle-projectile',
         hudIconKey: 'weapon-needle-fan',
-        knockback: { force: 72, durationMs: 84 },
+        knockback: { force: 70, durationMs: 82 },
         attackBehavior: {
-          kind: 'single',
-          projectileLifetimeMs: 760,
-          summonOnKill: {
-            maxMinions: 3,
-            durationMs: 4200,
-            speed: 170,
-            damage: 10,
-            attackIntervalMs: 320,
-            contactRadius: 24,
-          },
+          kind: 'split-shot',
+          projectileCount: 1,
+          spreadDegrees: 10,
+          projectileLifetimeMs: 240,
+          damageMultiplier: 0.82,
+          speedMultiplier: 0.9,
+          maxHits: 1,
         },
       },
     },
@@ -255,72 +236,64 @@ test('weapon attack range helper uses ranged metadata and melee behavior authori
   assert.equal(Object.hasOwn(glaive, 'range'), false)
 })
 
-test('starter burst and rocket launcher plans expose the new ranged identities', () => {
+test('starter and frost now use distance scaling and boomerang paths', () => {
   const starter = WEAPON_DEFINITIONS['starter-blaster']
   const frost = WEAPON_DEFINITIONS['frost-lance']
   const starterPlan = buildAttackPlan(starter, { x: 0, y: 0 }, { x: 100, y: 0 })
   const frostPlan = buildAttackPlan(frost, { x: 0, y: 0 }, { x: 100, y: 0 })
 
-  assert.equal(starterPlan.projectiles.length, 5)
-  assert.equal(starterPlan.projectiles[1].delayMs, 28)
+  assert.equal(starterPlan.projectiles.length, 1)
+  assert.equal(starterPlan.projectiles[0].distanceScaling?.farMultiplier, 1.35)
   assert.equal(frostPlan.projectiles.length, 1)
-  assert.equal(frostPlan.projectiles[0].explosionOnHit?.radius, 88)
-  assert.equal(frostPlan.projectiles[0].explosionOnExpire?.damage, 28)
-  assert.equal(getWeaponOutputGeometry(starter), 'burst-rhythm')
-  assert.equal(getWeaponSpecialEffectProfile(starter), 'none')
-  assert.equal(getWeaponOutputGeometry(frost), 'single-shot')
-  assert.equal(getWeaponSpecialEffectProfile(frost), 'impact-splash')
+  assert.equal(frostPlan.projectiles[0].boomerang?.outboundDistance, 190)
+  assert.equal(getWeaponOutputGeometry(starter), 'distance-shot')
+  assert.equal(getWeaponSpecialEffectProfile(starter), 'distance-ramp')
+  assert.equal(getWeaponOutputGeometry(frost), 'return-shot')
+  assert.equal(getWeaponSpecialEffectProfile(frost), 'return-pass')
 })
 
-test('deploy, summon, zone, split, and ricochet weapons expose distinct plans', () => {
+test('burst, split, zone, and impact weapons expose distinct plans', () => {
   const spark = WEAPON_DEFINITIONS['spark-carbine']
   const needle = WEAPON_DEFINITIONS['needle-fan']
   const mist = WEAPON_DEFINITIONS['mist-vortex']
   const storm = WEAPON_DEFINITIONS['storm-cannon']
-  const arc = WEAPON_DEFINITIONS['arc-loom']
 
   const sparkPlan = buildAttackPlan(spark, { x: 0, y: 0 }, { x: 100, y: 0 })
   const needlePlan = buildAttackPlan(needle, { x: 0, y: 0 }, { x: 100, y: 0 })
   const mistPlan = buildAttackPlan(mist, { x: 0, y: 0 }, { x: 100, y: 0 })
   const stormPlan = buildAttackPlan(storm, { x: 0, y: 0 }, { x: 100, y: 0 })
-  const arcPlan = buildAttackPlan(arc, { x: 0, y: 0 }, { x: 100, y: 0 })
 
-  assert.equal(spark.attackBehavior.kind, 'deploy-turret')
+  assert.equal(spark.attackBehavior.kind, 'burst-fire')
   assert.equal(sparkPlan.projectiles.length, 1)
-  assert.equal(sparkPlan.projectiles[0].deployTurret?.maxTurrets, 2)
-  assert.equal(getWeaponOutputGeometry(spark), 'deployable-node')
+  assert.equal(sparkPlan.projectiles[0].delayMs, 0)
+  assert.equal(getWeaponOutputGeometry(spark), 'burst-rhythm')
 
-  assert.equal(needle.attackBehavior.kind, 'single')
+  assert.equal(needle.attackBehavior.kind, 'split-shot')
   assert.equal(needlePlan.projectiles.length, 1)
-  assert.equal(needlePlan.projectiles[0].summonOnKill?.maxMinions, 3)
+  assert.equal(Math.abs(needlePlan.projectiles[0].direction.y), 0)
 
   assert.equal(mist.attackBehavior.kind, 'zone-control')
-  assert.equal(mistPlan.projectiles[0].hazardOnHit?.radius, 44)
-  assert.equal(mistPlan.projectiles[0].hazardOnHit?.mode, 'trigger-trap')
-  assert.equal(getWeaponSpecialEffectProfile(mist), 'impact-splash')
+  assert.equal(mistPlan.projectiles[0].hazardOnHit?.radius, 46)
+  assert.equal(getWeaponSpecialEffectProfile(mist), 'hazard-linger')
 
-  assert.equal(storm.attackBehavior.kind, 'split-shot')
-  assert.equal(stormPlan.projectiles.length, 8)
-  assert.ok(Math.abs(stormPlan.projectiles[0].direction.y) > 0)
-
-  assert.equal(arc.attackBehavior.kind, 'single')
-  assert.equal(arcPlan.projectiles[0].ricochet?.maxBounces, 4)
-  assert.equal(getWeaponSpecialEffectProfile(arc), 'ricochet')
+  assert.equal(storm.attackBehavior.kind, 'impact-aoe')
+  assert.equal(stormPlan.projectiles[0].explosionOnHit?.radius, 56)
+  assert.equal(stormPlan.projectiles[0].explosionOnHit?.damage, 20)
+  assert.equal(getWeaponSpecialEffectProfile(storm), 'impact-splash')
 })
 
-test('melee cleave and combo weapons remain actionable and identifiable', () => {
+test('chain, execute melee, and wide melee remain actionable and identifiable', () => {
   const arc = WEAPON_DEFINITIONS['arc-loom']
   const glaive = WEAPON_DEFINITIONS['slime-glaive']
   const prism = WEAPON_DEFINITIONS['prism-cutter']
 
-  assert.equal(buildAttackPlan(arc, { x: 0, y: 0 }, { x: 0, y: 10 }).projectiles[0].ricochet.maxBounces, 4)
+  assert.equal(buildAttackPlan(arc, { x: 0, y: 0 }, { x: 0, y: 10 }).projectiles[0].chain.maxChains, 1)
   assert.equal(buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 1)
-  assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 4)
-  assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.at(-1).maxTargets, 4)
+  assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings[0].execute.damageMultiplier, 2.1)
   assert.equal(getWeaponOutputGeometry(glaive), 'wide-cleave')
-  assert.equal(getWeaponOutputGeometry(prism), 'combo-melee')
-  assert.equal(getWeaponSpecialEffectProfile(arc), 'ricochet')
-  assert.equal(getWeaponSpecialEffectProfile(prism), 'high-knockback')
+  assert.equal(getWeaponOutputGeometry(prism), 'execute-sweep')
+  assert.equal(getWeaponSpecialEffectProfile(arc), 'chain-bounce')
+  assert.equal(getWeaponSpecialEffectProfile(prism), 'execute-finisher')
   assert.equal(isAttackPlanActionable(buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 })), true)
 })
 
@@ -331,17 +304,17 @@ test('crafted roster identity signatures are unique across all weapons', () => {
 })
 
 test('weapon identity labels prefer metadata and summaries expose role text', () => {
-  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['arc-loom']), '연쇄 킥')
-  assert.match(getWeaponSummary(WEAPON_DEFINITIONS['starter-blaster']), /5박자/)
-  assert.match(getWeaponSummary(WEAPON_DEFINITIONS['spark-carbine']), /배치 2기/)
-  assert.match(getWeaponSummary(WEAPON_DEFINITIONS['prism-cutter']), /4연 콤보/)
+  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['arc-loom']), '감염 전파')
+  assert.match(getWeaponSummary(WEAPON_DEFINITIONS['starter-blaster']), /멀수록 증폭/)
+  assert.match(getWeaponSummary(WEAPON_DEFINITIONS['spark-carbine']), /1박자/)
+  assert.match(getWeaponSummary(WEAPON_DEFINITIONS['prism-cutter']), /빈사 수확/)
 
   const fallbackFrost = {
     ...WEAPON_DEFINITIONS['frost-lance'],
     identityLabel: undefined,
   }
 
-  assert.equal(getWeaponIdentityLabel(fallbackFrost), '충격 폭발')
+  assert.equal(getWeaponIdentityLabel(fallbackFrost), '귀환 사격')
 })
 
 test('chain selection and chain damage prioritize nearby enemies deterministically', () => {
