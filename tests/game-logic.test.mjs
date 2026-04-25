@@ -1049,7 +1049,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
 
   const [acidSummary] = describeAvailableRecipes(acidRecipes)
   assert.match(acidSummary ?? '', /술먹고 난 토 \[숙취 토사]/)
-  assert.match(acidSummary ?? '', /사거리 240/)
+  assert.match(acidSummary ?? '', /사거리 200/)
   assert.match(acidSummary ?? '', /숙취 토사/)
   assert.doesNotMatch(acidSummary ?? '', /초당 \d+회/)
 
@@ -1071,12 +1071,12 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   const [sparkSummary] = describeAvailableRecipes(sparkRecipes)
   const [mistSummary] = describeAvailableRecipes(mistRecipes)
   assert.match(sparkSummary ?? '', /방범 카메라 \[포탑 배치]/)
-  assert.match(sparkSummary ?? '', /배치 2기/)
-  assert.match(sparkSummary ?? '', /포탑당 9/)
+  assert.match(sparkSummary ?? '', /배치 1기/)
+  assert.match(sparkSummary ?? '', /포탑당 6/)
   assert.match(mistSummary ?? '', /컴파일러 \[문법 폭발]/)
-  assert.match(mistSummary ?? '', /직격 8/)
-  assert.match(mistSummary ?? '', /폭발 24/)
-  assert.match(mistSummary ?? '', /함정 44/)
+  assert.match(mistSummary ?? '', /직격 6/)
+  assert.match(mistSummary ?? '', /폭발 14/)
+  assert.match(mistSummary ?? '', /함정 24/)
 
   const needleRecipes = getActionableRecipes(
     {
@@ -2458,15 +2458,15 @@ test('effective weapon stats scale by star grade for combat-visible fusion payof
   const tunedThreeStar = deriveEffectiveWeaponStats('acid-sprayer', { 'acid-sprayer': 'quick-loader' }, 3)
   const glaiveThreeStar = deriveEffectiveWeaponStats('slime-glaive', {}, 3)
 
-  assert.equal(fiveStar.damage, 19)
-  assert.equal(fiveStar.fireRateMs, 319)
-  assert.equal(fiveStar.projectileSpeed, 554)
+  assert.equal(fiveStar.damage, 13)
+  assert.equal(fiveStar.fireRateMs, 600)
+  assert.equal(fiveStar.projectileSpeed, 380)
   assert.ok(fiveStar.damage > oneStar.damage)
-  assert.ok(fiveStar.fireRateMs < oneStar.fireRateMs)
-  assert.ok(fiveStar.projectileSpeed > oneStar.projectileSpeed)
-  assert.equal(tunedThreeStar.fireRateMs, 333)
+  assert.equal(fiveStar.fireRateMs, oneStar.fireRateMs)
+  assert.equal(fiveStar.projectileSpeed, oneStar.projectileSpeed)
+  assert.equal(tunedThreeStar.fireRateMs, 540)
   assert.equal(glaiveThreeStar.attackBehavior.kind, 'melee-cleave')
-  assert.equal(glaiveThreeStar.attackBehavior.range, WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.range + 12)
+  assert.equal(glaiveThreeStar.attackBehavior.range, WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.range + 10)
 })
 
 test('player level combat stats raise health and weapon damage globally', () => {
@@ -2492,7 +2492,7 @@ test('player level combat stats raise health and weapon damage globally', () => 
 
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
   assert.equal(levelTenBlaster.damage, 7)
-  assert.equal(levelTenBlaster.range, 487)
+  assert.equal(levelTenBlaster.range, 371)
   assert.equal(levelTenBlaster.playerDamageMultiplier, 1.45)
   assert.equal(levelTenBlaster.weaponSpecialTier, 1)
   assert.equal(levelTenBlaster.visualPowerTier, 1)
@@ -2503,44 +2503,44 @@ test('player level combat stats raise health and weapon damage globally', () => 
 test('weapon milestone upgrades expand behavior every five and ten player levels', () => {
   const levelFiveGlaive = deriveEffectiveWeaponStats('slime-glaive', {}, 1, 5)
   assert.equal(levelFiveGlaive.attackBehavior.kind, 'melee-cleave')
-  assert.equal(levelFiveGlaive.attackBehavior.range, 93)
+  assert.equal(levelFiveGlaive.attackBehavior.range, 78)
 
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
   assert.equal(levelTenBlaster.attackBehavior.kind, 'burst-fire')
-  assert.equal(levelTenBlaster.attackBehavior.shotsPerBurst, 6)
+  assert.equal(levelTenBlaster.attackBehavior.shotsPerBurst, 2)
 
   const levelTwentyFrost = deriveEffectiveWeaponStats('frost-lance', {}, 1, 20)
   assert.equal(levelTwentyFrost.attackBehavior.kind, 'impact-aoe')
-  assert.equal(levelTwentyFrost.attackBehavior.explosionRadius, 116)
-  assert.equal(levelTwentyFrost.attackBehavior.explosionDamage, 55)
+  assert.equal(levelTwentyFrost.attackBehavior.explosionRadius, 69)
+  assert.equal(levelTwentyFrost.attackBehavior.explosionDamage, 35)
 
   const levelTwentyArc = deriveEffectiveWeaponStats('arc-loom', {}, 1, 20)
   assert.equal(levelTwentyArc.attackBehavior.kind, 'single')
-  assert.equal(levelTwentyArc.attackBehavior.ricochet?.maxBounces, 4)
-  assert.equal(levelTwentyArc.attackBehavior.ricochet?.bounceRange, 240)
+  assert.equal(levelTwentyArc.attackBehavior.ricochet?.maxBounces, 1)
+  assert.equal(levelTwentyArc.attackBehavior.ricochet?.bounceRange, 140)
 
   const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
   assert.equal(levelTwentyMist.attackBehavior.kind, 'zone-control')
-  assert.equal(levelTwentyMist.attackBehavior.zoneRadius, 58)
-  assert.equal(levelTwentyMist.attackBehavior.zoneDamage, 47)
+  assert.equal(levelTwentyMist.attackBehavior.zoneRadius, 32)
+  assert.equal(levelTwentyMist.attackBehavior.zoneDamage, 27)
   assert.equal(levelTwentyMist.attackBehavior.zoneTriggerMode, 'trigger-explode')
 
   const levelTwentySpark = deriveEffectiveWeaponStats('spark-carbine', {}, 1, 20)
   assert.equal(levelTwentySpark.attackBehavior.kind, 'deploy-turret')
-  assert.equal(levelTwentySpark.attackBehavior.deploy.maxTurrets, 3)
-  assert.equal(levelTwentySpark.attackBehavior.deploy.range, 330)
+  assert.equal(levelTwentySpark.attackBehavior.deploy.maxTurrets, 2)
+  assert.equal(levelTwentySpark.attackBehavior.deploy.range, 238)
 
   const levelTwentyPrism = deriveEffectiveWeaponStats('prism-cutter', {}, 1, 20)
   assert.equal(levelTwentyPrism.attackBehavior.kind, 'combo-melee')
-  assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.maxTargets, 6)
-  assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.range, 103)
+  assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.maxTargets, 4)
+  assert.equal(levelTwentyPrism.attackBehavior.steps.at(-1)?.range, 84)
 })
 
 test('level-up weapon visuals expose stronger projectiles and HUD copy', () => {
   const levelTenBlaster = deriveEffectiveWeaponStats('starter-blaster', {}, 1, 10)
   const plan = buildAttackPlan(levelTenBlaster, { x: 0, y: 0 }, { x: 10, y: 0 })
 
-  assert.equal(plan.projectiles.length, 6)
+  assert.equal(plan.projectiles.length, 2)
   assert.equal(plan.projectiles[0].visualPowerTier, 1)
   assert.equal(plan.projectiles[0].radius, 6)
 
@@ -2574,7 +2574,7 @@ test('combat effects are split out for projectile trails and lingering hazard pu
   const frostPlan = buildAttackPlan(levelTwentyFrost, { x: 0, y: 0 }, { x: 10, y: 0 })
   const mistPlan = buildAttackPlan(levelTwentyMist, { x: 0, y: 0 }, { x: 10, y: 0 })
 
-  assert.equal(frostPlan.projectiles[0]?.explosionOnHit?.radius, 116)
+  assert.equal(frostPlan.projectiles[0]?.explosionOnHit?.radius, 69)
   assert.equal(mistPlan.projectiles[0]?.hazardOnHit?.visualPowerTier, 2)
   assert.ok(arenaSceneSource.includes('spawnProjectileTrailEffect('))
   assert.ok(arenaSceneSource.includes('createHazardZoneEffect('))

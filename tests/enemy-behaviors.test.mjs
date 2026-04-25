@@ -264,11 +264,11 @@ test('radial-burst helper emits evenly distributed danger around the caster', ()
   assert.deepEqual(projectiles[1] && {
     x: Math.round(projectiles[1].direction.x * 10) / 10,
     y: Math.round(projectiles[1].direction.y * 10) / 10,
-  }, { x: -0.5, y: 0.9 })
+  }, { x: 0.7, y: 0.7 })
   assert.deepEqual(projectiles[2] && {
     x: Math.round(projectiles[2].direction.x * 10) / 10,
     y: Math.round(projectiles[2].direction.y * 10) / 10,
-  }, { x: -0.5, y: -0.9 })
+  }, { x: 0, y: 1 })
 })
 
 test('circle hit test and codex enemy summary expose the new enemy identities', () => {

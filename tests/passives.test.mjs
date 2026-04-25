@@ -99,9 +99,9 @@ test('passives modify hazard, burst, impact, and melee behavior safely with roll
 
   const baseBurst = WEAPON_DEFINITIONS['spark-carbine']
   const modifiedBurst = applyPassiveWeaponEffects(baseBurst, state)
-  assert.equal(modifiedBurst.attackBehavior.kind, 'burst-fire')
-  assert.ok(modifiedBurst.attackBehavior.shotsPerBurst > baseBurst.attackBehavior.shotsPerBurst)
-  assert.equal(modifiedBurst.attackBehavior.spreadDegrees, baseBurst.attackBehavior.spreadDegrees)
+  assert.equal(modifiedBurst.attackBehavior.kind, 'deploy-turret')
+  assert.ok(modifiedBurst.attackBehavior.deploy.maxTurrets > baseBurst.attackBehavior.deploy.maxTurrets)
+  assert.ok(modifiedBurst.attackBehavior.deploy.range > baseBurst.attackBehavior.deploy.range)
 
   const glaiveState = addPassiveCard({}, createPassiveCardChoice('wide-zone', 6, createSequenceRandom([0.4, 0.9])))
   const baseGlaive = WEAPON_DEFINITIONS['slime-glaive']
@@ -111,8 +111,8 @@ test('passives modify hazard, burst, impact, and melee behavior safely with roll
 
   const baseStorm = WEAPON_DEFINITIONS['storm-cannon']
   const modifiedStorm = applyPassiveWeaponEffects(baseStorm, state)
-  assert.equal(modifiedStorm.attackBehavior.kind, 'impact-aoe')
-  assert.equal(modifiedStorm.attackBehavior.explosionRadius, baseStorm.attackBehavior.explosionRadius)
+  assert.equal(modifiedStorm.attackBehavior.kind, 'split-shot')
+  assert.ok(modifiedStorm.attackBehavior.projectileCount > baseStorm.attackBehavior.projectileCount)
 })
 
 test('critical-hit resolution stays deterministic from rolled passive state', () => {
