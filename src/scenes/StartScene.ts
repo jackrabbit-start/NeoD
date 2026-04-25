@@ -83,7 +83,7 @@ export class StartScene extends Phaser.Scene {
     this.add.container(width / 2 - titleGroupWidth / 2, titleY, [titleAvatar, titleText])
 
     this.add
-      .text(width / 2, Math.max(228, height * 0.5), '파친코 기계 앞에서 삶을 탕진한 김동성은 마지막 빚 독촉을 피해 무작정 달리기 시작했습니다.\n굴러 떨어지는 토큰은 더는 판돈이 아니라, 무기와 레벨로 바꿔 중독을 끊어낼 연료입니다.\n무엇이 쫓아오든 30분만 버티면, 그는 처음으로 잭팟이 아닌 자기 발로 내일을 되찾게 됩니다.', {
+      .text(width / 2, Math.max(228, height * 0.5), '파친코 기계 앞에서 삶을 탕진한 김동성은 마지막 빚 독촉을 피해 무작정 달리기 시작했습니다.\n굴러 떨어지는 토큰은 더는 판돈이 아니라, 무기와 레벨로 바꿔 중독을 끊어낼 연료입니다.\n무엇이 쫓아오든 20분만 버티면, 그는 처음으로 잭팟이 아닌 자기 발로 내일을 되찾게 됩니다.', {
         fontSize: '17px',
         color: '#ffe28a',
         align: 'center',

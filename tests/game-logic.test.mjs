@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
+import { RUN_PROGRESS_PHASES } from '../.tmp-test/src/data/runProgression.js'
 import { ITEM_DEFINITIONS } from '../.tmp-test/src/data/items.js'
 import { RECIPE_DEFINITIONS } from '../.tmp-test/src/data/recipes.js'
 import { WEAPON_DEFINITIONS } from '../.tmp-test/src/data/weapons.js'
@@ -1196,8 +1197,18 @@ test('run progression advances by elapsed time instead of enemy clear state', ()
   assert.equal(finale.oneTimeSpawns?.includes('slime-boss'), true)
   assert.equal(isFinaleActive(FINAL_STAGE_START_MS), true)
   assert.equal(isRunTimedOut(RUN_DURATION_MS), true)
-  assert.equal(formatRunTime(RUN_DURATION_MS), '30:00')
+  assert.equal(formatRunTime(RUN_DURATION_MS), '20:00')
   assert.deepEqual(getUnknownRunEnemyIds(), [])
+  const scheduledEnemyIds = new Set(
+    RUN_PROGRESS_PHASES.flatMap((phase) => [
+      ...phase.entries.map((entry) => entry.enemyId),
+      ...(phase.oneTimeSpawns ?? []),
+    ]),
+  )
+  assert.deepEqual(
+    Object.keys(ENEMY_DEFINITIONS).filter((enemyId) => !scheduledEnemyIds.has(enemyId)),
+    [],
+  )
   assert.equal(getRunSpawnCapacity(firstPhase, firstPhase.softEnemyCap, firstPhase.burstSize), 0)
 })
 
@@ -1215,7 +1226,7 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
     {
       enemyId: 'slime',
       enemyName: '출석 체크 알림',
-      count: 9,
+      count: 6,
       ratio: 1,
       percentLabel: '100%',
     },
@@ -1237,7 +1248,7 @@ test('run progression spawn sequence interleaves weighted enemies early', () => 
   const firstBackPhase = getRunPhaseByElapsedMs(30_000)
   const sequence = flattenRunPhaseEntries(firstBackPhase)
 
-  assert.equal(sequence.length, 12)
+  assert.equal(sequence.length, 9)
   assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
 })
 
@@ -1464,15 +1475,15 @@ test('enemy names match college engineering life story beats', () => {
   assert.match(ENEMY_DEFINITIONS['siege-toad'].description, /캡스톤 마감/)
   assert.ok(Object.values(ENEMY_DEFINITIONS).every((enemy) => !enemy.name.includes('슬라임')))
 
-  const attendanceSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/slime-idle-0.svg'), 'utf8')
-  const capstoneSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/siege-toad-idle-0.svg'), 'utf8')
-  const prismSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/prism-slime-idle-0.svg'), 'utf8')
-  const professorSvg = readFileSync(resolve(TEST_DIR, '../public/assets/units/slime-boss-idle-0.svg'), 'utf8')
-  assert.match(attendanceSvg, /<title>출석 체크 알림<\/title>/)
-  assert.match(capstoneSvg, /<title>캡스톤 마감덩어리<\/title>/)
-  assert.match(prismSvg, /<title>A\+ 착각 노트<\/title>/)
+  for (const enemy of Object.values(ENEMY_DEFINITIONS)) {
+    const svg = readFileSync(resolve(TEST_DIR, `../public/assets/units/${enemy.textureKey}-idle-0.svg`), 'utf8')
+    assert.ok(
+      svg.includes(`<title>${enemy.name}</title>`),
+      `${enemy.id} should use a matching themed SVG title`,
+    )
+  }
+
   assert.equal(ENEMY_DEFINITIONS['prism-slime'].textureKey, 'prism-slime')
-  assert.match(professorSvg, /<title>최종 발표 교수님<\/title>/)
 })
 
 test('content id catalogs include scoped enemy and reward branches', () => {
@@ -1617,7 +1628,7 @@ test('weapon descriptions carry Kim-flavored personal hooks', () => {
 test('stage selection views expose readable time-stage choices and current marker', () => {
   const stages = getStageSelectionViews(15 * 60_000)
 
-  assert.equal(stages.length, 30)
+  assert.equal(stages.length, 20)
   assert.equal(stages[15]?.isCurrent, true)
   assert.match(stages[15]?.label ?? '', /Stage 16/)
   assert.match(stages[15]?.description ?? '', /체력 ×/)
@@ -1630,7 +1641,7 @@ test('stage selection views expose readable time-stage choices and current marke
 test('stage selection maps choices to time offsets instead of wave clears', () => {
   assert.equal(getStageSelectionStartElapsedMs(0), 0)
   assert.equal(getStageSelectionStartElapsedMs(2), 2 * 60_000)
-  assert.equal(getStageSelectionStartElapsedMs(25), FINAL_STAGE_START_MS)
+  assert.equal(getStageSelectionStartElapsedMs(16), FINAL_STAGE_START_MS)
   assert.equal(getStageSelectionStartElapsedMs(99), null)
 })
 
@@ -1652,7 +1663,7 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   assert.deepEqual(presentation.statLines, [
     '결과: 클리어',
     '최종 무기: 스타터 블래스터',
-    '생존 시간: 25:30',
+    '생존 시간: 16:30',
     '도달 단계: 6막 크라운 피날레',
     '피날레 진입: 예',
   ])
@@ -1760,7 +1771,7 @@ test('start screen gates arena entry behind an explicit button', () => {
   assert.ok(!startSceneSource.includes('시작 전에는 시간이 흐르지 않고 적도 등장하지 않습니다.'))
   assert.ok(startSceneSource.includes('파친코 기계 앞에서 삶을 탕진한 김동성'))
   assert.ok(startSceneSource.includes('무기와 레벨로 바꿔 중독을 끊어낼 연료'))
-  assert.ok(startSceneSource.includes('무엇이 쫓아오든 30분만 버티면'))
+  assert.ok(startSceneSource.includes('무엇이 쫓아오든 20분만 버티면'))
   assert.ok(startSceneSource.includes('잭팟이 아닌 자기 발로 내일을 되찾게'))
   assert.ok(!startSceneSource.includes("'새 런 시작'"))
   assert.ok(!startSceneSource.includes('경기장에 진입'))

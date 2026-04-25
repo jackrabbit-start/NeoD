@@ -3811,7 +3811,7 @@ export class ArenaScene extends Phaser.Scene {
         `무기: ${weapon.name} ${formatWeaponStarLabel(activeStar)} · ${getWeaponSummary(weapon)}`,
         `적 출현 확률 (${this.getRunStageOddsLabel(currentPhase)})`,
         ...visibleEnemyChanceLines,
-        `생존 시간: ${formatRunTime(this.runElapsedMs)} / 30:00`,
+        `생존 시간: ${formatRunTime(this.runElapsedMs)} / 20:00`,
         `현재 단계: ${this.currentStageIndex + 1}막`,
         `생존한 적: ${this.enemies.length}/${this.activeEnemySoftCap} 상한`,
         `적 체력 배율: ×${this.activeEnemyHealthMultiplier.toFixed(2)}`,
@@ -3824,8 +3824,8 @@ export class ArenaScene extends Phaser.Scene {
       ],
       recipes: this.getFusionSummaryLines(),
       objective: this.isFinaleActive
-        ? '마지막 추격 파도를 돌파하고 30:00 전에 결전을 끝내 살아남으세요.'
-        : '김동성의 추격에서 30분 동안 버티며 토큰으로 무기를 키우고 생존 루프를 이어가세요.',
+        ? '마지막 추격 파도를 돌파하고 20:00 전에 결전을 끝내 살아남으세요.'
+        : '김동성의 추격에서 20분 동안 버티며 토큰으로 무기를 키우고 생존 루프를 이어가세요.',
       tip: GAMEPLAY_CONTROL_TIP,
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',

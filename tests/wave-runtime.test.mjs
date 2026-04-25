@@ -26,7 +26,7 @@ test('run progression runtime starts with immediate recurring pressure', () => {
 
 test('run progression advances by elapsed time even while enemies carry over', () => {
   const start = createRunProgressionRuntime(29_900)
-  const step = advanceRunProgressionRuntime(start, 200, 8)
+  const step = advanceRunProgressionRuntime(start, 200, 7)
 
   assert.equal(step.activePhase.id, 'minute-01-b')
   assert.equal(step.phaseChanged, true)
@@ -43,7 +43,7 @@ test('run progression enforces deterministic soft caps for refill pressure', () 
   assert.equal(nearCap.spawnedEnemyIds.length, 1)
 })
 
-test('run progression emits the boss exactly at the 25 minute finale boundary', () => {
+test('run progression emits the boss exactly at the 16 minute finale boundary', () => {
   const beforeFinale = createRunProgressionRuntime(FINAL_STAGE_START_MS - 100)
   const step = advanceRunProgressionRuntime(beforeFinale, 100, 99)
 
@@ -52,17 +52,17 @@ test('run progression emits the boss exactly at the 25 minute finale boundary', 
   assert.ok(step.spawnedEnemyIds.includes('slime-boss'))
 })
 
-test('run progression hard-caps at 30 minutes for timeout handling', () => {
+test('run progression hard-caps at 20 minutes for timeout handling', () => {
   const step = advanceRunProgressionRuntime(createRunProgressionRuntime(RUN_DURATION_MS - 50), 100, 0)
 
   assert.equal(step.state.elapsedMs, RUN_DURATION_MS)
   assert.equal(step.timedOut, true)
 })
 
-test('run progression table covers 30 minutes with half-minute probability phases', () => {
-  assert.equal(RUN_PROGRESS_PHASES.length, 60)
+test('run progression table covers 20 minutes with half-minute probability phases', () => {
+  assert.equal(RUN_PROGRESS_PHASES.length, 40)
   assert.equal(RUN_PROGRESS_PHASES[0]?.startMs, 0)
-  assert.equal(RUN_PROGRESS_PHASES.at(-1)?.startMs, 29 * 60_000 + 30_000)
+  assert.equal(RUN_PROGRESS_PHASES.at(-1)?.startMs, 19 * 60_000 + 30_000)
   assert.ok((RUN_PROGRESS_PHASES.at(-1)?.softEnemyCap ?? 0) > (RUN_PROGRESS_PHASES[0]?.softEnemyCap ?? 0))
   assert.ok((RUN_PROGRESS_PHASES.at(-1)?.healthMultiplier ?? 0) > (RUN_PROGRESS_PHASES[0]?.healthMultiplier ?? 0))
 })
