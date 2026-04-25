@@ -3,7 +3,6 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import {
   createRunResultHudState,
   createRunResultPresentation,
-  isRunResultRestartKey,
   type RunResultPayload,
 } from '../systems/runResult.js'
 import type { HudController } from '../ui/Hud.js'
@@ -85,24 +84,33 @@ export class ResultScene extends Phaser.Scene {
       )
       .setOrigin(0.5)
 
-    const keyboard = this.input.keyboard
-    if (!keyboard) {
-      return
-    }
+    const restartButton = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 72, 244, 48, 0x1f3a5f, 0.96)
+      .setStrokeStyle(2, Number.parseInt(presentation.accentColor.slice(1), 16), 0.95)
+      .setInteractive({ useHandCursor: true })
+      .setName('restart-run-button')
 
-    const handleRestartKey = (event: KeyboardEvent): void => {
-      if (!isRunResultRestartKey(event)) {
-        return
-      }
+    const restartButtonLabel = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 72, '새 런 시작', {
+        fontSize: '20px',
+        color: '#f8fafc',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
 
-      event.preventDefault()
-      keyboard.off(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, handleRestartKey)
+    restartButton.on(Phaser.Input.Events.POINTER_OVER, () => {
+      restartButton.setFillStyle(0x2d5f8f, 1)
+    })
+    restartButton.on(Phaser.Input.Events.POINTER_OUT, () => {
+      restartButton.setFillStyle(0x1f3a5f, 0.96)
+    })
+    restartButton.on(Phaser.Input.Events.POINTER_DOWN, () => {
+      restartButton.setFillStyle(0x16314f, 1)
+    })
+    restartButton.on(Phaser.Input.Events.POINTER_UP, () => {
+      restartButton.disableInteractive()
+      restartButtonLabel.setText('시작 중...')
       this.scene.start('arena')
-    }
-
-    keyboard.on(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, handleRestartKey)
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      keyboard.off(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, handleRestartKey)
     })
   }
 }

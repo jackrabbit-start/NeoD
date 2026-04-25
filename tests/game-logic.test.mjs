@@ -111,7 +111,6 @@ import {
 import {
   createRunResultHudState,
   createRunResultPresentation,
-  isRunResultRestartKey,
 } from '../.tmp-test/src/systems/runResult.js'
 import {
   PACHINKO_LEVEL_THRESHOLDS,
@@ -1073,7 +1072,7 @@ test('boss win result presentation is explicit and reward-neutral', () => {
 
   assert.equal(presentation.title, '런 클리어')
   assert.match(presentation.subtitle, /크라운 슬라임/)
-  assert.match(presentation.restartPrompt, /R 키/)
+  assert.match(presentation.restartPrompt, /버튼/)
   assert.deepEqual(presentation.statLines, [
     '결과: 클리어',
     '최종 무기: 스타터 블래스터',
@@ -1123,13 +1122,21 @@ test('loss result presentation keeps restart guidance distinct from boss clear',
   assert.match(presentation.restartPrompt, /새 런/)
 })
 
-test('result restart key accepts physical R even when IME changes the produced key', () => {
-  assert.equal(isRunResultRestartKey({ code: 'KeyR', key: 'ㄱ', keyCode: 229 }), true)
-  assert.equal(isRunResultRestartKey({ key: 'r' }), true)
-  assert.equal(isRunResultRestartKey({ keyCode: 82 }), true)
-  assert.equal(isRunResultRestartKey({ which: 82 }), true)
-  assert.equal(isRunResultRestartKey({ code: 'KeyE', key: 'ㄷ', keyCode: 229 }), false)
-  assert.equal(isRunResultRestartKey({ code: 'KeyR', key: 'r', metaKey: true }), false)
+test('result scene restart is button-driven instead of R-key driven', () => {
+  const resultSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ResultScene.ts'), 'utf8')
+
+  assert.ok(
+    resultSceneSource.includes(`.setName('restart-run-button')`),
+    'ResultScene should expose a named restart button for the result screen',
+  )
+  assert.ok(
+    resultSceneSource.includes(`Phaser.Input.Events.POINTER_UP`),
+    'ResultScene restart should be activated by pointer/click input',
+  )
+  assert.ok(
+    !resultSceneSource.includes(`Phaser.Input.Keyboard.Events.ANY_KEY_DOWN`),
+    'ResultScene must not keep the old R-key restart binding',
+  )
 })
 
 test('elite wave appears before the boss wave', () => {
