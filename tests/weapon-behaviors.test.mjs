@@ -483,9 +483,11 @@ test('pause and cooldown gating block firing before scene spawn dispatch', () =>
   assert.equal(shouldWeaponFire(false, true, 100, 100), true)
 })
 
-test('codex summaries include weapon identity beyond raw stats', () => {
+test('codex summaries describe token rewards instead of hidden recipe output cards', () => {
   const codex = getCodexState(true)
-  const arcRecipe = codex.recipes.find((recipe) => recipe.output.id === 'arc-loom')
+  const sparkSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
 
-  assert.match(arcRecipe?.output.summary ?? '', /감다살 연쇄/)
+  assert.equal(codex.recipes.length, 0)
+  assert.match(codex.hint, /토큰 파친코/)
+  assert.ok(sparkSlime?.stats.some((stat) => /보상 경험치 \+2/.test(stat)))
 })

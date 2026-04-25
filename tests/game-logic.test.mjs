@@ -12,7 +12,7 @@ import { ENEMY_IDS, LOOT_IDS, RECIPE_IDS, WEAPON_IDS } from '../.tmp-test/src/da
 import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/combine.js'
 import { getCodexState } from '../.tmp-test/src/systems/codex.js'
 import { CodexController } from '../.tmp-test/src/ui/Codex.js'
-import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RADIUS, PROJECTILE_HIT_PADDING } from '../.tmp-test/src/game/combatGeometry.js'
+import { COMBAT_RECT, ENEMY_CONTACT_PADDING, PACHINKO_DIVIDER_X, PACHINKO_RECT, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RADIUS, PROJECTILE_HIT_PADDING, clampPointToRect, isPointInsideRect } from '../.tmp-test/src/game/combatGeometry.js'
 import { VECTOR_ASSETS } from '../.tmp-test/src/game/visualManifest.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
@@ -72,10 +72,17 @@ import {
 } from '../.tmp-test/src/systems/tuning.js'
 import { getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.js'
 import {
+  STARTER_WEAPON_STACK_KEY,
+  addWeaponStack,
   applyRecipeSelection,
+  canFuseWeaponStack,
+  createWeaponStackKey,
   equipOwnedWeapon,
+  equipWeaponStack,
+  fuseWeaponStack,
   getActionableRecipes,
   seedOwnedWeapons,
+  seedWeaponStacks,
 } from '../.tmp-test/src/systems/weaponOwnership.js'
 import {
   resolveAutoAttackShot,
@@ -104,8 +111,19 @@ import {
 import {
   createRunResultHudState,
   createRunResultPresentation,
-  isRunResultRestartKey,
 } from '../.tmp-test/src/systems/runResult.js'
+import {
+  PACHINKO_LEVEL_THRESHOLDS,
+  STAR_ODDS_BY_LEVEL,
+  applyEnemyPachinkoTokenProgress,
+  getPachinkoRewardLevel,
+  getTokenXpForEnemy,
+  resolvePachinkoLandingReward,
+  resolvePachinkoReward,
+  resolveStarForLevel,
+  resolveWeaponReward,
+  shouldEnemyGrantPachinkoToken,
+} from '../.tmp-test/src/systems/pachinkoRewards.js'
 import { HudController } from '../.tmp-test/src/ui/Hud.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
@@ -294,6 +312,9 @@ test('new arena runs start from the clean baseline state', () => {
   assert.deepEqual(state.ownedWeaponIds, ['starter-blaster'])
   assert.equal(state.activeWeaponId, 'starter-blaster')
   assert.deepEqual(state.tuningState, {})
+  assert.deepEqual(state.weaponStacks, [{ weaponId: 'starter-blaster', star: 1, count: 1 }])
+  assert.equal(state.activeWeaponKey, STARTER_WEAPON_STACK_KEY)
+  assert.equal(state.pachinkoTokenXp, 0)
   assert.equal(state.isInventoryOpen, false)
   assert.equal(state.isCodexOpen, false)
   assert.equal(state.isRunEnding, false)
@@ -315,12 +336,119 @@ test('new arena run state does not reuse mutable containers', () => {
   first.inventory['gel-shard'] = 2
   first.ownedWeaponIds.push('acid-sprayer')
   first.tuningState['acid-sprayer'] = 'sharpened-core'
+  first.weaponStacks[0].count = 99
 
   const second = createInitialArenaRunState()
 
   assert.deepEqual(second.inventory, {})
   assert.deepEqual(second.ownedWeaponIds, ['starter-blaster'])
   assert.deepEqual(second.tuningState, {})
+  assert.deepEqual(second.weaponStacks, [{ weaponId: 'starter-blaster', star: 1, count: 1 }])
+})
+
+test('pachinko reward levels and enemy token xp follow the approved thresholds', () => {
+  assert.deepEqual(PACHINKO_LEVEL_THRESHOLDS, [0, 6, 14, 26, 42])
+  assert.deepEqual(STAR_ODDS_BY_LEVEL[1], [70, 25, 5, 0, 0])
+  assert.deepEqual(STAR_ODDS_BY_LEVEL[5], [20, 30, 30, 15, 5])
+
+  assert.equal(getTokenXpForEnemy('slime'), 1)
+  assert.equal(getTokenXpForEnemy('spark-slime'), 2)
+  assert.equal(getTokenXpForEnemy('dash-slime'), 2)
+  assert.equal(getTokenXpForEnemy('orbit-slime'), 2)
+  assert.equal(getTokenXpForEnemy('prism-slime'), 4)
+  assert.equal(getTokenXpForEnemy('slime-boss'), 0)
+  assert.equal(shouldEnemyGrantPachinkoToken('slime'), true)
+  assert.equal(shouldEnemyGrantPachinkoToken('slime-boss'), false)
+
+  assert.equal(getPachinkoRewardLevel(0), 1)
+  assert.equal(getPachinkoRewardLevel(5), 1)
+  assert.equal(getPachinkoRewardLevel(6), 2)
+  assert.equal(getPachinkoRewardLevel(14), 3)
+  assert.equal(getPachinkoRewardLevel(26), 4)
+  assert.equal(getPachinkoRewardLevel(42), 5)
+  assert.equal(getPachinkoRewardLevel(999), 5)
+})
+
+test('pachinko reward resolution keeps weapon random and star odds deterministic', () => {
+  assert.equal(resolveWeaponReward(() => 0), 'starter-blaster')
+  assert.equal(resolveWeaponReward(() => 0.999), 'needle-fan')
+  assert.equal(resolveStarForLevel(1, () => 0.69), 1)
+  assert.equal(resolveStarForLevel(1, () => 0.70), 1)
+  assert.equal(resolveStarForLevel(1, () => 0.701), 2)
+  assert.equal(resolveStarForLevel(5, () => 0.99), 5)
+
+  const rolls = [0.12, 0.99]
+  assert.deepEqual(resolvePachinkoReward(4, () => rolls.shift()), {
+    weaponId: 'acid-sprayer',
+    star: 5,
+  })
+})
+
+test('enemy defeat token progress feeds the same landing reward resolver as the scene', () => {
+  let progress = { totalTokenXp: 0, queuedTokenXp: [] }
+  progress = applyEnemyPachinkoTokenProgress(progress, 'slime')
+  assert.deepEqual(progress, {
+    totalTokenXp: 1,
+    queuedTokenXp: [1],
+    grantedTokenXp: 1,
+    didEnqueue: true,
+    rewardLevel: 1,
+  })
+
+  progress = applyEnemyPachinkoTokenProgress(progress, 'prism-slime')
+  assert.deepEqual(progress.queuedTokenXp, [1, 4])
+  assert.equal(progress.totalTokenXp, 5)
+  assert.equal(progress.rewardLevel, 1)
+
+  const bossProgress = applyEnemyPachinkoTokenProgress(progress, 'slime-boss')
+  assert.deepEqual(bossProgress, {
+    ...progress,
+    grantedTokenXp: 0,
+    didEnqueue: false,
+    rewardLevel: 1,
+  })
+
+  assert.deepEqual(resolvePachinkoLandingReward(42, 0.999), {
+    weaponId: 'needle-fan',
+    star: 5,
+  })
+})
+
+test('weapon star stacks fuse only same weapon and same star into the next grade', () => {
+  let stacks = seedWeaponStacks()
+  stacks = addWeaponStack(stacks, 'starter-blaster', 1, 1)
+  stacks = addWeaponStack(stacks, 'acid-sprayer', 2, 2)
+
+  const starterKey = createWeaponStackKey('starter-blaster', 1)
+  const acidTwoKey = createWeaponStackKey('acid-sprayer', 2)
+  assert.equal(canFuseWeaponStack(stacks, starterKey), true)
+  assert.equal(canFuseWeaponStack(stacks, acidTwoKey), true)
+  assert.equal(equipWeaponStack(stacks, starterKey, acidTwoKey), acidTwoKey)
+
+  const fusedStarter = fuseWeaponStack({ weaponStacks: stacks, activeWeaponKey: starterKey }, starterKey)
+  assert.ok(fusedStarter)
+  assert.equal(fusedStarter?.activeWeaponKey, createWeaponStackKey('starter-blaster', 2))
+  assert.deepEqual(
+    fusedStarter?.weaponStacks.find((stack) => stack.weaponId === 'starter-blaster' && stack.star === 2),
+    { weaponId: 'starter-blaster', star: 2, count: 1 },
+  )
+  assert.ok(
+    deriveEffectiveWeaponStats(fusedStarter.weaponId, {}, fusedStarter.resultStar).damage
+      > deriveEffectiveWeaponStats(fusedStarter.weaponId, {}, 1).damage,
+  )
+
+  const maxStar = addWeaponStack([], 'arc-loom', 5, 2)
+  assert.equal(canFuseWeaponStack(maxStar, createWeaponStackKey('arc-loom', 5)), false)
+  assert.equal(fuseWeaponStack({ weaponStacks: maxStar, activeWeaponKey: createWeaponStackKey('arc-loom', 5) }, createWeaponStackKey('arc-loom', 5)), null)
+})
+
+test('combat and pachinko rectangles split the 960px canvas into play and reward lanes', () => {
+  assert.deepEqual(COMBAT_RECT, { x: 0, y: 0, width: 720, height: 540 })
+  assert.equal(PACHINKO_DIVIDER_X, 728)
+  assert.deepEqual(PACHINKO_RECT, { x: 740, y: 24, width: 200, height: 492 })
+  assert.equal(isPointInsideRect({ x: 719, y: 120 }, COMBAT_RECT), true)
+  assert.equal(isPointInsideRect({ x: 740, y: 120 }, COMBAT_RECT), false)
+  assert.deepEqual(clampPointToRect({ x: 900, y: -10 }, COMBAT_RECT, 14), { x: 706, y: 14 })
 })
 
 test('map layout defines a larger scrolling world with a safe starting area', () => {
@@ -944,7 +1072,7 @@ test('boss win result presentation is explicit and reward-neutral', () => {
 
   assert.equal(presentation.title, '런 클리어')
   assert.match(presentation.subtitle, /크라운 슬라임/)
-  assert.match(presentation.restartPrompt, /R 키/)
+  assert.match(presentation.restartPrompt, /버튼/)
   assert.deepEqual(presentation.statLines, [
     '결과: 클리어',
     '최종 무기: 스타터 블래스터',
@@ -994,13 +1122,41 @@ test('loss result presentation keeps restart guidance distinct from boss clear',
   assert.match(presentation.restartPrompt, /새 런/)
 })
 
-test('result restart key accepts physical R even when IME changes the produced key', () => {
-  assert.equal(isRunResultRestartKey({ code: 'KeyR', key: 'ㄱ', keyCode: 229 }), true)
-  assert.equal(isRunResultRestartKey({ key: 'r' }), true)
-  assert.equal(isRunResultRestartKey({ keyCode: 82 }), true)
-  assert.equal(isRunResultRestartKey({ which: 82 }), true)
-  assert.equal(isRunResultRestartKey({ code: 'KeyE', key: 'ㄷ', keyCode: 229 }), false)
-  assert.equal(isRunResultRestartKey({ code: 'KeyR', key: 'r', metaKey: true }), false)
+test('result scene restart is button-driven instead of R-key driven', () => {
+  const resultSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ResultScene.ts'), 'utf8')
+
+  assert.ok(
+    resultSceneSource.includes(`.setName('restart-run-button')`),
+    'ResultScene should expose a named restart button for the result screen',
+  )
+  assert.ok(
+    resultSceneSource.includes(`const restartRun = (): void => {`),
+    'ResultScene restart should use a shared restart handler for button input',
+  )
+  assert.ok(
+    resultSceneSource.includes(`restartButton.on(Phaser.Input.Events.POINTER_DOWN`),
+    'ResultScene restart should fire on button pointer down rather than waiting for a fragile pointer-up path',
+  )
+  assert.ok(
+    resultSceneSource.includes(`this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)`),
+    'ResultScene should include a scene-level pointer fallback so button clicks restart even if game-object hit testing misses',
+  )
+  assert.ok(
+    resultSceneSource.includes(`this.scene.start('arena')`),
+    'ResultScene restart handler should start the arena scene',
+  )
+  assert.ok(
+    resultSceneSource.includes(`const restartButtonY = Math.max(48, height - 48)`),
+    'ResultScene restart button should stay inside the resized canvas instead of using fixed GAME_HEIGHT coordinates',
+  )
+  assert.ok(
+    !resultSceneSource.includes(`Phaser.Input.Keyboard.Events.ANY_KEY_DOWN`),
+    'ResultScene must not keep the old R-key restart binding',
+  )
+  assert.ok(
+    !resultSceneSource.includes(`GAME_HEIGHT - 72`),
+    'ResultScene restart button must not use the old fixed baseline that can fall outside resized canvases',
+  )
 })
 
 test('elite wave appears before the boss wave', () => {
@@ -1008,75 +1164,25 @@ test('elite wave appears before the boss wave', () => {
   assert.deepEqual(getWaveByIndex(4)?.entries, [{ enemyId: 'slime-boss', count: 1 }])
 })
 
-test('codex selectors expose shared items, recipes, and enemies', () => {
+test('codex selectors expose hidden materials and token enemy rewards', () => {
   const codex = getCodexState(true)
 
   assert.equal(codex.isOpen, true)
-  assert.equal(codex.items.length, 7)
-  assert.equal(codex.recipes.length, 9)
+  assert.equal(codex.items.length, 0)
+  assert.equal(codex.recipes.length, 0)
   assert.equal(codex.enemies.length, 7)
+  assert.match(codex.hint, /토큰 파친코/)
 
-  const arcRecipe = codex.recipes.find((recipe) => recipe.id === 'arc-loom-recipe')
-  assert.equal(arcRecipe?.identityLabel, '감다살 연쇄')
-  assert.match(arcRecipe?.identityHint ?? '', /전하/)
-  assert.deepEqual(
-    arcRecipe?.inputs.map((input) => input.id),
-    ['spark-knot', 'mist-bead'],
-  )
 
-  const sparkRecipe = codex.recipes.find((recipe) => recipe.id === 'spark-carbine-recipe')
-  assert.equal(sparkRecipe?.identityLabel, '오버드라이브 속사')
-  assert.deepEqual(
-    sparkRecipe?.inputs.map((input) => input.id),
-    ['gel-shard', 'spark-knot'],
-  )
-  assert.equal(sparkRecipe?.output.id, 'spark-carbine')
-
-  const mistRecipe = codex.recipes.find((recipe) => recipe.id === 'mist-vortex-recipe')
-  assert.equal(mistRecipe?.identityLabel, '멘탈 안개')
-  assert.deepEqual(
-    mistRecipe?.inputs.map((input) => input.id),
-    ['frost-mote', 'mist-bead'],
-  )
-  assert.equal(mistRecipe?.output.id, 'mist-vortex')
-
-  const glaiveRecipe = codex.recipes.find((recipe) => recipe.id === 'slime-glaive-recipe')
-  assert.equal(glaiveRecipe?.identityLabel, '워킹 참격')
-  assert.deepEqual(
-    glaiveRecipe?.inputs.map((input) => input.id),
-    ['acid-core', 'spark-knot'],
-  )
-  assert.equal(glaiveRecipe?.output.id, 'slime-glaive')
-
-  const cutterRecipe = codex.recipes.find((recipe) => recipe.id === 'prism-cutter-recipe')
-  assert.equal(cutterRecipe?.identityLabel, '2016 절단')
-  assert.deepEqual(
-    cutterRecipe?.inputs.map((input) => input.id),
-    ['acid-core', 'mist-bead'],
-  )
-  assert.equal(cutterRecipe?.output.id, 'prism-cutter')
-
-  const needleRecipe = codex.recipes.find((recipe) => recipe.id === 'needle-fan-recipe')
-  assert.equal(needleRecipe?.identityLabel, '간바레 산탄')
-  assert.deepEqual(
-    needleRecipe?.inputs.map((input) => input.id),
-    ['chitin-needle', 'spark-knot'],
-  )
-  assert.equal(needleRecipe?.output.id, 'needle-fan')
 
   const voltSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
   assert.ok(voltSlime)
-  assert.deepEqual(
-    voltSlime?.drops.map((drop) => drop.id),
-    ['spark-knot', 'mist-bead', 'frost-mote'],
-  )
+  assert.deepEqual(voltSlime?.drops, [])
+  assert.ok(voltSlime?.stats.some((stat) => stat.includes('보상 경험치 +2')))
 
   const prismSlime = codex.enemies.find((enemy) => enemy.id === 'prism-slime')
   assert.ok(prismSlime)
-  assert.deepEqual(
-    prismSlime?.drops.map((drop) => drop.id),
-    ['tuning-capsule'],
-  )
+  assert.ok(prismSlime?.stats.some((stat) => stat.includes('보상 경험치 +4')))
 
   const dashSlime = codex.enemies.find((enemy) => enemy.id === 'dash-slime')
   assert.ok(dashSlime)
@@ -1086,14 +1192,15 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
   assert.ok(orbitSlime)
   assert.ok(orbitSlime?.stats.some((stat) => stat.includes('맴돕니다')))
 
+  const boss = codex.enemies.find((enemy) => enemy.id === 'slime-boss')
+  assert.ok(boss?.stats.some((stat) => stat.includes('즉시 런을 종료')))
+
   const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
   assert.ok(needleWasp)
   assert.ok(needleWasp?.description.includes('비-슬라임'))
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('부채꼴')))
-  assert.deepEqual(
-    needleWasp?.drops.map((drop) => drop.id),
-    ['chitin-needle', 'spark-knot', 'mist-bead'],
-  )
+  assert.deepEqual(needleWasp?.drops, [])
+  assert.ok(needleWasp?.stats.some((stat) => stat.includes('보상 경험치 +3')))
 })
 
 test('recipe identity metadata stays aligned with known ids and weapon outputs', () => {
@@ -1140,8 +1247,8 @@ test('codex controller preserves scroll across repeated open renders', () => {
 
   controller.update(openState)
   assert.equal(element.hidden, false)
-  assert.match(element.innerHTML, /아이템/)
-  assert.match(element.innerHTML, /조합식/)
+  assert.match(element.innerHTML, /숨긴 재료/)
+  assert.match(element.innerHTML, /별 합성 안내/)
   assert.match(element.innerHTML, /적/)
   assert.equal(element.assignments, 1)
 
@@ -1158,7 +1265,7 @@ test('codex controller preserves scroll across repeated open renders', () => {
 
   controller.update(openState)
   assert.equal(element.hidden, false)
-  assert.match(element.innerHTML, /아이템/)
+  assert.match(element.innerHTML, /숨긴 재료/)
   assert.equal(element.assignments, 3)
 })
 
@@ -1403,6 +1510,23 @@ test('effective weapon stats apply each tuning without mutating base definitions
   )
   assert.deepEqual(deriveEffectiveWeaponStats('acid-sprayer', {}), WEAPON_DEFINITIONS['acid-sprayer'])
   assert.deepEqual(WEAPON_DEFINITIONS['acid-sprayer'], baseWeapon)
+})
+
+test('effective weapon stats scale by star grade for combat-visible fusion payoff', () => {
+  const oneStar = deriveEffectiveWeaponStats('acid-sprayer', {}, 1)
+  const fiveStar = deriveEffectiveWeaponStats('acid-sprayer', {}, 5)
+  const tunedThreeStar = deriveEffectiveWeaponStats('acid-sprayer', { 'acid-sprayer': 'quick-loader' }, 3)
+  const glaiveThreeStar = deriveEffectiveWeaponStats('slime-glaive', {}, 3)
+
+  assert.equal(fiveStar.damage, 34)
+  assert.equal(fiveStar.fireRateMs, 175)
+  assert.equal(fiveStar.projectileSpeed, 660)
+  assert.ok(fiveStar.damage > oneStar.damage)
+  assert.ok(fiveStar.fireRateMs < oneStar.fireRateMs)
+  assert.ok(fiveStar.projectileSpeed > oneStar.projectileSpeed)
+  assert.equal(tunedThreeStar.fireRateMs, 182)
+  assert.equal(glaiveThreeStar.attackBehavior.kind, 'melee-cleave')
+  assert.equal(glaiveThreeStar.attackBehavior.range, WEAPON_DEFINITIONS['slime-glaive'].attackBehavior.range + 12)
 })
 
 test('effective melee weapon tuning updates nested behavior immutably', () => {

@@ -12,6 +12,7 @@ Content-oriented catalog for the repo documentation wiki.
 - [wiki/melee-weapon-line.md](wiki/melee-weapon-line.md): durable architecture and verification notes for V1 frontal-cleave melee weapons and capsule tuning.
 - [wiki/map-traversal-obstacles.md](wiki/map-traversal-obstacles.md): durable architecture and verification notes for V1 larger-map traversal, obstacle-free movement, top-right minimap, and heart recovery pickups.
 - [wiki/stack-foundation.md](wiki/stack-foundation.md): locked stack decision for the browser-first Phaser prototype.
+- [wiki/pachinko-token-rewards.md](wiki/pachinko-token-rewards.md): durable token pickup, right-side pachinko, weapon-star reward, and manual fusion rules.
 - [wiki/parallel-ai-worktrees.md](wiki/parallel-ai-worktrees.md): branch, worktree, Ralph, and PR workflow for parallel AI execution.
 - [wiki/post-interview-context-workflow.md](wiki/post-interview-context-workflow.md): manual post-deep-interview context capture workflow for lessons, changed files, and durable wiki synthesis.
 - [wiki/run-result-flow.md](wiki/run-result-flow.md): run-ending HUD and ResultScene presentation rules for boss clear/failure flows.

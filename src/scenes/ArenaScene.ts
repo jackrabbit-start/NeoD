@@ -1,27 +1,24 @@
 import Phaser from 'phaser'
 import { ENEMY_DEFINITIONS } from '../data/enemies.js'
-import { ITEM_DEFINITIONS } from '../data/items.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import type {
-  AvailableRecipe,
   EnemyDefinition,
-  HudOwnedItemView,
   HudOwnedWeaponView,
-  InventoryState,
-  LootId,
-  RecipeId,
   WeaponId,
+  WeaponStack,
+  WeaponStackKey,
 } from '../domain/types.js'
 import {
   ENEMY_CONTACT_PADDING,
+  PACHINKO_RECT,
   PLAYER_COLLISION_RADIUS,
   PROJECTILE_HIT_PADDING,
+  type RectBounds,
 } from '../game/combatGeometry.js'
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { CodexController } from '../ui/Codex.js'
 import type { HudController } from '../ui/Hud.js'
 import { getCodexState } from '../systems/codex.js'
-import { resolveWeightedDrop } from '../systems/drop.js'
 import {
   advanceEnemyCooldown,
   createEnemySpreadBurstProjectiles,
@@ -80,6 +77,13 @@ import {
   type PlayerDashState,
 } from '../systems/playerDash.js'
 import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
+import {
+  applyEnemyPachinkoTokenProgress,
+  getPachinkoRewardLevel,
+  getTokenXpForEnemy,
+  resolvePachinkoLandingReward,
+  shouldEnemyGrantPachinkoToken,
+} from '../systems/pachinkoRewards.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
 import {
   advanceKnockbackState,
@@ -105,25 +109,20 @@ import {
   selectChainTargets,
 } from '../systems/weaponBehaviors.js'
 import type { ChainSpec, HazardSpawnSpec, MeleeSwingSpec, Point, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
+import { deriveEffectiveWeaponStats } from '../systems/tuning.js'
 import {
-  deriveEffectiveWeaponStats,
-  getTuningEffectLabel,
-  getWeaponTuningBlockReason,
-  resolveTuningSelection,
-  type WeaponTuningState,
-} from '../systems/tuning.js'
-import {
-  equipOwnedWeapon,
-  getActionableRecipes,
+  addWeaponStack,
+  canFuseWeaponStack,
+  equipWeaponStack,
+  fuseWeaponStack,
+  getStackKey,
+  getWeaponIdFromStackKey,
+  parseWeaponStackKey,
+  sortWeaponStacks,
 } from '../systems/weaponOwnership.js'
 import { getSkippedRegularWaveCount, getStageSelectionViews } from '../systems/stageSelection.js'
 import { getDefeatedEnemyRunOutcome, getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
 import { resolveAutoAttackShot } from './arena/autoAttack.js'
-import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
-import {
-  applyLootPickup,
-  applyRecipeSelectionWorkflow,
-} from './arena/combineInventoryWorkflow.js'
 import {
   createWaveAdvancePlan,
   setSpawnLoopPaused,
@@ -154,6 +153,11 @@ interface MiniMapDisplay {
   graphics: Phaser.GameObjects.Graphics
   label: Phaser.GameObjects.Text
   bounds: MiniMapBounds
+}
+
+interface ViewportSize {
+  width: number
+  height: number
 }
 
 interface EnemyTelegraph {
@@ -187,12 +191,27 @@ interface EnemyEntity {
   spreadBurst?: EnemySpreadBurstCharge
 }
 
-interface LootEntity {
+interface PachinkoTokenEntity {
   sprite: PhysicsImage
-  itemId: LootId
+}
+
+interface PachinkoTokenPickupEntity {
+  sprite: PhysicsImage
   aura: Phaser.GameObjects.Arc
   auraTween: Phaser.Tweens.Tween
+  enemyId: EnemyDefinition['id']
   isAttracting: boolean
+}
+
+interface PachinkoPinEntity {
+  sprite: PhysicsImage
+  xRatio: number
+  yRatio: number
+}
+
+interface PachinkoLaneDividerEntity {
+  visual: Phaser.GameObjects.Rectangle
+  xRatio: number
 }
 
 interface HealthPickupEntity {
@@ -236,6 +255,7 @@ interface HazardZoneEntity {
 }
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
+const PACHINKO_TOKEN_COLOR = 0xffd866
 
 interface ArenaSceneStartData {
   startWaveIndex?: number
@@ -272,9 +292,9 @@ export class ArenaScene extends Phaser.Scene {
 
   private enemies: EnemyEntity[] = []
 
-  private lootDrops: LootEntity[] = []
-
   private healthPickups: HealthPickupEntity[] = []
+
+  private pachinkoTokenPickups: PachinkoTokenPickupEntity[] = []
 
   private nextHeartPickupAt = 0
 
@@ -284,13 +304,9 @@ export class ArenaScene extends Phaser.Scene {
 
   private hazardZones: HazardZoneEntity[] = []
 
-  private ownedWeaponIds: WeaponId[] = []
+  private weaponStacks: WeaponStack[] = []
 
-  private activeWeaponId: WeaponId = 'starter-blaster'
-
-  private inventory: InventoryState = {}
-
-  private tuningState: WeaponTuningState = {}
+  private activeWeaponKey: WeaponStackKey = 'starter-blaster:1'
 
   private isInventoryOpen = false
 
@@ -332,6 +348,30 @@ export class ArenaScene extends Phaser.Scene {
 
   private nextEnemyRuntimeId = 1
 
+  private pachinkoTokenXp = 0
+
+  private pachinkoTokenQueue: number[] = []
+
+  private pachinkoTokenInFlight: PachinkoTokenEntity | null = null
+
+  private latestPachinkoReward: string | null = null
+
+  private pachinkoPins?: Phaser.Physics.Arcade.StaticGroup
+
+  private pachinkoVisuals: Phaser.GameObjects.GameObject[] = []
+
+  private pachinkoBoardVisual?: Phaser.GameObjects.Rectangle
+
+  private pachinkoDividerVisual?: Phaser.GameObjects.Rectangle
+
+  private pachinkoTitleVisual?: Phaser.GameObjects.Text
+
+  private pachinkoPinEntities: PachinkoPinEntity[] = []
+
+  private pachinkoLaneDividers: PachinkoLaneDividerEntity[] = []
+
+  private pachinkoBoardRect: RectBounds | null = null
+
   constructor() {
     super('arena')
   }
@@ -345,9 +385,9 @@ export class ArenaScene extends Phaser.Scene {
     this.hud.setHandlers({
       onInventoryToggle: () => this.toggleInventory(),
       onInventoryClose: () => this.closeInventory(),
-      onRecipeSelect: (recipeId) => this.handleRecipeSelection(recipeId),
-      onWeaponEquip: (weaponId) => this.handleWeaponEquip(weaponId),
+      onWeaponEquip: (weaponKey) => this.handleWeaponEquip(weaponKey as WeaponStackKey),
       onWeaponTune: (weaponId) => this.handleWeaponTune(weaponId),
+      onWeaponFuse: (weaponKey) => this.handleWeaponFuse(weaponKey),
       onStageSelectionToggle: () => this.toggleStageSelection(),
       onStageSelectionClose: () => this.closeStageSelection(),
       onStageSelect: (stageIndex) => this.handleStageSelection(stageIndex),
@@ -368,6 +408,7 @@ export class ArenaScene extends Phaser.Scene {
       worldBounds.height,
     )
     this.createMapVisuals()
+    this.createPachinkoBoard()
 
     this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'player')
     this.player.setCircle(PLAYER_COLLISION_RADIUS)
@@ -380,7 +421,6 @@ export class ArenaScene extends Phaser.Scene {
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
     this.createMiniMap()
-    this.seedAmbientLoot()
     this.nextHeartPickupAt = getInitialHeartPickupSpawnAt(this.time.now)
 
     const keyboard = this.input.keyboard
@@ -397,6 +437,10 @@ export class ArenaScene extends Phaser.Scene {
     this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
+    })
 
     this.wavesCleared = getSkippedRegularWaveCount(startWaveIndex)
     this.startWave(startWaveIndex)
@@ -429,8 +473,9 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    this.updateLootDrops(delta)
     this.updateHealthPickups(time, delta)
+    this.updatePachinkoTokenPickups(delta)
+    this.updatePachinko()
     this.updateHazards(delta)
     if (this.isRunEnding) {
       return
@@ -459,6 +504,28 @@ export class ArenaScene extends Phaser.Scene {
     return getWaveByIndex(startWaveIndex) ? startWaveIndex : 0
   }
 
+  private getViewportSize(): ViewportSize {
+    return {
+      width: Math.max(1, Math.round(this.scale.gameSize.width || GAME_WIDTH)),
+      height: Math.max(1, Math.round(this.scale.gameSize.height || GAME_HEIGHT)),
+    }
+  }
+
+  private handleScaleResize(): void {
+    if (!this.playerHealthBar || !this.miniMap) {
+      return
+    }
+
+    this.destroyPlayerHealthBar()
+    this.playerHealthBar = this.createPlayerHealthBar()
+    this.syncPlayerHealthBar()
+
+    this.destroyMiniMap()
+    this.createMiniMap()
+    this.syncMiniMap()
+    this.syncPachinkoBoard()
+  }
+
   private createMapVisuals(): void {
     const { worldBounds } = this.mapLayout
     const arena = this.add.rectangle(
@@ -485,14 +552,10 @@ export class ArenaScene extends Phaser.Scene {
     this.mapVisuals.push(grid)
   }
 
-  private seedAmbientLoot(): void {
-    for (const spawn of this.mapLayout.ambientItemSpawns) {
-      this.spawnLootDrop(spawn.x, spawn.y, spawn.itemId)
-    }
-  }
 
   private createMiniMap(): void {
-    const bounds = getTopRightMiniMapBounds(GAME_WIDTH)
+    const { width } = this.getViewportSize()
+    const bounds = getTopRightMiniMapBounds(width)
     const graphics = this.add
       .graphics()
       .setDepth(48)
@@ -547,15 +610,6 @@ export class ArenaScene extends Phaser.Scene {
     graphics.lineStyle(1, 0xffffff, 0.46)
     graphics.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height)
 
-    for (const loot of this.lootDrops) {
-      if (!loot.sprite.active) {
-        continue
-      }
-      const dot = projectWorldPointToMiniMap(loot.sprite, worldBounds, bounds)
-      graphics.fillStyle(ITEM_DEFINITIONS[loot.itemId].color, 0.82)
-      graphics.fillCircle(dot.x, dot.y, 1.9)
-    }
-
     for (const pickup of this.healthPickups) {
       if (!pickup.sprite.active) {
         continue
@@ -563,6 +617,15 @@ export class ArenaScene extends Phaser.Scene {
       const dot = projectWorldPointToMiniMap(pickup.sprite, worldBounds, bounds)
       graphics.fillStyle(HEART_PICKUP_COLOR, 0.95)
       graphics.fillCircle(dot.x, dot.y, 2.4)
+    }
+
+    for (const pickup of this.pachinkoTokenPickups) {
+      if (!pickup.sprite.active) {
+        continue
+      }
+      const dot = projectWorldPointToMiniMap(pickup.sprite, worldBounds, bounds)
+      graphics.fillStyle(PACHINKO_TOKEN_COLOR, 0.95)
+      graphics.fillCircle(dot.x, dot.y, 2.2)
     }
 
     for (const enemy of this.enemies) {
@@ -657,7 +720,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleFiring(time: number): void {
-    const weapon = deriveEffectiveWeaponStats(this.activeWeaponId, this.tuningState)
+    const activeStack = parseWeaponStackKey(this.activeWeaponKey)
+    const weapon = deriveEffectiveWeaponStats(activeStack?.weaponId ?? getWeaponIdFromStackKey(this.activeWeaponKey), {}, activeStack?.star ?? 1)
     const weaponRange = getWeaponAttackRange(weapon)
     const target = resolveAutoAttackShot(
       {
@@ -1054,42 +1118,6 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private updateLootDrops(delta: number): void {
-    if (this.isInteractionBlocked()) {
-      return
-    }
-
-    for (const loot of this.lootDrops) {
-      if (!loot.sprite.active) {
-        this.destroyLootDrop(loot)
-        continue
-      }
-
-      const distance = Phaser.Math.Distance.Between(
-        loot.sprite.x,
-        loot.sprite.y,
-        this.player.x,
-        this.player.y,
-      )
-      const pickupPhase = getLootPickupPhase(distance)
-
-      if (pickupPhase === 'collect') {
-        const pickupResult = applyLootPickup(this.inventory, loot.itemId)
-        this.inventory = pickupResult.nextInventory
-        this.statusMessage = pickupResult.statusMessage
-        this.destroyLootDrop(loot)
-        continue
-      }
-
-      if (pickupPhase === 'attract') {
-        this.applyLootAttraction(loot, distance, delta)
-        continue
-      }
-
-      this.setLootAttractionStyle(loot, false)
-      this.syncLootAura(loot)
-    }
-  }
 
   private updateHealthPickups(time: number, delta: number): void {
     if (this.isInteractionBlocked()) {
@@ -1131,43 +1159,6 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private applyLootAttraction(loot: LootEntity, distance: number, delta: number): void {
-    this.setLootAttractionStyle(loot, true)
-
-    const attractionStep = getLootAttractionStep(distance, delta)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
-    if (distance <= 0 || travelDistance <= 0) {
-      this.syncLootAura(loot)
-      return
-    }
-
-    const travelRatio = travelDistance / distance
-    loot.sprite.setPosition(
-      loot.sprite.x + (this.player.x - loot.sprite.x) * travelRatio,
-      loot.sprite.y + (this.player.y - loot.sprite.y) * travelRatio,
-    )
-    this.syncLootAura(loot)
-  }
-
-  private setLootAttractionStyle(loot: LootEntity, isAttracting: boolean): void {
-    if (loot.isAttracting === isAttracting) {
-      return
-    }
-
-    loot.isAttracting = isAttracting
-    const itemColor = ITEM_DEFINITIONS[loot.itemId].color
-
-    if (isAttracting) {
-      loot.sprite.setScale(1.18)
-      loot.sprite.setTint(0xffffff)
-      loot.aura.setStrokeStyle(3, 0xffffff, 0.95)
-      return
-    }
-
-    loot.sprite.setScale(1.08)
-    loot.sprite.clearTint()
-    loot.aura.setStrokeStyle(2, itemColor, 0.78)
-  }
 
   private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number): void {
     this.setHealthPickupAttractionStyle(pickup, true)
@@ -1206,11 +1197,6 @@ export class ArenaScene extends Phaser.Scene {
     pickup.aura.setStrokeStyle(2, HEART_PICKUP_COLOR, 0.82)
   }
 
-  private syncLootAura(loot: LootEntity): void {
-    if (loot.aura.active) {
-      loot.aura.setPosition(loot.sprite.x, loot.sprite.y)
-    }
-  }
 
   private syncHealthPickupAura(pickup: HealthPickupEntity): void {
     if (pickup.aura.active) {
@@ -1218,17 +1204,6 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private destroyLootDrop(loot: LootEntity): void {
-    loot.auraTween.stop()
-
-    if (loot.aura.active) {
-      loot.aura.destroy()
-    }
-
-    if (loot.sprite.active) {
-      loot.sprite.destroy()
-    }
-  }
 
   private collectHeartPickup(pickup: HealthPickupEntity): void {
     const previousHealth = this.playerHealth
@@ -1257,34 +1232,145 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private spawnLootDrop(x: number, y: number, itemId: LootId): void {
-    const itemDefinition = ITEM_DEFINITIONS[itemId]
-    const aura = this.add.circle(x, y, 16, itemDefinition.color, 0.18)
-    aura.setStrokeStyle(2, itemDefinition.color, 0.78)
+  private updatePachinkoTokenPickups(delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    for (const pickup of this.pachinkoTokenPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyPachinkoTokenPickup(pickup)
+        continue
+      }
+
+      const distance = Phaser.Math.Distance.Between(
+        pickup.sprite.x,
+        pickup.sprite.y,
+        this.player.x,
+        this.player.y,
+      )
+      const pickupPhase = getLootPickupPhase(distance)
+
+      if (pickupPhase === 'collect') {
+        this.collectPachinkoTokenPickup(pickup)
+        continue
+      }
+
+      if (pickupPhase === 'attract') {
+        this.applyPachinkoTokenAttraction(pickup, distance, delta)
+        continue
+      }
+
+      this.setPachinkoTokenAttractionStyle(pickup, false)
+      this.syncPachinkoTokenAura(pickup)
+    }
+  }
+
+  private applyPachinkoTokenAttraction(
+    pickup: PachinkoTokenPickupEntity,
+    distance: number,
+    delta: number,
+  ): void {
+    this.setPachinkoTokenAttractionStyle(pickup, true)
+
+    const attractionStep = getLootAttractionStep(distance, delta)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    if (distance <= 0 || travelDistance <= 0) {
+      this.syncPachinkoTokenAura(pickup)
+      return
+    }
+
+    const travelRatio = travelDistance / distance
+    pickup.sprite.setPosition(
+      pickup.sprite.x + (this.player.x - pickup.sprite.x) * travelRatio,
+      pickup.sprite.y + (this.player.y - pickup.sprite.y) * travelRatio,
+    )
+    this.syncPachinkoTokenAura(pickup)
+  }
+
+  private setPachinkoTokenAttractionStyle(pickup: PachinkoTokenPickupEntity, isAttracting: boolean): void {
+    if (pickup.isAttracting === isAttracting) {
+      return
+    }
+
+    pickup.isAttracting = isAttracting
+
+    if (isAttracting) {
+      pickup.sprite.setScale(0.95)
+      pickup.sprite.setTint(0xffffff)
+      pickup.aura.setStrokeStyle(3, 0xffffff, 0.92)
+      return
+    }
+
+    pickup.sprite.setScale(0.74)
+    pickup.sprite.setTint(PACHINKO_TOKEN_COLOR)
+    pickup.aura.setStrokeStyle(2, PACHINKO_TOKEN_COLOR, 0.82)
+  }
+
+  private syncPachinkoTokenAura(pickup: PachinkoTokenPickupEntity): void {
+    if (pickup.aura.active) {
+      pickup.aura.setPosition(pickup.sprite.x, pickup.sprite.y)
+    }
+  }
+
+  private collectPachinkoTokenPickup(pickup: PachinkoTokenPickupEntity): void {
+    this.enqueuePachinkoToken(pickup.enemyId)
+    this.destroyPachinkoTokenPickup(pickup)
+  }
+
+  private destroyPachinkoTokenPickup(pickup: PachinkoTokenPickupEntity): void {
+    pickup.auraTween.stop()
+
+    if (pickup.aura.active) {
+      pickup.aura.destroy()
+    }
+
+    if (pickup.sprite.active) {
+      pickup.sprite.destroy()
+    }
+  }
+
+  private spawnPachinkoTokenPickup(
+    x: number,
+    y: number,
+    enemyId: EnemyDefinition['id'],
+  ): void {
+    const tokenXp = getTokenXpForEnemy(enemyId)
+    if (tokenXp <= 0) {
+      return
+    }
+
+    const aura = this.add.circle(x, y, 16, PACHINKO_TOKEN_COLOR, 0.18)
+    aura.setStrokeStyle(2, PACHINKO_TOKEN_COLOR, 0.82)
     aura.setBlendMode(Phaser.BlendModes.ADD)
     aura.setDepth(3)
     const auraTween = this.tweens.add({
       targets: aura,
-      scale: { from: 0.88, to: 1.18 },
-      alpha: { from: 0.48, to: 0.86 },
-      duration: 720,
+      scale: { from: 0.86, to: 1.26 },
+      alpha: { from: 0.48, to: 0.88 },
+      duration: 620,
       ease: 'Sine.easeInOut',
       yoyo: true,
       repeat: -1,
     })
 
-    const loot = this.physics.add.image(x, y, itemDefinition.textureKey)
-    loot.setCircle(10)
-    loot.setDepth(4)
-    loot.setScale(1.08)
-    this.lootDrops.push({
-      sprite: loot,
-      itemId,
+    const sprite = this.physics.add.image(x, y, 'tuning-capsule')
+    sprite.setCircle(9)
+    sprite.setDepth(4)
+    sprite.setScale(0.74)
+    sprite.setTint(PACHINKO_TOKEN_COLOR)
+    sprite.setVelocity(Phaser.Math.Between(-42, 42), Phaser.Math.Between(-34, 18))
+    sprite.setDrag(420, 420)
+
+    this.pachinkoTokenPickups.push({
+      sprite,
       aura,
       auraTween,
+      enemyId,
       isAttracting: false,
     })
   }
+
 
   private spawnHeartPickup(): void {
     const spawn = selectHeartItemSpawnPoint(this.mapLayout.heartItemSpawns, Math.random)
@@ -1387,18 +1473,21 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.enemies = this.enemies.filter((enemy) => enemy.sprite.active)
-    for (const loot of this.lootDrops) {
-      if (!loot.sprite.active) {
-        this.destroyLootDrop(loot)
-      }
-    }
-    this.lootDrops = this.lootDrops.filter((loot) => loot.sprite.active)
+
     for (const pickup of this.healthPickups) {
       if (!pickup.sprite.active) {
         this.destroyHealthPickup(pickup)
       }
     }
     this.healthPickups = this.healthPickups.filter((pickup) => pickup.sprite.active)
+
+    for (const pickup of this.pachinkoTokenPickups) {
+      if (!pickup.sprite.active) {
+        this.destroyPachinkoTokenPickup(pickup)
+      }
+    }
+    this.pachinkoTokenPickups = this.pachinkoTokenPickups.filter((pickup) => pickup.sprite.active)
+
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
     this.enemyProjectiles = this.enemyProjectiles.filter((projectile) => projectile.sprite.active)
     this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
@@ -1496,14 +1585,12 @@ export class ArenaScene extends Phaser.Scene {
       return true
     }
 
-    if (enemy.config.drops) {
-      const droppedItem = resolveWeightedDrop(enemy.config.drops)
-      if (droppedItem) {
-        this.spawnLootDrop(enemy.sprite.x, enemy.sprite.y, droppedItem)
-      }
-    }
-
     const defeatOutcome = getDefeatedEnemyRunOutcome(enemy.config.id)
+    const didDropPachinkoToken = defeatOutcome === 'continue' && shouldEnemyGrantPachinkoToken(enemy.config.id)
+    if (didDropPachinkoToken) {
+      this.spawnPachinkoTokenPickup(enemy.sprite.x, enemy.sprite.y, enemy.config.id)
+      this.statusMessage = `${enemy.config.name} 처치. 토큰이 떨어졌습니다. 캐릭터로 먹으면 파친코에 투입됩니다.`
+    }
     if (enemy.telegraph?.visual.active) {
       enemy.telegraph.visual.destroy()
       enemy.telegraph = undefined
@@ -1521,7 +1608,9 @@ export class ArenaScene extends Phaser.Scene {
       return true
     }
 
-    this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
+    if (!didDropPachinkoToken) {
+      this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
+    }
     return true
   }
 
@@ -1644,22 +1733,12 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     setSpawnLoopPaused(this.spawnTimer, shouldPause)
-    this.setLootPulsePaused(shouldPause)
     this.setHealthPickupPulsePaused(shouldPause)
+    this.setPachinkoTokenPulsePaused(shouldPause)
 
     this.freezeCombat(shouldPause)
   }
 
-  private setLootPulsePaused(shouldPause: boolean): void {
-    for (const loot of this.lootDrops) {
-      if (shouldPause) {
-        loot.auraTween.pause()
-        continue
-      }
-
-      loot.auraTween.resume()
-    }
-  }
 
   private setHealthPickupPulsePaused(shouldPause: boolean): void {
     for (const pickup of this.healthPickups) {
@@ -1672,74 +1751,67 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private handleRecipeSelection(recipeId: RecipeId): void {
+  private setPachinkoTokenPulsePaused(shouldPause: boolean): void {
+    for (const pickup of this.pachinkoTokenPickups) {
+      if (shouldPause) {
+        pickup.auraTween.pause()
+        continue
+      }
+
+      pickup.auraTween.resume()
+    }
+  }
+
+
+  private handleWeaponEquip(weaponKey: WeaponStackKey): void {
     if (!this.isInventoryOpen) {
       return
     }
 
-    const result = applyRecipeSelectionWorkflow({
-      inventory: this.inventory,
-      ownedWeaponIds: this.ownedWeaponIds,
-    }, recipeId)
-
-    if (result.kind !== 'success') {
-      this.statusMessage = result.statusMessage
+    const nextWeaponKey = equipWeaponStack(this.weaponStacks, this.activeWeaponKey, weaponKey)
+    if (nextWeaponKey === this.activeWeaponKey) {
+      const weaponId = getWeaponIdFromStackKey(weaponKey)
+      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name}은 이미 장착 중이거나 보유하지 않았습니다.`
       this.updateHud()
       return
     }
 
-    this.inventory = result.nextInventory
-    this.ownedWeaponIds = result.ownedWeaponIds
-    this.activeWeaponId = result.activeWeaponId
-    this.statusMessage = result.statusMessage
+    this.activeWeaponKey = nextWeaponKey
+    this.statusMessage = `${this.getActiveWeaponLabel()} 장착 완료.`
     this.updateHud()
   }
 
-  private handleWeaponEquip(weaponId: WeaponId): void {
+  private handleWeaponFuse(weaponKey: WeaponStackKey): void {
     if (!this.isInventoryOpen) {
       return
     }
 
-    const nextWeaponId = equipOwnedWeapon(this.ownedWeaponIds, this.activeWeaponId, weaponId)
-    if (nextWeaponId === this.activeWeaponId) {
-      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name}은 이미 장착 중입니다.`
-      this.updateHud()
-      return
-    }
-
-    this.activeWeaponId = nextWeaponId
-    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} 장착 완료.`
-    this.updateHud()
-  }
-
-  private handleWeaponTune(weaponId: WeaponId): void {
-    if (!this.isInventoryOpen) {
-      return
-    }
-
-    const result = resolveTuningSelection({
-      inventory: this.inventory,
-      ownedWeaponIds: this.ownedWeaponIds,
-      tuningState: this.tuningState,
-    }, weaponId)
+    const result = fuseWeaponStack({
+      weaponStacks: this.weaponStacks,
+      activeWeaponKey: this.activeWeaponKey,
+    }, weaponKey)
 
     if (!result) {
-      const reason = getWeaponTuningBlockReason({
-        inventory: this.inventory,
-        ownedWeaponIds: this.ownedWeaponIds,
-        tuningState: this.tuningState,
-      }, weaponId)
-      this.statusMessage = reason ?? '지금은 해당 무기를 튜닝할 수 없습니다.'
+      this.statusMessage = '같은 무기와 같은 별 2개가 있어야 합성할 수 있습니다.'
       this.updateHud()
       return
     }
 
-    const effectLabel = getTuningEffectLabel(result.effectId) ?? result.effectId
-    this.inventory = result.nextInventory
-    this.tuningState = result.nextTuningState
-    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} 튜닝 완료: ${effectLabel}.`
+    this.weaponStacks = result.weaponStacks
+    this.activeWeaponKey = result.activeWeaponKey
+    this.statusMessage = `${WEAPON_DEFINITIONS[result.weaponId].name} ${'★'.repeat(result.resultStar)} 합성 완료.`
     this.updateHud()
   }
+
+  private handleWeaponTune(_weaponId: WeaponId): void {
+    if (!this.isInventoryOpen) {
+      return
+    }
+
+    this.statusMessage = '튜닝은 이번 파친코 별 등급 패스에서는 비활성화되었습니다.'
+    this.updateHud()
+  }
+
 
   private freezeCombat(shouldFreeze: boolean): void {
     if (this.enemySpacingCollider) {
@@ -1841,7 +1913,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private createPlayerHealthBar(): PlayerHealthBar {
-    const { x, y, width, height } = getPlayerHealthBarMetrics(GAME_WIDTH, GAME_HEIGHT)
+    const viewport = this.getViewportSize()
+    const { x, y, width, height } = getPlayerHealthBarMetrics(viewport.width, viewport.height)
     const depth = 30
 
     const background = this.add
@@ -1858,7 +1931,7 @@ export class ArenaScene extends Phaser.Scene {
       .setScrollFactor(0)
 
     const label = this.add
-      .text(GAME_WIDTH / 2, y - 1, '', {
+      .text(viewport.width / 2, y - 1, '', {
         color: '#f7fbff',
         fontFamily: 'Inter, system-ui, sans-serif',
         fontSize: '10px',
@@ -1935,10 +2008,6 @@ export class ArenaScene extends Phaser.Scene {
     this.physics.world.resume()
 
     const initialState = createInitialArenaRunState()
-    this.ownedWeaponIds = initialState.ownedWeaponIds
-    this.activeWeaponId = initialState.activeWeaponId
-    this.inventory = initialState.inventory
-    this.tuningState = initialState.tuningState
     this.isInventoryOpen = initialState.isInventoryOpen
     this.isCodexOpen = initialState.isCodexOpen
     this.isStageSelectOpen = false
@@ -1986,12 +2055,14 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
 
-    for (const loot of this.lootDrops) {
-      this.destroyLootDrop(loot)
-    }
+    this.destroyPachinkoBoard()
 
     for (const pickup of this.healthPickups) {
       this.destroyHealthPickup(pickup)
+    }
+
+    for (const pickup of this.pachinkoTokenPickups) {
+      this.destroyPachinkoTokenPickup(pickup)
     }
 
     for (const projectile of this.projectiles) {
@@ -2023,8 +2094,10 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.enemies = []
-    this.lootDrops = []
     this.healthPickups = []
+    this.pachinkoTokenPickups = []
+    this.pachinkoTokenQueue = []
+    this.pachinkoTokenInFlight = null
     this.projectiles = []
     this.enemyProjectiles = []
     this.hazardZones = []
@@ -2053,31 +2126,36 @@ export class ArenaScene extends Phaser.Scene {
   private createResultPayload(outcome: RunOutcome): RunResultPayload {
     return {
       outcome,
-      weaponName: WEAPON_DEFINITIONS[this.activeWeaponId].name,
+      weaponName: this.getActiveWeaponLabel(),
       wavesCleared: this.wavesCleared,
     }
   }
 
+  private getActivePachinkoTokenPickupCount(): number {
+    return this.pachinkoTokenPickups.filter((pickup) => pickup.sprite.active).length
+  }
+
   private updateHud(): void {
-    const weapon = deriveEffectiveWeaponStats(this.activeWeaponId, this.tuningState)
-    const actionableRecipes = getActionableRecipes(this.inventory, this.ownedWeaponIds)
-    const tuningText = weapon.tuningLabel ? ` · ${weapon.tuningLabel}` : ''
+    const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
+    const activeStack = this.weaponStacks.find((stack) => getStackKey(stack) === this.activeWeaponKey)
+    const activeStar = activeStack?.star ?? 1
+    const weapon = deriveEffectiveWeaponStats(weaponId, {}, activeStar)
 
     this.hud.update({
       title: 'NeoD',
       subtitle: this.activeWaveLabel || '슬라임 아레나 대기 중',
       stats: [
         `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
-        `무기: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
+        `무기: ${weapon.name} ${'★'.repeat(activeStar)} · ${getWeaponSummary(weapon)}`,
         `생존한 적: ${this.enemies.length}`,
         `남은 출현: ${this.remainingSpawns}`,
       ],
-      inventory: describeInventoryEntries(this.inventory),
-      recipes: describeAvailableRecipes(actionableRecipes),
+      inventory: [`파친코 보상 레벨 Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, `바닥 토큰 ${this.getActivePachinkoTokenPickupCount()}개 · 토큰 큐 ${this.pachinkoTokenQueue.length}개`],
+      recipes: this.getFusionSummaryLines(),
       objective: this.isBossActive
         ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
-        : '웨이브를 돌파하며 드롭을 모아 새로운 무기를 완성하세요.',
-      tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스 · 스테이지 선택 버튼',
+        : '웨이브를 돌파하며 토큰을 파친코에 넣고 무기 별 등급을 합성하세요.',
+      tip: 'WASD 이동 · J 대시/짧은 무적 · 자동 사격 · 떨어진 토큰을 먹으면 파친코 자동 투입 · 인벤토리에서 같은 별 합성 · Q 코덱스 · 스테이지 선택 버튼',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen || this.isStageSelectOpen,
@@ -2087,10 +2165,18 @@ export class ArenaScene extends Phaser.Scene {
         isOpen: this.isStageSelectOpen,
         stages: getStageSelectionViews(this.currentWaveIndex),
       },
+      pachinko: {
+        level: getPachinkoRewardLevel(this.pachinkoTokenXp),
+        totalTokenXp: this.pachinkoTokenXp,
+        droppedTokens: this.getActivePachinkoTokenPickupCount(),
+        queuedTokens: this.pachinkoTokenQueue.length,
+        isTokenInFlight: Boolean(this.pachinkoTokenInFlight),
+        latestReward: this.latestPachinkoReward,
+      },
       modal: {
         isOpen: this.isInventoryOpen,
-        items: this.getOwnedItemViews(),
-        recipes: this.getRecipeViews(actionableRecipes),
+        items: [],
+        recipes: [],
         weapons: this.getOwnedWeaponViews(),
       },
     })
@@ -2128,56 +2214,273 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private getOwnedItemViews(): HudOwnedItemView[] {
-    return (Object.entries(this.inventory) as [LootId, number][]).map(([itemId, count]) => ({
-      id: itemId,
-      name: ITEM_DEFINITIONS[itemId].name,
-      description: ITEM_DEFINITIONS[itemId].description,
-      count,
-    }))
-  }
-
-  private getRecipeViews(recipes: AvailableRecipe[]) {
-    return recipes.map(({ recipe, weapon }) => ({
-      id: recipe.id,
-      name: recipe.name,
-      identityLabel: recipe.identityLabel,
-      identityHint: recipe.identityHint,
-      outputWeaponId: recipe.outputWeaponId,
-      outputWeaponName: weapon.name,
-      damage: weapon.damage,
-      inputs: recipe.inputs.map((itemId) => ITEM_DEFINITIONS[itemId].name),
-      outputWeaponHudIconKey: weapon.visual.hudIconKey,
-      outputWeaponAccentColor: weapon.visual.accentColor,
-    }))
-  }
-
   private getOwnedWeaponViews(): HudOwnedWeaponView[] {
-    return this.ownedWeaponIds.map((weaponId) => {
-      const ownedWeapon = WEAPON_DEFINITIONS[weaponId]
-      const effectiveWeapon = deriveEffectiveWeaponStats(weaponId, this.tuningState)
-      const tuningBlockReason = getWeaponTuningBlockReason({
-        inventory: this.inventory,
-        ownedWeaponIds: this.ownedWeaponIds,
-        tuningState: this.tuningState,
-      }, weaponId)
+    return sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).map((stack) => {
+      const ownedWeapon = WEAPON_DEFINITIONS[stack.weaponId]
+      const effectiveWeapon = deriveEffectiveWeaponStats(stack.weaponId, {}, stack.star)
+      const stackKey = getStackKey(stack)
+      const canFuse = canFuseWeaponStack(this.weaponStacks, stackKey)
+      const fuseDisabledReason = stack.star >= 5
+        ? '5★가 최대 등급입니다.'
+        : '같은 무기와 같은 별 2개가 필요합니다.'
 
       return {
-        id: weaponId,
+        id: stack.weaponId,
+        stackKey,
         name: ownedWeapon.name,
         description: ownedWeapon.description,
+        star: stack.star,
+        count: stack.count,
         damage: effectiveWeapon.damage,
         fireRateMs: effectiveWeapon.fireRateMs,
         projectileSpeed: effectiveWeapon.projectileSpeed,
-        isEquipped: weaponId === this.activeWeaponId,
-        tuningLabel: effectiveWeapon.tuningLabel ?? null,
-        canTune: tuningBlockReason === null,
-        tuneDisabledReason: tuningBlockReason,
+        isEquipped: stackKey === this.activeWeaponKey,
+        tuningLabel: null,
+        canTune: false,
+        tuneDisabledReason: '튜닝은 이번 파친코 별 등급 패스에서는 비활성화되었습니다.',
+        canFuse,
+        fuseDisabledReason: canFuse ? null : fuseDisabledReason,
         hudIconKey: ownedWeapon.visual.hudIconKey,
         accentColor: ownedWeapon.visual.accentColor,
       }
     })
   }
+
+  private getFusionSummaryLines(): string[] {
+    const eligible = sortWeaponStacks(this.weaponStacks, this.activeWeaponKey).filter((stack) => canFuseWeaponStack(this.weaponStacks, getStackKey(stack)))
+    if (eligible.length === 0) {
+      return ['같은 무기와 같은 별 2개를 모으면 합성 가능']
+    }
+
+    return eligible.map((stack) => `${WEAPON_DEFINITIONS[stack.weaponId].name} ${'★'.repeat(stack.star)} 합성 가능`)
+  }
+
+  private getActiveWeaponLabel(): string {
+    const weaponId = getWeaponIdFromStackKey(this.activeWeaponKey)
+    const stack = this.weaponStacks.find((candidate) => getStackKey(candidate) === this.activeWeaponKey)
+    return `${WEAPON_DEFINITIONS[weaponId].name}${stack ? ` ${'★'.repeat(stack.star)}` : ''}`
+  }
+
+  private enqueuePachinkoToken(enemyId: EnemyDefinition['id']): void {
+    const nextProgress = applyEnemyPachinkoTokenProgress(
+      {
+        totalTokenXp: this.pachinkoTokenXp,
+        queuedTokenXp: this.pachinkoTokenQueue,
+      },
+      enemyId,
+    )
+    if (!nextProgress.didEnqueue) {
+      return
+    }
+
+    this.pachinkoTokenXp = nextProgress.totalTokenXp
+    this.pachinkoTokenQueue = nextProgress.queuedTokenXp
+    this.statusMessage = `파친코 토큰 획득: +${nextProgress.grantedTokenXp} XP · 보상 Lv.${nextProgress.rewardLevel}`
+    this.launchNextPachinkoToken()
+  }
+
+  private updatePachinko(): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    const rect = this.syncPachinkoBoard()
+    this.launchNextPachinkoToken()
+
+    const token = this.pachinkoTokenInFlight
+    if (!token?.sprite.active) {
+      return
+    }
+
+    if (token.sprite.x < rect.x + 8) {
+      token.sprite.setX(rect.x + 8)
+      token.sprite.setVelocityX(Math.abs(token.sprite.body?.velocity.x ?? 80))
+    } else if (token.sprite.x > rect.x + rect.width - 8) {
+      token.sprite.setX(rect.x + rect.width - 8)
+      token.sprite.setVelocityX(-Math.abs(token.sprite.body?.velocity.x ?? 80))
+    }
+
+    if (token.sprite.y >= rect.y + rect.height - 18) {
+      this.resolvePachinkoToken(token)
+    }
+  }
+
+  private launchNextPachinkoToken(): void {
+    if (this.pachinkoTokenInFlight || this.pachinkoTokenQueue.length === 0 || this.isInteractionBlocked()) {
+      return
+    }
+
+    this.pachinkoTokenQueue.shift()
+    const rect = this.syncPachinkoBoard()
+    const sprite = this.physics.add.image(
+      rect.x + rect.width / 2,
+      rect.y + 12,
+      'tuning-capsule',
+    )
+    sprite.setCircle(9)
+    sprite.setScale(0.8)
+    sprite.setTint(PACHINKO_TOKEN_COLOR)
+    sprite.setDepth(62)
+    sprite.setBounce(0.68, 0.52)
+    sprite.setVelocity(Phaser.Math.Between(-80, 80), 0)
+    sprite.setGravityY(360)
+    if (this.pachinkoPins) {
+      this.physics.add.collider(sprite, this.pachinkoPins)
+    }
+    this.pachinkoTokenInFlight = { sprite }
+  }
+
+  private resolvePachinkoToken(token: PachinkoTokenEntity): void {
+    const rect = this.syncPachinkoBoard()
+    const laneRatio = Phaser.Math.Clamp((token.sprite.x - rect.x) / rect.width, 0, 0.999)
+    const reward = resolvePachinkoLandingReward(this.pachinkoTokenXp, laneRatio)
+    this.weaponStacks = addWeaponStack(this.weaponStacks, reward.weaponId, reward.star, 1)
+    const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${'★'.repeat(reward.star)}`
+    this.latestPachinkoReward = rewardLabel
+    this.statusMessage = `파친코 보상 획득: ${rewardLabel}`
+    token.sprite.destroy()
+    this.pachinkoTokenInFlight = null
+    this.launchNextPachinkoToken()
+  }
+
+  private getPachinkoWorldRect(): RectBounds {
+    const viewport = this.getViewportSize()
+    const camera = this.cameras.main
+    const width = Math.min(PACHINKO_RECT.width, Math.max(156, viewport.width - 32))
+    const rightMargin = 20
+    const bottomMargin = 24
+    const minimapClearanceY = 132
+    const y = viewport.height >= 430 ? minimapClearanceY : 72
+    const height = Math.max(190, viewport.height - y - bottomMargin)
+    const screenX = Math.max(16, viewport.width - width - rightMargin)
+
+    return {
+      x: camera.worldView.x + screenX,
+      y: camera.worldView.y + y,
+      width,
+      height,
+    }
+  }
+
+  private syncPachinkoBoard(): RectBounds {
+    const rect = this.getPachinkoWorldRect()
+    const previousRect = this.pachinkoBoardRect
+    const inFlightSprite = this.pachinkoTokenInFlight?.sprite
+    if (previousRect && inFlightSprite?.active) {
+      const xRatio = previousRect.width > 0
+        ? Phaser.Math.Clamp((inFlightSprite.x - previousRect.x) / previousRect.width, 0, 1)
+        : 0.5
+      const yOffset = inFlightSprite.y - previousRect.y
+      inFlightSprite.setPosition(rect.x + rect.width * xRatio, rect.y + yOffset)
+    }
+
+    this.pachinkoBoardRect = rect
+
+    this.pachinkoBoardVisual
+      ?.setPosition(rect.x + rect.width / 2, rect.y + rect.height / 2)
+      .setDisplaySize(rect.width, rect.height)
+
+    this.pachinkoDividerVisual
+      ?.setPosition(rect.x - 12, rect.y + rect.height / 2)
+      .setDisplaySize(6, rect.height + 26)
+
+    this.pachinkoTitleVisual?.setPosition(rect.x + 12, rect.y + 10)
+
+    for (const pin of this.pachinkoPinEntities) {
+      if (!pin.sprite.active) {
+        continue
+      }
+      pin.sprite.setPosition(rect.x + rect.width * pin.xRatio, rect.y + rect.height * pin.yRatio)
+      pin.sprite.refreshBody()
+    }
+
+    for (const divider of this.pachinkoLaneDividers) {
+      if (!divider.visual.active) {
+        continue
+      }
+      divider.visual.setPosition(rect.x + rect.width * divider.xRatio, rect.y + rect.height - 30)
+    }
+
+    return rect
+  }
+
+  private createPachinkoBoard(): void {
+    const rect = this.getPachinkoWorldRect()
+    const board = this.add.rectangle(
+      rect.x + rect.width / 2,
+      rect.y + rect.height / 2,
+      rect.width,
+      rect.height,
+      0x101a32,
+      0.94,
+    )
+    board.setStrokeStyle(2, 0xffd866, 0.78)
+    board.setDepth(56)
+
+    const divider = this.add.rectangle(rect.x - 12, rect.y + rect.height / 2, 6, rect.height + 26, 0x050b14, 0.95)
+      .setStrokeStyle(1, 0x9bb5ff, 0.4)
+      .setDepth(57)
+    const title = this.add.text(rect.x + 12, rect.y + 10, 'TOKEN\nPACHINKO', {
+      color: '#ffd866',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: '11px',
+      fontStyle: '700',
+      align: 'left',
+    }).setDepth(63)
+    this.pachinkoBoardVisual = board
+    this.pachinkoDividerVisual = divider
+    this.pachinkoTitleVisual = title
+    this.pachinkoVisuals.push(board, divider, title)
+
+    this.pachinkoPins = this.physics.add.staticGroup()
+    for (let row = 0; row < 6; row += 1) {
+      const pinsInRow = row % 2 === 0 ? 4 : 5
+      for (let column = 0; column < pinsInRow; column += 1) {
+        const xRatio = (column + 1) / (pinsInRow + 1)
+        const yRatio = 0.18 + row * 0.11
+        const x = rect.x + rect.width * xRatio
+        const y = rect.y + rect.height * yRatio
+        const pin = this.pachinkoPins.create(x, y, 'starter-projectile') as PhysicsImage
+        pin.setCircle(5)
+        pin.setScale(0.55)
+        pin.setTint(0x9bb5ff)
+        pin.setDepth(60)
+        pin.refreshBody()
+        this.pachinkoPinEntities.push({ sprite: pin, xRatio, yRatio })
+      }
+    }
+
+    for (let lane = 1; lane < 5; lane += 1) {
+      const xRatio = lane / 5
+      const laneDivider = this.add.rectangle(rect.x + rect.width * xRatio, rect.y + rect.height - 30, 2, 42, 0x9bb5ff, 0.55)
+        .setDepth(59)
+      this.pachinkoLaneDividers.push({ visual: laneDivider, xRatio })
+      this.pachinkoVisuals.push(laneDivider)
+    }
+    this.syncPachinkoBoard()
+  }
+
+  private destroyPachinkoBoard(): void {
+    if (this.pachinkoTokenInFlight?.sprite.active) {
+      this.pachinkoTokenInFlight.sprite.destroy()
+    }
+    this.pachinkoPins?.clear(true, true)
+    this.pachinkoPins = undefined
+    this.pachinkoPinEntities = []
+    this.pachinkoLaneDividers = []
+    for (const visual of this.pachinkoVisuals) {
+      if (visual.active) {
+        visual.destroy()
+      }
+    }
+    this.pachinkoVisuals = []
+    this.pachinkoBoardVisual = undefined
+    this.pachinkoDividerVisual = undefined
+    this.pachinkoTitleVisual = undefined
+    this.pachinkoBoardRect = null
+    this.pachinkoTokenInFlight = null
+  }
+
 
   private spawnProjectile(projectileSpec: ProjectileSpawnSpec, textureKey: string): void {
     const projectile = this.physics.add.image(this.player.x, this.player.y, textureKey)

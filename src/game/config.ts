@@ -9,9 +9,12 @@ export const GAME_HEIGHT = 540
 export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   return {
     type: Phaser.AUTO,
-    parent,
-    width: GAME_WIDTH,
-    height: GAME_HEIGHT,
+    scale: {
+      parent,
+      mode: Phaser.Scale.RESIZE,
+      width: GAME_WIDTH,
+      height: GAME_HEIGHT,
+    },
     backgroundColor: '#0a1220',
     physics: {
       default: 'arcade',

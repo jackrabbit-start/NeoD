@@ -4,7 +4,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   slime: {
     id: 'slime',
     name: '진흙 슬라임',
-    description: '초반 조합에 필요한 핵심 재료를 떨어뜨리는 기본 슬라임입니다.',
+    description: '초반 보상 레벨을 올리는 기본 파친코 토큰 공급 슬라임입니다.',
     maxHealth: 30,
     speed: 84,
     contactDamage: 18,
@@ -36,7 +36,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   'spark-slime': {
     id: 'spark-slime',
     name: '볼트 슬라임',
-    description: '새로운 아크 조합 재료를 품고 있는 밝은 변종 슬라임입니다.',
+    description: '조금 더 많은 보상 경험치를 주는 밝은 변종 슬라임입니다.',
     maxHealth: 40,
     speed: 92,
     contactDamage: 20,
@@ -78,7 +78,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   'prism-slime': {
     id: 'prism-slime',
     name: '프리즘 슬라임',
-    description: '쓰러뜨리면 튜닝 캡슐을 결정화하는 엘리트 슬라임입니다.',
+    description: '쓰러뜨리면 큰 보상 경험치를 주는 엘리트 슬라임입니다.',
     maxHealth: 110,
     speed: 82,
     contactDamage: 28,
@@ -97,7 +97,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     attackBehavior: {
       kind: 'contact',
     },
-    behaviorSummary: '빠르게 추적하며 튜닝 캡슐을 노리는 엘리트 압박 역할입니다.',
+    behaviorSummary: '빠르게 추적하며 큰 토큰 보상 경험치를 주는 엘리트 압박 역할입니다.',
     visual: {
       portraitKey: 'spark-slime',
     },
