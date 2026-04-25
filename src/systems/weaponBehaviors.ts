@@ -1,5 +1,4 @@
 import type {
-  WeaponAttributeDefinition,
   WeaponBoomerangDefinition,
   WeaponBurstFireBehavior,
   WeaponChainBehavior,
@@ -40,7 +39,6 @@ export interface HazardSpawnSpec {
   tickEveryMs: number
   damage: number
   tint: number
-  attribute?: WeaponAttributeDefinition
   mode?: 'damage-zone' | 'trigger-trap'
   armingDelayMs?: number
   visualPowerTier?: number
@@ -63,7 +61,6 @@ export interface ImpactBurstSpec {
 
 export interface TurretDeploySpec extends WeaponTurretDefinition {
   tint: number
-  attribute?: WeaponAttributeDefinition
   visualPowerTier?: number
 }
 
@@ -79,7 +76,6 @@ export interface ProjectileSpawnSpec {
   maxTravelDistance: number
   maxHits: number
   knockback: WeaponKnockbackDefinition
-  attribute?: WeaponAttributeDefinition
   chain?: ChainSpec
   explosionOnHit?: HazardSpawnSpec
   explosionOnExpire?: HazardSpawnSpec
@@ -108,7 +104,6 @@ export interface MeleeSwingSpec {
   visualDurationMs: number
   maxTargets: number
   knockback: WeaponKnockbackDefinition
-  attribute?: WeaponAttributeDefinition
   execute?: WeaponExecuteDefinition
   healOnHit?: number
   visualPowerTier?: number
@@ -233,7 +228,6 @@ const createHazardSpec = (
   tickEveryMs: behavior.kind === 'zone-control' ? behavior.zoneTickMs : behavior.hazardTickMs,
   damage: behavior.kind === 'zone-control' ? behavior.zoneDamage : behavior.hazardDamage,
   tint: weapon.projectileTint,
-  attribute: weapon.attribute,
   mode: behavior.kind === 'zone-control' && behavior.zoneTriggerMode === 'trigger-explode'
     ? 'trigger-trap'
     : 'damage-zone',
@@ -253,15 +247,11 @@ const createBaseProjectile = (
   speed: weapon.projectileSpeed,
   damage: weapon.damage,
   tint: weapon.projectileTint,
-  radius: Math.max(
-    2,
-    Math.round((BASE_PROJECTILE_RADIUS + Math.max(0, weapon.visualPowerTier ?? 0)) * (weapon.projectileSizeMultiplier ?? 1)),
-  ),
+  radius: BASE_PROJECTILE_RADIUS + Math.max(0, weapon.visualPowerTier ?? 0),
   lifetimeMs,
   maxTravelDistance: getWeaponAttackRange(weapon),
   maxHits: 1,
   knockback: weapon.knockback,
-  attribute: weapon.attribute,
   visualPowerTier: weapon.visualPowerTier,
   ...overrides,
 })
@@ -311,6 +301,35 @@ const createSplitProjectiles = (
       speed,
       maxHits: behavior.maxHits ?? 1,
       execute: behavior.execute,
+    })
+  })
+}
+
+const createRicochetProjectiles = (
+  weapon: WeaponDefinition,
+  origin: Point,
+  direction: Point,
+  lifetimeMs: number,
+  ricochet: WeaponRicochetDefinition,
+  execute?: WeaponExecuteDefinition,
+  summonOnKill?: WeaponSummonOnKillDefinition,
+): ProjectileSpawnSpec[] => {
+  const projectileCount = Math.max(1, ricochet.projectileCount ?? 1)
+  const centerIndex = (projectileCount - 1) / 2
+  const spreadDegrees = ricochet.spreadDegrees ?? 0
+  const speedVariance = ricochet.speedVariance ?? 0
+
+  return Array.from({ length: projectileCount }, (_, index) => {
+    const offset = spreadDegrees > 0 ? (index - centerIndex) * spreadDegrees : 0
+    const rotatedDirection = normalize(rotate(direction, offset))
+    const varianceRatio = centerIndex === 0 ? 0 : (index - centerIndex) / Math.max(centerIndex, 1)
+    const speed = Math.max(1, Math.round(weapon.projectileSpeed * (1 + speedVariance * varianceRatio)))
+
+    return createBaseProjectile(weapon, origin, rotatedDirection, lifetimeMs, {
+      speed,
+      ricochet,
+      execute,
+      summonOnKill,
     })
   })
 }
@@ -461,7 +480,6 @@ const createDeployTurretProjectile = (
     speed: Math.max(1, Math.round(weapon.projectileSpeed * (behavior.speedMultiplier ?? 1))),
     deployTurret: {
       ...behavior.deploy,
-      attribute: weapon.attribute,
       tint: weapon.projectileTint,
       visualPowerTier: weapon.visualPowerTier,
     },
@@ -482,7 +500,6 @@ const createMeleeSwing = (
   visualDurationMs: behavior.visualDurationMs,
   maxTargets: behavior.maxTargets,
   knockback: weapon.knockback,
-  attribute: weapon.attribute,
   execute: behavior.execute,
   healOnHit: behavior.healOnHit,
   visualPowerTier: weapon.visualPowerTier,
@@ -510,7 +527,6 @@ const createComboMeleeSwings = (
       force: Math.max(1, Math.round(weapon.knockback.force * (step.knockbackMultiplier ?? 1))),
       durationMs: Math.max(40, Math.round(weapon.knockback.durationMs * (step.knockbackMultiplier ?? 1))),
     },
-    attribute: weapon.attribute,
     execute: step.execute,
     healOnHit: step.healOnHit,
     visualPowerTier: weapon.visualPowerTier,
@@ -538,15 +554,25 @@ export function buildAttackPlan(
     case 'single':
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: [
-          createBaseProjectile(weapon, origin, direction, weapon.attackBehavior.projectileLifetimeMs, {
-            distanceScaling: weapon.attackBehavior.distanceScaling,
-            execute: weapon.attackBehavior.execute,
-            boomerang: weapon.attackBehavior.boomerang,
-            ricochet: weapon.attackBehavior.ricochet,
-            summonOnKill: weapon.attackBehavior.summonOnKill,
-          }),
-        ],
+        projectiles: weapon.attackBehavior.ricochet
+          ? createRicochetProjectiles(
+              weapon,
+              origin,
+              direction,
+              weapon.attackBehavior.projectileLifetimeMs,
+              weapon.attackBehavior.ricochet,
+              weapon.attackBehavior.execute,
+              weapon.attackBehavior.summonOnKill,
+            )
+          : [
+              createBaseProjectile(weapon, origin, direction, weapon.attackBehavior.projectileLifetimeMs, {
+                distanceScaling: weapon.attackBehavior.distanceScaling,
+                execute: weapon.attackBehavior.execute,
+                boomerang: weapon.attackBehavior.boomerang,
+                ricochet: weapon.attackBehavior.ricochet,
+                summonOnKill: weapon.attackBehavior.summonOnKill,
+              }),
+            ],
         meleeSwings: [],
       }
     case 'spray-hazard':
@@ -821,52 +847,49 @@ export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponS
 
 export function getWeaponSummary(weapon: WeaponDefinition): string {
   const range = getWeaponAttackRange(weapon)
-  const attributeSummary = weapon.attribute
-    ? ` · ${weapon.attribute.elementLabel} · ${weapon.attribute.traitLabel}${weapon.attribute.statusEffect ? ` · ${weapon.attribute.statusEffect.label}` : ''}`
-    : ''
 
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
-    return `피해 ${weapon.damage} · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+    return `피해 ${weapon.damage} · 공 ${weapon.attackBehavior.ricochet.projectileCount ?? 1}개 · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
   }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.summonOnKill) {
-    return `피해 ${weapon.damage} · 처치 시 아군화 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+    return `피해 ${weapon.damage} · 처치 시 아군화 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
   }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
-    return `피해 ${weapon.damage} · 귀환 재타격 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+    return `피해 ${weapon.damage} · 귀환 재타격 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
   }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.distanceScaling) {
-    return `피해 ${weapon.damage} · 멀수록 증폭 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+    return `피해 ${weapon.damage} · 멀수록 증폭 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
   }
 
   switch (weapon.attackBehavior.kind) {
     case 'single':
-      return `피해 ${weapon.damage} · 단발 견제 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `피해 ${weapon.damage} · 단발 견제 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'split-shot':
-      return `${weapon.attackBehavior.execute ? '마무리' : '갈래당'} ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.projectileCount}갈래 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `${weapon.attackBehavior.execute ? '마무리' : '갈래당'} ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.projectileCount}갈래 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'burst-fire':
-      return `탄당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.shotsPerBurst}박자 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `탄당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.shotsPerBurst}박자 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'spray-hazard':
-      return `피해 ${weapon.damage} · ${weapon.attackBehavior.execute ? '빈사 처형' : '장판 압박'} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.execute ? '빈사 처형' : '장판 압박'} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'volley':
-      return `피해 ${weapon.damage} · ${weapon.attackBehavior.projectileCount}연발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.projectileCount}연발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'pierce':
-      return `피해 ${weapon.damage} · 관통 ${weapon.attackBehavior.maxHits}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `피해 ${weapon.damage} · 관통 ${weapon.attackBehavior.maxHits}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'chain':
-      return `피해 ${weapon.damage} · 연쇄 ${weapon.attackBehavior.maxChains}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `피해 ${weapon.damage} · 연쇄 ${weapon.attackBehavior.maxChains}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'impact-burst':
-      return `피해 ${weapon.damage} · 착탄 폭발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `피해 ${weapon.damage} · 착탄 폭발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'impact-aoe':
-      return `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.explosionDamage} · 반경 ${weapon.attackBehavior.explosionRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.explosionDamage} · 반경 ${weapon.attackBehavior.explosionRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'zone-control':
       return weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
-        ? `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.zoneDamage} · 함정 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
-        : `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+        ? `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.zoneDamage} · 함정 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+        : `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'deploy-turret':
-      return `배치 ${weapon.attackBehavior.deploy.maxTurrets}기 · 포탑당 ${weapon.attackBehavior.deploy.projectileDamage} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `배치 ${weapon.attackBehavior.deploy.maxTurrets}기 · 포탑당 ${weapon.attackBehavior.deploy.projectileDamage} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'melee-cleave':
-      return `피해 ${weapon.damage} · ${weapon.attackBehavior.healOnHit ? `흡혈 ${weapon.attackBehavior.healOnHit}` : weapon.attackBehavior.execute ? '빈사 수확' : `전방 ${weapon.attackBehavior.arcDegrees}°`} · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.healOnHit ? `흡혈 ${weapon.attackBehavior.healOnHit}` : weapon.attackBehavior.execute ? '빈사 수확' : `전방 ${weapon.attackBehavior.arcDegrees}°`} · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
     case 'combo-melee':
-      return `탄당 ${weapon.damage} · ${weapon.attackBehavior.steps.length}연 콤보 · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+      return `탄당 ${weapon.damage} · ${weapon.attackBehavior.steps.length}연 콤보 · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponSummary')
   }
@@ -876,7 +899,7 @@ export function getWeaponAttackContract(weapon: WeaponDefinition): WeaponAttackC
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
     return {
       family: 'ricochet-single',
-      geometry: `bounce:${weapon.attackBehavior.ricochet.maxBounces}:range:${weapon.attackBehavior.ricochet.bounceRange}`,
+      geometry: `bounce:${weapon.attackBehavior.ricochet.maxBounces}:count:${weapon.attackBehavior.ricochet.projectileCount ?? 1}:range:${weapon.attackBehavior.ricochet.bounceRange}`,
       cadence: `cooldown:${weapon.fireRateMs}`,
       followUp: 'target-hop',
     }

@@ -97,6 +97,9 @@ export interface WeaponRicochetDefinition {
   bounceRange: number
   damageMultiplierPerBounce?: number
   speedMultiplierPerBounce?: number
+  projectileCount?: number
+  spreadDegrees?: number
+  speedVariance?: number
 }
 
 export interface WeaponSummonOnKillDefinition {
