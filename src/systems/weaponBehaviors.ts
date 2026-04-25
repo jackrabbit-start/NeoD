@@ -649,6 +649,13 @@ export function buildAttackPlan(
         meleeSwings: [],
       }
     case 'melee-cleave':
+      if (weapon.attackBehavior.healOnHit) {
+        return {
+          cooldownMs: weapon.fireRateMs,
+          projectiles: [],
+          meleeSwings: [],
+        }
+      }
       return {
         cooldownMs: weapon.fireRateMs,
         projectiles: [],

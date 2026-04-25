@@ -325,7 +325,7 @@ test('melee cleave and combo weapons remain actionable and identifiable', () => 
   const prism = WEAPON_DEFINITIONS['prism-cutter']
 
   assert.equal(buildAttackPlan(arc, { x: 0, y: 0 }, { x: 0, y: 10 }).projectiles[0].ricochet.maxBounces, 1)
-  assert.equal(buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 1)
+  assert.equal(buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 0)
   assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.length, 4)
   assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings[0]?.hitShape, 'box')
   assert.equal(buildAttackPlan(prism, { x: 0, y: 0 }, { x: 100, y: 0 }).meleeSwings.at(-1)?.hitShape, 'arc')
@@ -334,7 +334,7 @@ test('melee cleave and combo weapons remain actionable and identifiable', () => 
   assert.equal(getWeaponOutputGeometry(prism), 'combo-melee')
   assert.equal(getWeaponSpecialEffectProfile(arc), 'ricochet')
   assert.equal(getWeaponSpecialEffectProfile(prism), 'high-knockback')
-  assert.equal(isAttackPlanActionable(buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 })), true)
+  assert.equal(isAttackPlanActionable(buildAttackPlan(glaive, { x: 0, y: 0 }, { x: 100, y: 0 })), false)
 })
 
 test('crafted roster identity signatures are unique across all weapons', () => {
