@@ -77,16 +77,6 @@ export class StartScene extends Phaser.Scene {
       .setShadow(0, 3, '#020713', 8)
 
     this.add
-      .text(width / 2, Math.max(142, height * 0.34), '시작 전에는 시간이 흐르지 않고 적도 등장하지 않습니다.\n준비되면 새 런을 시작하세요.', {
-        fontSize: '22px',
-        color: '#d8e2ff',
-        align: 'center',
-        lineSpacing: 8,
-        wordWrap: { width: textWidth },
-      })
-      .setOrigin(0.5)
-
-    this.add
       .text(width / 2, Math.max(228, height * 0.5), '파친코 도박에 빠진 김동성은 매번 ‘이번 한 번만’이라는 말로 자기 삶을 잃어 갔습니다.\n쌓인 빚과 추격을 피해 들어온 이 경기장은, 중독에서 벗어나기 위한 마지막 탈출구입니다.\n토큰을 삼키는 대신 무기로 바꾸고, 그는 오늘 처음으로 도망이 아닌 탈출을 선택합니다.', {
         fontSize: '17px',
         color: '#ffe28a',

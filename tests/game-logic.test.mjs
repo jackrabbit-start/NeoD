@@ -1545,7 +1545,7 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
 })
 
 test('game title and title control hints stay aligned with playable keyboard shortcuts', () => {
-  assert.equal(GAME_TITLE, '김동성에게 살아남기')
+  assert.equal(GAME_TITLE, '달려라 김동성!')
   assert.deepEqual([...GAME_HEADER_CONTROL_HINTS], ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'])
   assert.match(GAMEPLAY_CONTROL_TIP, /I 인벤토리/)
   assert.match(GAMEPLAY_CONTROL_TIP, /Q 코덱스/)
@@ -1690,6 +1690,7 @@ test('start screen gates arena entry behind an explicit button', () => {
   assert.ok(startSceneSource.includes('const startRun = (): void => {'))
   assert.ok(startSceneSource.includes("this.scene.stop('arena')"))
   assert.ok(startSceneSource.includes("this.scene.start('arena', { startElapsedMs: 0 })"))
+  assert.ok(!startSceneSource.includes('시작 전에는 시간이 흐르지 않고 적도 등장하지 않습니다.'))
   assert.ok(startSceneSource.includes('파친코 도박에 빠진 김동성'))
   assert.ok(startSceneSource.includes('중독에서 벗어나기 위한 마지막 탈출구'))
   assert.ok(startSceneSource.includes('this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScenePointerDown)'))

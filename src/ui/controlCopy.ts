@@ -1,4 +1,4 @@
-export const GAME_TITLE = '김동성에게 살아남기'
+export const GAME_TITLE = '달려라 김동성!'
 
 export const GAME_HEADER_CONTROL_HINTS = ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'] as const
 
