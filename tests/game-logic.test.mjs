@@ -28,6 +28,10 @@ import {
   getActionableRecipes,
   seedOwnedWeapons,
 } from '../.tmp-test/src/systems/weaponOwnership.js'
+import {
+  resolveAutoAttackShot,
+  resolveNearestAutoAttackTarget,
+} from '../.tmp-test/src/scenes/arena/autoAttack.js'
 import { getWaveByIndex, isBossWaveReady, shouldAdvanceWave } from '../.tmp-test/src/systems/waves.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
@@ -222,6 +226,123 @@ test('wave progression only advances when the current wave is fully cleared', ()
   assert.equal(shouldAdvanceWave(1, 0), false)
   assert.equal(shouldAdvanceWave(0, 2), false)
   assert.equal(shouldAdvanceWave(0, 0), true)
+})
+
+test('nearest auto-attack target returns null when no active enemies are available', () => {
+  assert.equal(resolveNearestAutoAttackTarget({ x: 10, y: 10 }, []), null)
+  assert.equal(
+    resolveNearestAutoAttackTarget(
+      { x: 10, y: 10 },
+      [
+        { x: 12, y: 12, isActive: false },
+        { x: 8, y: 8, isActive: false },
+      ],
+    ),
+    null,
+  )
+})
+
+test('nearest auto-attack target ignores inactive enemies and returns a normalized vector', () => {
+  const target = resolveNearestAutoAttackTarget(
+    { x: 0, y: 0 },
+    [
+      { x: 1, y: 0, isActive: false },
+      { x: 3, y: 4, isActive: true },
+      { x: 9, y: 0, isActive: true },
+    ],
+  )
+
+  assert.deepEqual(target && { x: target.x, y: target.y, distanceSq: target.distanceSq }, {
+    x: 3,
+    y: 4,
+    distanceSq: 25,
+  })
+  assert.equal(target?.directionX, 0.6)
+  assert.equal(target?.directionY, 0.8)
+})
+
+test('nearest auto-attack target re-evaluates to the closest enemy each call', () => {
+  const firstTarget = resolveNearestAutoAttackTarget(
+    { x: 0, y: 0 },
+    [
+      { x: 4, y: 0, isActive: true },
+      { x: 8, y: 0, isActive: true },
+    ],
+  )
+  const secondTarget = resolveNearestAutoAttackTarget(
+    { x: 7, y: 0 },
+    [
+      { x: 4, y: 0, isActive: true },
+      { x: 8, y: 0, isActive: true },
+    ],
+  )
+
+  assert.equal(firstTarget?.x, 4)
+  assert.equal(secondTarget?.x, 8)
+})
+
+test('nearest auto-attack target handles an overlapping enemy with a deterministic fallback direction', () => {
+  const target = resolveNearestAutoAttackTarget(
+    { x: 5, y: 5 },
+    [
+      { x: 5, y: 5, isActive: true },
+      { x: 8, y: 5, isActive: true },
+    ],
+  )
+
+  assert.deepEqual(target, {
+    x: 5,
+    y: 5,
+    directionX: 0,
+    directionY: -1,
+    distanceSq: 0,
+  })
+})
+
+test('auto-attack shot gating respects interaction pause, cooldown, and target availability', () => {
+  const origin = { x: 0, y: 0 }
+  const candidates = [{ x: 3, y: 4, isActive: true }]
+
+  assert.equal(
+    resolveAutoAttackShot(origin, candidates, {
+      isInteractionBlocked: true,
+      time: 1000,
+      nextFireAt: 0,
+    }),
+    null,
+  )
+  assert.equal(
+    resolveAutoAttackShot(origin, candidates, {
+      isInteractionBlocked: false,
+      time: 100,
+      nextFireAt: 200,
+    }),
+    null,
+  )
+
+  assert.deepEqual(
+    resolveAutoAttackShot(origin, [], {
+      isInteractionBlocked: false,
+      time: 1000,
+      nextFireAt: 0,
+    }),
+    null,
+  )
+
+  assert.deepEqual(
+    resolveAutoAttackShot(origin, candidates, {
+      isInteractionBlocked: false,
+      time: 1000,
+      nextFireAt: 200,
+    }),
+    {
+      x: 3,
+      y: 4,
+      directionX: 0.6,
+      directionY: 0.8,
+      distanceSq: 25,
+    },
+  )
 })
 
 test('boss trigger stays behind the final regular wave', () => {

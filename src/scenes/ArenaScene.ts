@@ -25,6 +25,7 @@ import {
   seedOwnedWeapons,
 } from '../systems/weaponOwnership.js'
 import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
+import { resolveAutoAttackShot } from './arena/autoAttack.js'
 import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
 import {
   applyLootPickup,
@@ -114,7 +115,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private statusMessage = 'Move with WASD, aim with the mouse, and click to fire.'
+  private statusMessage = 'Move with WASD while your weapon auto-targets the nearest enemy.'
 
   private lastPlayerHitAt = 0
 
@@ -241,21 +242,27 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleFiring(time: number): void {
-    if (this.isInteractionBlocked() || !this.input.activePointer.isDown || time < this.nextFireAt) {
-      return
-    }
-
     const weapon = WEAPON_DEFINITIONS[this.activeWeaponId]
-    const pointer = this.input.activePointer
-    const target = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY)
-    const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
-    const direction = target.subtract(origin)
+    const target = resolveAutoAttackShot(
+      {
+        x: this.player.x,
+        y: this.player.y,
+      },
+      this.enemies.map((enemy) => ({
+        x: enemy.sprite.x,
+        y: enemy.sprite.y,
+        isActive: enemy.sprite.active,
+      })),
+      {
+        isInteractionBlocked: this.isInteractionBlocked(),
+        time,
+        nextFireAt: this.nextFireAt,
+      },
+    )
 
-    if (direction.lengthSq() === 0) {
+    if (!target) {
       return
     }
-
-    direction.normalize()
 
     const projectile = this.physics.add.image(
       this.player.x,
@@ -263,10 +270,10 @@ export class ArenaScene extends Phaser.Scene {
       weapon.projectileTextureKey,
     )
     projectile.setCircle(PROJECTILE_COLLISION_RADIUS)
-    projectile.setRotation(direction.angle())
+    projectile.setRotation(Math.atan2(target.directionY, target.directionX))
     projectile.setVelocity(
-      direction.x * weapon.projectileSpeed,
-      direction.y * weapon.projectileSpeed,
+      target.directionX * weapon.projectileSpeed,
+      target.directionY * weapon.projectileSpeed,
     )
 
     const spinTween = this.tweens.add({
@@ -752,7 +759,7 @@ export class ArenaScene extends Phaser.Scene {
       inventory: [],
       recipes: [],
       objective: 'Press R on the result screen to restart.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to swap or combine · Q codex',
+      tip: 'WASD move · Auto-fire nearest enemy · Open inventory to swap or combine · Q codex',
       status: this.statusMessage,
       inventoryButtonLabel: 'Inventory unavailable',
       inventoryButtonDisabled: true,
@@ -791,7 +798,7 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isBossActive
         ? 'Defeat the Crown Slime to clear the run.'
         : 'Survive the waves, collect drops, and open inventory to combine upgrades.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to combine or swap weapons · Q codex',
+      tip: 'WASD move · Auto-fire nearest enemy · Open inventory to combine or swap weapons · Q codex',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? 'Resume run' : 'Open inventory',
       inventoryButtonDisabled: this.isCodexOpen,
