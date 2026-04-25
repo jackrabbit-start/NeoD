@@ -13,8 +13,14 @@ if (!app) {
 app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
-      <strong>NeoD · browser-first V1 prototype</strong>
-      <span>Safe fictional slime run · drop + combine loop</span>
+      <div class="game-header__brand">
+        <strong>NeoD · browser-first V1 prototype</strong>
+        <span>Safe fictional slime run · drop + combine loop</span>
+      </div>
+      <div class="game-header__rails" aria-hidden="true">
+        <span></span>
+        <span></span>
+      </div>
     </header>
     <section class="game-stage-shell">
       <section class="game-frame">
@@ -46,7 +52,7 @@ hud.update({
   inventory: ['Waiting for drops'],
   recipes: ['Waiting for recipe state'],
   objective: 'Start the run and defeat the slime boss.',
-  tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to combine · Q codex',
+  tip: 'WASD move · Auto-fire nearest enemy · Open inventory to combine · Q codex',
   status: 'Booting',
   inventoryButtonLabel: 'Open inventory',
   inventoryButtonDisabled: false,

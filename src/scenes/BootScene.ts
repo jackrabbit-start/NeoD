@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { IDLE_ANIMATIONS, VECTOR_ASSETS, type AnimationDefinition, type VectorAssetDefinition } from '../game/visualManifest.js'
 
 function generateCircleTexture(
   scene: Phaser.Scene,
@@ -18,22 +19,62 @@ function generateCircleTexture(
   graphics.destroy()
 }
 
+function queueSvgTexture(scene: Phaser.Scene, asset: VectorAssetDefinition): void {
+  if (scene.textures.exists(asset.key)) {
+    return
+  }
+
+  scene.load.svg(asset.key, asset.path, {
+    width: asset.width,
+    height: asset.height,
+  })
+}
+
+function ensureFallbackTexture(scene: Phaser.Scene, asset: VectorAssetDefinition): void {
+  if (!asset.fallback || scene.textures.exists(asset.key)) {
+    return
+  }
+
+  generateCircleTexture(scene, asset.key, asset.fallback.radius, asset.fallback.color)
+}
+
+function registerLoopingAnimation(scene: Phaser.Scene, definition: AnimationDefinition): void {
+  if (scene.anims.exists(definition.key)) {
+    return
+  }
+
+  const hasAllFrames = definition.frames.every((frameKey) => scene.textures.exists(frameKey))
+  if (!hasAllFrames) {
+    return
+  }
+
+  scene.anims.create({
+    key: definition.key,
+    frames: definition.frames.map((key) => ({ key })),
+    frameRate: definition.frameRate,
+    repeat: -1,
+  })
+}
+
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('boot')
   }
 
+  preload(): void {
+    for (const asset of VECTOR_ASSETS) {
+      queueSvgTexture(this, asset)
+    }
+  }
+
   create(): void {
-    generateCircleTexture(this, 'player', 14, 0x66d9ef)
-    generateCircleTexture(this, 'slime', 12, 0x84ff95)
-    generateCircleTexture(this, 'boss', 28, 0xd8a6ff)
-    generateCircleTexture(this, 'projectile', 5, 0xf8fafc)
-    generateCircleTexture(this, 'gel-shard', 7, 0x7dffb0)
-    generateCircleTexture(this, 'acid-core', 7, 0xb4ff5e)
-    generateCircleTexture(this, 'frost-mote', 7, 0x83d5ff)
-    generateCircleTexture(this, 'spark-knot', 7, 0xffd866)
-    generateCircleTexture(this, 'mist-bead', 7, 0xc4f1ff)
-    generateCircleTexture(this, 'tuning-capsule', 7, 0xff9df3)
+    for (const asset of VECTOR_ASSETS) {
+      ensureFallbackTexture(this, asset)
+    }
+
+    for (const animation of IDLE_ANIMATIONS) {
+      registerLoopingAnimation(this, animation)
+    }
 
     this.scene.start('arena')
   }

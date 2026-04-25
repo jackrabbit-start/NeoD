@@ -53,10 +53,10 @@ const renderEnemies = (enemies: CodexEnemyEntry[]) => `
             <p>${enemy.description}</p>
             <p class="codex-meta">${enemy.stats.join(' · ')}</p>
             <p class="codex-inline-list">
-              <span class="codex-label">Drops</span>
+              <span class="codex-label">드롭</span>
               ${enemy.drops.length > 0
                 ? enemy.drops.map((drop) => `${renderSwatch(drop.color)}${drop.name}`).join('')
-                : '<span>Boss-only finish target</span>'}
+                : '<span>보스 전용 종료 목표</span>'}
             </p>
           </article>
         `,
@@ -86,15 +86,15 @@ export class CodexController {
           <span class="codex-hint">${state.hint}</span>
         </header>
         <section class="codex-section">
-          <h3>Items</h3>
+          <h3>아이템</h3>
           ${renderItems(state.items)}
         </section>
         <section class="codex-section">
-          <h3>Recipes</h3>
+          <h3>조합식</h3>
           ${renderRecipes(state.recipes)}
         </section>
         <section class="codex-section">
-          <h3>Enemies</h3>
+          <h3>적</h3>
           ${renderEnemies(state.enemies)}
         </section>
       </div>

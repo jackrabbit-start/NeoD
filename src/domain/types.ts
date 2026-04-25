@@ -2,12 +2,56 @@ import type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
 export type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
+export type EnemyAnimationKey = 'slime-idle' | 'spark-slime-idle' | 'slime-boss-idle'
+
 export interface ItemDefinition {
   id: LootId
   name: string
   description: string
   color: number
+  textureKey: string
 }
+
+export interface WeaponVisualDefinition {
+  hudIconKey: string
+  accentColor: number
+}
+
+export interface WeaponSingleBehavior {
+  kind: 'single'
+  projectileLifetimeMs: number
+}
+
+export interface WeaponSprayHazardBehavior {
+  kind: 'spray-hazard'
+  projectileCount: number
+  spreadDegrees: number
+  projectileLifetimeMs: number
+  hazardRadius: number
+  hazardDurationMs: number
+  hazardTickMs: number
+  hazardDamage: number
+}
+
+export interface WeaponPierceBehavior {
+  kind: 'pierce'
+  projectileLifetimeMs: number
+  maxHits: number
+}
+
+export interface WeaponChainBehavior {
+  kind: 'chain'
+  projectileLifetimeMs: number
+  maxChains: number
+  chainRange: number
+  chainFalloff: number
+}
+
+export type WeaponAttackBehavior =
+  | WeaponSingleBehavior
+  | WeaponSprayHazardBehavior
+  | WeaponPierceBehavior
+  | WeaponChainBehavior
 
 export interface WeaponDefinition {
   id: WeaponId
@@ -17,6 +61,9 @@ export interface WeaponDefinition {
   fireRateMs: number
   projectileSpeed: number
   projectileTint: number
+  projectileTextureKey: string
+  attackBehavior: WeaponAttackBehavior
+  visual: WeaponVisualDefinition
 }
 
 export interface RecipeDefinition {
@@ -32,6 +79,10 @@ export interface WeightedDropEntry {
   weight: number
 }
 
+export interface EnemyVisualDefinition {
+  portraitKey?: string
+}
+
 export interface EnemyDefinition {
   id: EnemyId
   name: string
@@ -42,7 +93,9 @@ export interface EnemyDefinition {
   score: number
   tint: number
   size: number
-  textureKey: 'slime' | 'boss'
+  textureKey: string
+  animationKey: EnemyAnimationKey
+  visual?: EnemyVisualDefinition
   drops?: WeightedDropEntry[]
 }
 
@@ -76,6 +129,8 @@ export interface HudRecipeView {
   outputWeaponName: string
   damage: number
   inputs: string[]
+  outputWeaponHudIconKey?: string
+  outputWeaponAccentColor?: number
 }
 
 export interface HudOwnedWeaponView {
@@ -89,6 +144,8 @@ export interface HudOwnedWeaponView {
   tuningLabel: string | null
   canTune: boolean
   tuneDisabledReason: string | null
+  hudIconKey?: string
+  accentColor?: number
 }
 
 export interface HudModalState {

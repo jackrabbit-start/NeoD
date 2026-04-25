@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" role="img" aria-label="Tuning capsule">
+  <defs>
+    <linearGradient id="capsule" x1="2" y1="2" x2="12" y2="12" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffd6fb"/>
+      <stop offset="0.48" stop-color="#ff9df3"/>
+      <stop offset="1" stop-color="#8fe4ff"/>
+    </linearGradient>
+  </defs>
+  <circle cx="7" cy="7" r="6" fill="#1a1837" stroke="#f7c9ff" stroke-width="1.2"/>
+  <path d="M4.2 8.9 8.9 4.2a1.35 1.35 0 0 1 1.9 1.9L6.1 10.8a1.35 1.35 0 0 1-1.9-1.9Z" fill="url(#capsule)"/>
+  <path d="m6.3 6.8.9.9" stroke="#ffffff" stroke-width=".8" stroke-linecap="round"/>
+</svg>
