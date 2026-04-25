@@ -2,11 +2,19 @@ import type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
 export type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
+export type EnemyAnimationKey = 'slime-idle' | 'spark-slime-idle' | 'slime-boss-idle'
+
 export interface ItemDefinition {
   id: LootId
   name: string
   description: string
   color: number
+  textureKey: string
+}
+
+export interface WeaponVisualDefinition {
+  hudIconKey: string
+  accentColor: number
 }
 
 export interface WeaponSingleBehavior {
@@ -53,7 +61,9 @@ export interface WeaponDefinition {
   fireRateMs: number
   projectileSpeed: number
   projectileTint: number
+  projectileTextureKey: string
   attackBehavior: WeaponAttackBehavior
+  visual: WeaponVisualDefinition
 }
 
 export interface RecipeDefinition {
@@ -101,6 +111,10 @@ export interface EnemyTelegraphedAoeAttackBehavior {
 
 export type EnemyAttackBehavior = EnemyContactAttackBehavior | EnemyTelegraphedAoeAttackBehavior
 
+export interface EnemyVisualDefinition {
+  portraitKey?: string
+}
+
 export interface EnemyDefinition {
   id: EnemyId
   name: string
@@ -111,10 +125,12 @@ export interface EnemyDefinition {
   score: number
   tint: number
   size: number
-  textureKey: 'slime' | 'boss'
+  textureKey: string
+  animationKey: EnemyAnimationKey
   movementBehavior: EnemyMovementBehavior
   attackBehavior: EnemyAttackBehavior
   behaviorSummary: string
+  visual?: EnemyVisualDefinition
   drops?: WeightedDropEntry[]
 }
 
@@ -147,8 +163,9 @@ export interface HudRecipeView {
   outputWeaponId: WeaponId
   outputWeaponName: string
   damage: number
-  identity: string
   inputs: string[]
+  outputWeaponHudIconKey?: string
+  outputWeaponAccentColor?: number
 }
 
 export interface HudOwnedWeaponView {
@@ -156,8 +173,9 @@ export interface HudOwnedWeaponView {
   name: string
   description: string
   damage: number
-  identity: string
   isEquipped: boolean
+  hudIconKey?: string
+  accentColor?: number
 }
 
 export interface HudModalState {

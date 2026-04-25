@@ -12,31 +12,33 @@ import type {
   RecipeId,
   WeaponId,
 } from '../domain/types.js'
+import {
+  ENEMY_CONTACT_PADDING,
+  PLAYER_COLLISION_RADIUS,
+  PROJECTILE_HIT_PADDING,
+} from '../game/combatGeometry.js'
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { CodexController } from '../ui/Codex.js'
 import type { HudController } from '../ui/Hud.js'
 import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
-import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import {
   advanceEnemyCooldown,
   createEnemyTelegraph,
   getDistanceBetween,
   isPointInsideCircle,
   resolveEnemyVelocity,
-  selectAutoFireTarget,
   shouldEnemyStartTelegraph,
 } from '../systems/enemyBehaviors.js'
+import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import {
   advanceHazardState,
   applyProjectileHitState,
   buildAttackPlan,
   collectTargetsInRadius,
   getChainDamage,
-  getWeaponIdentityLabel,
   getWeaponSummary,
   isProjectileOutOfBounds,
-  shouldWeaponFire,
   selectChainTargets,
 } from '../systems/weaponBehaviors.js'
 import type { ChainSpec, HazardSpawnSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
@@ -46,6 +48,7 @@ import {
   seedOwnedWeapons,
 } from '../systems/weaponOwnership.js'
 import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
+import { resolveAutoAttackShot } from './arena/autoAttack.js'
 import { describeAvailableRecipes, describeInventoryEntries } from './arena/combineInventoryPresenter.js'
 import {
   applyLootPickup,
@@ -53,6 +56,7 @@ import {
 } from './arena/combineInventoryWorkflow.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
+type PhysicsSprite = Phaser.Physics.Arcade.Sprite
 
 interface EnemyHealthBar {
   background: Phaser.GameObjects.Rectangle
@@ -62,9 +66,19 @@ interface EnemyHealthBar {
   offsetY: number
 }
 
+interface EnemyTelegraph {
+  visual: Phaser.GameObjects.Arc
+  x: number
+  y: number
+  radius: number
+  damage: number
+  remainingMs: number
+  totalMs: number
+}
+
 interface EnemyEntity {
   runtimeId: number
-  sprite: PhysicsImage
+  sprite: PhysicsSprite
   config: EnemyDefinition
   currentHealth: number
   healthBar: EnemyHealthBar
@@ -103,22 +117,12 @@ interface HazardZoneEntity {
   tickCountdownMs: number
 }
 
-interface EnemyTelegraph {
-  visual: Phaser.GameObjects.Arc
-  x: number
-  y: number
-  radius: number
-  damage: number
-  remainingMs: number
-  totalMs: number
-}
-
 export class ArenaScene extends Phaser.Scene {
   private hud!: HudController
 
   private codex!: CodexController
 
-  private player!: PhysicsImage
+  private player!: PhysicsSprite
 
   private enemySprites!: Phaser.Physics.Arcade.Group
 
@@ -182,18 +186,10 @@ export class ArenaScene extends Phaser.Scene {
     this.hud = this.game.registry.get('hud') as HudController
     this.codex = this.game.registry.get('codex') as CodexController
     this.hud.setHandlers({
-      onInventoryToggle: () => {
-        this.toggleInventory()
-      },
-      onInventoryClose: () => {
-        this.closeInventory()
-      },
-      onRecipeSelect: (recipeId) => {
-        this.handleRecipeSelection(recipeId)
-      },
-      onWeaponEquip: (weaponId) => {
-        this.handleWeaponEquip(weaponId)
-      },
+      onInventoryToggle: () => this.toggleInventory(),
+      onInventoryClose: () => this.closeInventory(),
+      onRecipeSelect: (recipeId) => this.handleRecipeSelection(recipeId),
+      onWeaponEquip: (weaponId) => this.handleWeaponEquip(weaponId),
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
@@ -209,16 +205,10 @@ export class ArenaScene extends Phaser.Scene {
     )
     arena.setStrokeStyle(2, 0x214266, 0.9)
 
-    this.add
-      .text(40, GAME_HEIGHT - 36, 'Prototype goal: survive the slime waves and beat the boss', {
-        fontSize: '16px',
-        color: '#9bb5ff',
-      })
-      .setDepth(1)
-
-    this.player = this.physics.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'player')
-    this.player.setCircle(14)
+    this.player = this.physics.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'player')
+    this.player.setCircle(PLAYER_COLLISION_RADIUS)
     this.player.setCollideWorldBounds(true)
+    this.player.play('player-idle')
 
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
@@ -289,6 +279,7 @@ export class ArenaScene extends Phaser.Scene {
   private handlePlayerMovement(): void {
     if (this.isInteractionBlocked()) {
       this.player.setVelocity(0, 0)
+      this.setPlayerAnimation(false)
       return
     }
 
@@ -297,33 +288,38 @@ export class ArenaScene extends Phaser.Scene {
       Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
     )
 
-    if (velocity.lengthSq() > 0) {
+    const isMoving = velocity.lengthSq() > 0
+    if (isMoving) {
       velocity.normalize().scale(this.playerSpeed)
     }
 
     this.player.setVelocity(velocity.x, velocity.y)
+    this.setPlayerAnimation(isMoving)
   }
 
   private handleFiring(time: number): void {
-    const target = selectAutoFireTarget(
+    const weapon = WEAPON_DEFINITIONS[this.activeWeaponId]
+    const target = resolveAutoAttackShot(
       {
         x: this.player.x,
         y: this.player.y,
       },
-      this.enemies
-        .filter((enemy) => enemy.sprite.active)
-        .map((enemy) => ({
-          id: enemy.runtimeId,
-          x: enemy.sprite.x,
-          y: enemy.sprite.y,
-        })),
+      this.enemies.map((enemy) => ({
+        x: enemy.sprite.x,
+        y: enemy.sprite.y,
+        isActive: enemy.sprite.active,
+      })),
+      {
+        isInteractionBlocked: this.isInteractionBlocked(),
+        time,
+        nextFireAt: this.nextFireAt,
+      },
     )
 
-    if (!shouldWeaponFire(this.isInteractionBlocked(), Boolean(target), time, this.nextFireAt) || !target) {
+    if (!target) {
       return
     }
 
-    const weapon = WEAPON_DEFINITIONS[this.activeWeaponId]
     const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
     const attackPlan = buildAttackPlan(weapon, origin, new Phaser.Math.Vector2(target.x, target.y))
     if (attackPlan.projectiles.length === 0) {
@@ -331,10 +327,17 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const projectileSpec of attackPlan.projectiles) {
-      this.spawnProjectile(projectileSpec)
+      this.spawnProjectile(projectileSpec, weapon.projectileTextureKey)
     }
 
     this.nextFireAt = time + attackPlan.cooldownMs
+    this.tweens.add({
+      targets: this.player,
+      scaleX: 0.94,
+      scaleY: 1.06,
+      duration: 70,
+      yoyo: true,
+    })
   }
 
   private updateEnemies(delta: number): void {
@@ -361,14 +364,8 @@ export class ArenaScene extends Phaser.Scene {
         if (enemy.telegraph.remainingMs <= 0) {
           if (
             isPointInsideCircle(
-              {
-                x: this.player.x,
-                y: this.player.y,
-              },
-              {
-                x: enemy.telegraph.x,
-                y: enemy.telegraph.y,
-              },
+              { x: this.player.x, y: this.player.y },
+              { x: enemy.telegraph.x, y: enemy.telegraph.y },
               enemy.telegraph.radius,
             )
           ) {
@@ -388,14 +385,8 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       const distanceToPlayer = getDistanceBetween(
-        {
-          x: enemy.sprite.x,
-          y: enemy.sprite.y,
-        },
-        {
-          x: this.player.x,
-          y: this.player.y,
-        },
+        { x: enemy.sprite.x, y: enemy.sprite.y },
+        { x: this.player.x, y: this.player.y },
       )
 
       if (
@@ -406,14 +397,8 @@ export class ArenaScene extends Phaser.Scene {
         )
       ) {
         const telegraphSpec = createEnemyTelegraph(
-          {
-            x: enemy.sprite.x,
-            y: enemy.sprite.y,
-          },
-          {
-            x: this.player.x,
-            y: this.player.y,
-          },
+          { x: enemy.sprite.x, y: enemy.sprite.y },
+          { x: this.player.x, y: this.player.y },
           enemy.config.attackBehavior,
         )
 
@@ -422,6 +407,7 @@ export class ArenaScene extends Phaser.Scene {
             .circle(telegraphSpec.x, telegraphSpec.y, telegraphSpec.radius, telegraphSpec.tint, 0.25)
             .setStrokeStyle(2, telegraphSpec.tint, 0.9)
             .setDepth(0.5)
+
           enemy.telegraph = {
             visual,
             x: telegraphSpec.x,
@@ -438,22 +424,15 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       const velocity = resolveEnemyVelocity(
-        {
-          x: enemy.sprite.x,
-          y: enemy.sprite.y,
-        },
-        {
-          x: this.player.x,
-          y: this.player.y,
-        },
+        { x: enemy.sprite.x, y: enemy.sprite.y },
+        { x: this.player.x, y: this.player.y },
         enemy.config.speed,
         enemy.config.movementBehavior,
       )
       enemy.sprite.setVelocity(velocity.x, velocity.y)
+      enemy.sprite.play(enemy.config.animationKey, true)
 
-      const touchingPlayer =
-        distanceToPlayer < enemy.config.size / 2 + 16
-
+      const touchingPlayer = distanceToPlayer < enemy.config.size / 2 + ENEMY_CONTACT_PADDING
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
       }
@@ -480,10 +459,7 @@ export class ArenaScene extends Phaser.Scene {
 
       if (
         isProjectileOutOfBounds(
-          {
-            x: projectile.sprite.x,
-            y: projectile.sprite.y,
-          },
+          { x: projectile.sprite.x, y: projectile.sprite.y },
           GAME_WIDTH,
           GAME_HEIGHT,
         )
@@ -497,7 +473,7 @@ export class ArenaScene extends Phaser.Scene {
           continue
         }
 
-        const hitDistance = enemy.config.size / 2 + projectile.radius
+        const hitDistance = enemy.config.size / 2 + Math.max(projectile.radius, PROJECTILE_HIT_PADDING)
         if (
           Phaser.Math.Distance.Between(
             projectile.sprite.x,
@@ -520,7 +496,7 @@ export class ArenaScene extends Phaser.Scene {
           this.damageEnemy(enemy, projectile.damage)
 
           if (projectile.chain) {
-            this.applyChainDamage(enemy, projectile.chain, projectile.damage, projectile.tint)
+            this.applyChainDamage(enemy, projectile.chain, projectile.damage)
           }
 
           if (projectile.hazardOnHit) {
@@ -579,10 +555,7 @@ export class ArenaScene extends Phaser.Scene {
       for (let tickIndex = 0; tickIndex < hazardStep.ticks; tickIndex += 1) {
         const affectedEnemyIds = new Set(
           collectTargetsInRadius(
-            {
-              x: hazard.x,
-              y: hazard.y,
-            },
+            { x: hazard.x, y: hazard.y },
             hazard.radius,
             this.enemies
               .filter((enemy) => enemy.sprite.active)
@@ -694,11 +667,11 @@ export class ArenaScene extends Phaser.Scene {
           ? 48
           : GAME_HEIGHT - 48
 
-    const sprite = this.physics.add.image(x, y, config.textureKey)
-    sprite.setTint(config.tint)
+    const sprite = this.physics.add.sprite(x, y, config.textureKey)
     sprite.setCircle(config.size / 2)
     sprite.setCollideWorldBounds(true)
     sprite.setBounce(0)
+    sprite.play(config.animationKey)
     this.enemySprites.add(sprite)
 
     const enemy: EnemyEntity = {
@@ -740,7 +713,7 @@ export class ArenaScene extends Phaser.Scene {
       this.tweens.add({
         targets: enemy.sprite,
         scale: 1,
-        duration: 80,
+        duration: 100,
       })
       return
     }
@@ -748,7 +721,8 @@ export class ArenaScene extends Phaser.Scene {
     if (enemy.config.drops) {
       const droppedItem = resolveWeightedDrop(enemy.config.drops)
       if (droppedItem) {
-        const loot = this.physics.add.image(enemy.sprite.x, enemy.sprite.y, droppedItem)
+        const itemDefinition = ITEM_DEFINITIONS[droppedItem]
+        const loot = this.physics.add.image(enemy.sprite.x, enemy.sprite.y, itemDefinition.textureKey)
         loot.setCircle(7)
         this.lootDrops.push({
           sprite: loot,
@@ -782,10 +756,12 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayerHitAt = now
     this.playerHealth = Math.max(0, this.playerHealth - damage)
     this.statusMessage = `Player hit for ${damage}. Stay mobile.`
-    this.player.setTint(0xffa8a8)
-
-    this.time.delayedCall(120, () => {
-      this.player.clearTint()
+    this.player.setAlpha(0.55)
+    this.tweens.add({
+      targets: this.player,
+      alpha: 1,
+      duration: 130,
+      ease: 'Quad.Out',
     })
 
     if (this.playerHealth <= 0) {
@@ -828,8 +804,16 @@ export class ArenaScene extends Phaser.Scene {
     if (shouldPause) {
       this.player.setVelocity(0, 0)
       this.physics.world.pause()
+      this.player.anims.pause()
+      for (const enemy of this.enemies) {
+        enemy.sprite.anims.pause()
+      }
     } else {
       this.physics.world.resume()
+      this.player.anims.resume()
+      for (const enemy of this.enemies) {
+        enemy.sprite.anims.resume()
+      }
     }
 
     if (this.spawnTimer) {
@@ -893,7 +877,14 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private createEnemyHealthBar(sprite: PhysicsImage, config: EnemyDefinition): EnemyHealthBar {
+  private setPlayerAnimation(isMoving: boolean): void {
+    const targetKey = isMoving ? 'player-move' : 'player-idle'
+    if (this.player.anims.currentAnim?.key !== targetKey) {
+      this.player.play(targetKey)
+    }
+  }
+
+  private createEnemyHealthBar(sprite: PhysicsSprite, config: EnemyDefinition): EnemyHealthBar {
     const { width, height, offsetY } = getEnemyHealthBarMetrics(config.size)
 
     const background = this.add
@@ -923,11 +914,7 @@ export class ArenaScene extends Phaser.Scene {
     const { background, fill, width, height, offsetY } = enemy.healthBar
     const left = enemy.sprite.x - width / 2
     const y = enemy.sprite.y - offsetY
-    const fillWidth = getEnemyHealthFillWidth(
-      enemy.currentHealth,
-      enemy.config.maxHealth,
-      width,
-    )
+    const fillWidth = getEnemyHealthFillWidth(enemy.currentHealth, enemy.config.maxHealth, width)
 
     background.setPosition(left, y)
     fill.setPosition(left, y)
@@ -1033,8 +1020,9 @@ export class ArenaScene extends Phaser.Scene {
       outputWeaponId: recipe.outputWeaponId,
       outputWeaponName: weapon.name,
       damage: weapon.damage,
-      identity: getWeaponIdentityLabel(weapon),
       inputs: recipe.inputs.map((itemId) => ITEM_DEFINITIONS[itemId].name),
+      outputWeaponHudIconKey: weapon.visual.hudIconKey,
+      outputWeaponAccentColor: weapon.visual.accentColor,
     }))
   }
 
@@ -1047,16 +1035,18 @@ export class ArenaScene extends Phaser.Scene {
         name: ownedWeapon.name,
         description: ownedWeapon.description,
         damage: ownedWeapon.damage,
-        identity: getWeaponIdentityLabel(ownedWeapon),
         isEquipped: weaponId === this.activeWeaponId,
+        hudIconKey: ownedWeapon.visual.hudIconKey,
+        accentColor: ownedWeapon.visual.accentColor,
       }
     })
   }
 
-  private spawnProjectile(projectileSpec: ProjectileSpawnSpec): void {
-    const projectile = this.physics.add.image(this.player.x, this.player.y, 'projectile')
+  private spawnProjectile(projectileSpec: ProjectileSpawnSpec, textureKey: string): void {
+    const projectile = this.physics.add.image(this.player.x, this.player.y, textureKey)
     projectile.setTint(projectileSpec.tint)
     projectile.setCircle(projectileSpec.radius)
+    projectile.setRotation(Math.atan2(projectileSpec.direction.y, projectileSpec.direction.x))
     projectile.setVelocity(
       projectileSpec.direction.x * projectileSpec.speed,
       projectileSpec.direction.y * projectileSpec.speed,
@@ -1089,10 +1079,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnHazardZone(x: number, y: number, hazard: HazardSpawnSpec): void {
-    const visual = this.add
-      .circle(x, y, hazard.radius, hazard.tint, 0.3)
-      .setStrokeStyle(2, hazard.tint, 0.85)
-      .setDepth(0.5)
+    const visual = this.add.circle(x, y, hazard.radius, hazard.tint, 0.3).setDepth(0.4)
 
     this.hazardZones.push({
       visual,
@@ -1111,35 +1098,14 @@ export class ArenaScene extends Phaser.Scene {
     primaryEnemy: EnemyEntity,
     chain: ChainSpec,
     baseDamage: number,
-    tint: number,
   ): void {
-    const start = {
-      x: primaryEnemy.sprite.x,
-      y: primaryEnemy.sprite.y,
-    }
-    const nearbyTargetIds = new Set(
-      collectTargetsInRadius(
-        start,
-        chain.range,
-        this.enemies
-          .filter((enemy) => enemy.sprite.active && enemy.runtimeId !== primaryEnemy.runtimeId)
-          .map((enemy) => ({
-            id: enemy.runtimeId,
-            x: enemy.sprite.x,
-            y: enemy.sprite.y,
-            radius: enemy.config.size / 2,
-          })),
-      ),
-    )
-    const targetIds = selectChainTargets(
-      start,
+    const nearbyTargetIds = selectChainTargets(
+      {
+        x: primaryEnemy.sprite.x,
+        y: primaryEnemy.sprite.y,
+      },
       this.enemies
-        .filter(
-          (enemy) =>
-            enemy.sprite.active &&
-            enemy.runtimeId !== primaryEnemy.runtimeId &&
-            nearbyTargetIds.has(enemy.runtimeId),
-        )
+        .filter((enemy) => enemy.sprite.active && enemy.runtimeId !== primaryEnemy.runtimeId)
         .map((enemy) => ({
           id: enemy.runtimeId,
           x: enemy.sprite.x,
@@ -1149,33 +1115,13 @@ export class ArenaScene extends Phaser.Scene {
       chain.maxChains,
     )
 
-    let previous = start
-    targetIds.forEach((runtimeId, chainIndex) => {
+    nearbyTargetIds.forEach((runtimeId, chainIndex) => {
       const target = this.enemies.find((enemy) => enemy.runtimeId === runtimeId && enemy.sprite.active)
       if (!target) {
         return
       }
 
       this.damageEnemy(target, getChainDamage(baseDamage, chainIndex + 1, chain.falloff))
-      this.drawChainArc(previous.x, previous.y, target.sprite.x, target.sprite.y, tint)
-      previous = {
-        x: target.sprite.x,
-        y: target.sprite.y,
-      }
-    })
-  }
-
-  private drawChainArc(startX: number, startY: number, endX: number, endY: number, tint: number): void {
-    const bolt = this.add.line(0, 0, startX, startY, endX, endY, tint, 0.9).setOrigin(0, 0)
-    bolt.setLineWidth(2, 2)
-    bolt.setDepth(1.5)
-    this.tweens.add({
-      targets: bolt,
-      alpha: 0,
-      duration: 90,
-      onComplete: () => {
-        bolt.destroy()
-      },
     })
   }
 }

@@ -3,8 +3,8 @@ import type { EnemyDefinition } from '../domain/types.js'
 export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> = {
   slime: {
     id: 'slime',
-    name: 'Murk Slime',
-    description: 'A baseline slime that sheds the core materials for early combines.',
+    name: '진흙 슬라임',
+    description: '초반 조합에 필요한 핵심 재료를 떨어뜨리는 기본 슬라임입니다.',
     maxHealth: 26,
     speed: 60,
     contactDamage: 8,
@@ -12,13 +12,17 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     tint: 0x7cff8f,
     size: 20,
     textureKey: 'slime',
+    animationKey: 'slime-idle',
     movementBehavior: {
       kind: 'direct-chase',
     },
     attackBehavior: {
       kind: 'contact',
     },
-    behaviorSummary: 'Direct chase contact pressure.',
+    behaviorSummary: '직선으로 추적하며 몸통 박치기로 압박합니다.',
+    visual: {
+      portraitKey: 'slime',
+    },
     drops: [
       { itemId: 'gel-shard', weight: 5 },
       { itemId: 'acid-core', weight: 3 },
@@ -27,15 +31,16 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'spark-slime': {
     id: 'spark-slime',
-    name: 'Volt Slime',
-    description: 'A brighter slime strain that carries the materials for the new arc recipe.',
+    name: '볼트 슬라임',
+    description: '새로운 아크 조합 재료를 품고 있는 밝은 변종 슬라임입니다.',
     maxHealth: 34,
     speed: 72,
     contactDamage: 10,
     score: 18,
     tint: 0xffdb6e,
     size: 22,
-    textureKey: 'slime',
+    textureKey: 'spark-slime',
+    animationKey: 'spark-slime-idle',
     movementBehavior: {
       kind: 'orbit',
       preferredDistance: 152,
@@ -52,7 +57,10 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
       anchor: 'player',
       tint: 0xffdb6e,
     },
-    behaviorSummary: 'Keeps distance, circles, and drops a telegraphed shock burst.',
+    behaviorSummary: '거리를 유지하며 선회한 뒤 예고된 충격 범위를 터뜨립니다.',
+    visual: {
+      portraitKey: 'spark-slime',
+    },
     drops: [
       { itemId: 'spark-knot', weight: 4 },
       { itemId: 'mist-bead', weight: 4 },
@@ -61,15 +69,16 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
   },
   'slime-boss': {
     id: 'slime-boss',
-    name: 'Crown Slime',
-    description: 'The oversized slime monarch that ends the run when defeated.',
+    name: '크라운 슬라임',
+    description: '쓰러뜨리면 런이 끝나는 거대한 슬라임 우두머리입니다.',
     maxHealth: 220,
     speed: 44,
     contactDamage: 16,
     score: 150,
     tint: 0xd3a0ff,
     size: 44,
-    textureKey: 'boss',
+    textureKey: 'slime-boss',
+    animationKey: 'slime-boss-idle',
     movementBehavior: {
       kind: 'direct-chase',
     },
@@ -83,6 +92,9 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
       anchor: 'self',
       tint: 0xd3a0ff,
     },
-    behaviorSummary: 'Chases directly, then winds up a heavy self-centered slam.',
+    behaviorSummary: '직선 추적 후 제자리 강타를 크게 예고합니다.',
+    visual: {
+      portraitKey: 'slime-boss',
+    },
   },
 }

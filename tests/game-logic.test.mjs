@@ -1,8 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/combine.js'
 import { getCodexState } from '../.tmp-test/src/systems/codex.js'
+import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
+import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RADIUS, PROJECTILE_HIT_PADDING } from '../.tmp-test/src/game/combatGeometry.js'
+import { ITEM_DEFINITIONS } from '../.tmp-test/src/data/items.js'
+import { WEAPON_DEFINITIONS } from '../.tmp-test/src/data/weapons.js'
+import { VECTOR_ASSETS } from '../.tmp-test/src/game/visualManifest.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
@@ -20,7 +28,13 @@ import {
   getActionableRecipes,
   seedOwnedWeapons,
 } from '../.tmp-test/src/systems/weaponOwnership.js'
+import {
+  resolveAutoAttackShot,
+  resolveNearestAutoAttackTarget,
+} from '../.tmp-test/src/scenes/arena/autoAttack.js'
 import { getWaveByIndex, isBossWaveReady, shouldAdvanceWave } from '../.tmp-test/src/systems/waves.js'
+
+const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
 test('weighted drops only return configured loot ids', () => {
   const result = resolveWeightedDrop(
@@ -75,7 +89,7 @@ test('loot pickup workflow updates inventory and reports the pickup message', ()
 
   assert.deepEqual(result, {
     nextInventory: { 'gel-shard': 1 },
-    statusMessage: 'Collected Gel Shard.',
+    statusMessage: '젤 파편 획득.',
   })
 })
 
@@ -90,7 +104,7 @@ test('recipe selection workflow reports the current not-actionable status messag
 
   assert.deepEqual(result, {
     kind: 'not-actionable',
-    statusMessage: 'That combine is no longer actionable. Choose another option.',
+    statusMessage: '해당 조합은 더 이상 실행할 수 없습니다. 다른 옵션을 선택하세요.',
   })
 })
 
@@ -111,17 +125,17 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
     nextInventory: {},
     ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
     activeWeaponId: 'acid-sprayer',
-    statusMessage: 'Acid Sprayer crafted and equipped. Resume the run when ready.',
+    statusMessage: 'Acid Sprayer 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
   })
 })
 
 test('inventory presenter mirrors the arena summary strings', () => {
-  assert.deepEqual(describeInventoryEntries({}), ['No drops collected yet.'])
-  assert.deepEqual(describeInventoryEntries({ 'gel-shard': 2 }), ['Gel Shard × 2'])
+  assert.deepEqual(describeInventoryEntries({}), ['아직 획득한 드롭이 없습니다.'])
+  assert.deepEqual(describeInventoryEntries({ 'gel-shard': 2 }), ['젤 파편 × 2'])
 })
 
 test('recipe presenter mirrors the actionable combine summary strings', () => {
-  assert.deepEqual(describeAvailableRecipes([]), ['No actionable combine yet.'])
+  assert.deepEqual(describeAvailableRecipes([]), ['지금 바로 가능한 조합이 없습니다.'])
 
   const recipes = getActionableRecipes(
     {
@@ -132,7 +146,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(recipes), [
-    'Acid Sprayer → 20 dmg · 4 shots/s · Acid spray (Turns stable slime matter into corrosive firepower.)',
+    '산성 분사기 → 피해 20 · 초당 4발 · 산성 분사 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
   ])
 })
 
@@ -214,6 +228,123 @@ test('wave progression only advances when the current wave is fully cleared', ()
   assert.equal(shouldAdvanceWave(0, 0), true)
 })
 
+test('nearest auto-attack target returns null when no active enemies are available', () => {
+  assert.equal(resolveNearestAutoAttackTarget({ x: 10, y: 10 }, []), null)
+  assert.equal(
+    resolveNearestAutoAttackTarget(
+      { x: 10, y: 10 },
+      [
+        { x: 12, y: 12, isActive: false },
+        { x: 8, y: 8, isActive: false },
+      ],
+    ),
+    null,
+  )
+})
+
+test('nearest auto-attack target ignores inactive enemies and returns a normalized vector', () => {
+  const target = resolveNearestAutoAttackTarget(
+    { x: 0, y: 0 },
+    [
+      { x: 1, y: 0, isActive: false },
+      { x: 3, y: 4, isActive: true },
+      { x: 9, y: 0, isActive: true },
+    ],
+  )
+
+  assert.deepEqual(target && { x: target.x, y: target.y, distanceSq: target.distanceSq }, {
+    x: 3,
+    y: 4,
+    distanceSq: 25,
+  })
+  assert.equal(target?.directionX, 0.6)
+  assert.equal(target?.directionY, 0.8)
+})
+
+test('nearest auto-attack target re-evaluates to the closest enemy each call', () => {
+  const firstTarget = resolveNearestAutoAttackTarget(
+    { x: 0, y: 0 },
+    [
+      { x: 4, y: 0, isActive: true },
+      { x: 8, y: 0, isActive: true },
+    ],
+  )
+  const secondTarget = resolveNearestAutoAttackTarget(
+    { x: 7, y: 0 },
+    [
+      { x: 4, y: 0, isActive: true },
+      { x: 8, y: 0, isActive: true },
+    ],
+  )
+
+  assert.equal(firstTarget?.x, 4)
+  assert.equal(secondTarget?.x, 8)
+})
+
+test('nearest auto-attack target handles an overlapping enemy with a deterministic fallback direction', () => {
+  const target = resolveNearestAutoAttackTarget(
+    { x: 5, y: 5 },
+    [
+      { x: 5, y: 5, isActive: true },
+      { x: 8, y: 5, isActive: true },
+    ],
+  )
+
+  assert.deepEqual(target, {
+    x: 5,
+    y: 5,
+    directionX: 0,
+    directionY: -1,
+    distanceSq: 0,
+  })
+})
+
+test('auto-attack shot gating respects interaction pause, cooldown, and target availability', () => {
+  const origin = { x: 0, y: 0 }
+  const candidates = [{ x: 3, y: 4, isActive: true }]
+
+  assert.equal(
+    resolveAutoAttackShot(origin, candidates, {
+      isInteractionBlocked: true,
+      time: 1000,
+      nextFireAt: 0,
+    }),
+    null,
+  )
+  assert.equal(
+    resolveAutoAttackShot(origin, candidates, {
+      isInteractionBlocked: false,
+      time: 100,
+      nextFireAt: 200,
+    }),
+    null,
+  )
+
+  assert.deepEqual(
+    resolveAutoAttackShot(origin, [], {
+      isInteractionBlocked: false,
+      time: 1000,
+      nextFireAt: 0,
+    }),
+    null,
+  )
+
+  assert.deepEqual(
+    resolveAutoAttackShot(origin, candidates, {
+      isInteractionBlocked: false,
+      time: 1000,
+      nextFireAt: 200,
+    }),
+    {
+      x: 3,
+      y: 4,
+      directionX: 0.6,
+      directionY: 0.8,
+      distanceSq: 25,
+    },
+  )
+})
+
 test('boss trigger stays behind the final regular wave', () => {
   assert.equal(isBossWaveReady(0), false)
   assert.equal(isBossWaveReady(1), false)
@@ -244,6 +375,88 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
   assert.deepEqual(
     voltSlime?.drops.map((drop) => drop.id),
     ['spark-knot', 'mist-bead', 'frost-mote'],
+  )
+})
+
+test('visual asset manifest paths exist for all external art assets', () => {
+  const missingAssets = VECTOR_ASSETS.filter((asset) => {
+    const assetPath = resolve(TEST_DIR, '..', 'public', asset.path)
+    return !existsSync(assetPath)
+  }).map((asset) => asset.path)
+
+  assert.deepEqual(missingAssets, [])
+})
+
+test('enemy visual metadata keeps immutable gameplay geometry while adding art hooks', () => {
+  assert.equal(PLAYER_COLLISION_RADIUS, 14)
+  assert.equal(PROJECTILE_COLLISION_RADIUS, 5)
+  assert.equal(ENEMY_CONTACT_PADDING, 16)
+  assert.equal(PROJECTILE_HIT_PADDING, 7)
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(ENEMY_DEFINITIONS).map(([enemyId, enemy]) => [
+        enemyId,
+        {
+          size: enemy.size,
+          textureKey: enemy.textureKey,
+          animationKey: enemy.animationKey,
+        },
+      ]),
+    ),
+    {
+      slime: { size: 20, textureKey: 'slime', animationKey: 'slime-idle' },
+      'spark-slime': { size: 22, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
+      'slime-boss': { size: 44, textureKey: 'slime-boss', animationKey: 'slime-boss-idle' },
+    },
+  )
+})
+
+test('item and weapon visual metadata stays aligned with the external asset pass', () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(ITEM_DEFINITIONS).map(([itemId, item]) => [itemId, item.textureKey]),
+    ),
+    {
+      'gel-shard': 'gel-shard',
+      'acid-core': 'acid-core',
+      'frost-mote': 'frost-mote',
+      'spark-knot': 'spark-knot',
+      'mist-bead': 'mist-bead',
+    },
+  )
+
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(WEAPON_DEFINITIONS).map(([weaponId, weapon]) => [
+        weaponId,
+        {
+          projectileTextureKey: weapon.projectileTextureKey,
+          hudIconKey: weapon.visual.hudIconKey,
+        },
+      ]),
+    ),
+    {
+      'starter-blaster': {
+        projectileTextureKey: 'starter-projectile',
+        hudIconKey: 'weapon-starter-blaster',
+      },
+      'acid-sprayer': {
+        projectileTextureKey: 'acid-projectile',
+        hudIconKey: 'weapon-acid-sprayer',
+      },
+      'frost-lance': {
+        projectileTextureKey: 'frost-projectile',
+        hudIconKey: 'weapon-frost-lance',
+      },
+      'storm-cannon': {
+        projectileTextureKey: 'storm-projectile',
+        hudIconKey: 'weapon-storm-cannon',
+      },
+      'arc-loom': {
+        projectileTextureKey: 'arc-projectile',
+        hudIconKey: 'weapon-arc-loom',
+      },
+    },
   )
 })
 

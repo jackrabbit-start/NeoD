@@ -217,19 +217,19 @@ export function buildAttackPlan(
 export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
   switch (weapon.attackBehavior.kind) {
     case 'spray-hazard':
-      return 'Acid spray'
+      return '산성 분사'
     case 'pierce':
-      return 'Piercing shot'
+      return '관통 사격'
     case 'chain':
-      return 'Chain lightning'
+      return '연쇄 번개'
     case 'single':
     default:
-      return 'Steady shot'
+      return '기본 사격'
   }
 }
 
 export function getWeaponSummary(weapon: WeaponDefinition): string {
-  return `${weapon.damage} dmg · ${Math.round(1000 / weapon.fireRateMs)} shots/s · ${getWeaponIdentityLabel(weapon)}`
+  return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · ${getWeaponIdentityLabel(weapon)}`
 }
 
 export function getChainDamage(baseDamage: number, chainIndex: number, falloff: number): number {

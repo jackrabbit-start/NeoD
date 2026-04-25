@@ -73,9 +73,9 @@ test('telegraph start and cooldown helpers remain deterministic', () => {
 test('circle hit test and codex enemy summary expose the new enemy identities', () => {
   assert.equal(isPointInsideCircle({ x: 108, y: 100 }, { x: 100, y: 100 }, 10), true)
   assert.equal(isPointInsideCircle({ x: 120, y: 100 }, { x: 100, y: 100 }, 10), false)
-  assert.match(getEnemyBehaviorSummary(ENEMY_DEFINITIONS['spark-slime']), /shock burst/i)
+  assert.match(getEnemyBehaviorSummary(ENEMY_DEFINITIONS['spark-slime']), /충격 범위/)
 
   const codex = getCodexState(true)
   const sparkSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
-  assert.ok(sparkSlime?.stats.some((entry) => /shock burst/i.test(entry)))
+  assert.ok(sparkSlime?.stats.some((entry) => /충격 범위/.test(entry)))
 })

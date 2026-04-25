@@ -39,14 +39,14 @@ test('frost lance plan preserves a piercing projectile', () => {
   assert.equal(plan.projectiles.length, 1)
   assert.equal(plan.projectiles[0]?.maxHits, 3)
   assert.equal(plan.projectiles[0]?.hazardOnHit, undefined)
-  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['frost-lance']), 'Piercing shot')
+  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['frost-lance']), '관통 사격')
 })
 
 test('arc loom summary and chain damage expose crowd-control identity', () => {
   const weapon = WEAPON_DEFINITIONS['arc-loom']
   const summary = getWeaponSummary(weapon)
 
-  assert.match(summary, /Chain lightning/)
+  assert.match(summary, /연쇄 번개/)
   assert.equal(getChainDamage(24, 1, 0.65), 16)
   assert.equal(getChainDamage(24, 2, 0.65), 10)
 })
@@ -138,5 +138,5 @@ test('codex summaries include weapon identity beyond raw stats', () => {
   const codex = getCodexState(true)
   const arcRecipe = codex.recipes.find((recipe) => recipe.output.id === 'arc-loom')
 
-  assert.match(arcRecipe?.output.summary ?? '', /Chain lightning/)
+  assert.match(arcRecipe?.output.summary ?? '', /연쇄 번개/)
 })
