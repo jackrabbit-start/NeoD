@@ -4,7 +4,7 @@ import type { WeaponStar } from '../domain/types.js'
 
 export type RandomSource = () => number
 
-export const MAX_PACHINKO_REWARD_STAR = 5 as const
+export const MAX_PACHINKO_REWARD_STAR = 20 as const
 export const MAX_ACTIVE_PACHINKO_TOKENS = 30 as const
 export const PACHINKO_SLOT_COUNT = 10 as const
 export const PACHINKO_TOKEN_LAUNCH_INTERVAL_MS = 110 as const
@@ -12,6 +12,10 @@ export const PACHINKO_REWARD_TABLE_REFRESH_MS = 5000 as const
 export const PACHINKO_FEVER_CHARGE_MAX = 100 as const
 export const PACHINKO_FEVER_DURATION_TOKENS = 3 as const
 export const PACHINKO_PITY_THRESHOLD = 4 as const
+export const DOUBLE_TOKEN_DROP_START_MS = 13 * 60_000
+export const RARE_TOKEN_XP_MULTIPLIER = 10 as const
+export const RARE_TOKEN_DROP_CHANCE = 0.03
+export const PACHINKO_STAR_20_TARGET_TOKEN_XP = 220_000
 
 export const PACHINKO_XP_DISPLAY_SCALE = 100 as const
 
@@ -32,6 +36,25 @@ export const ENEMY_TOKEN_XP: Record<EnemyId, number> = {
   'lantern-moth': 130,
   'mirror-wisp': 140,
   'siege-toad': 220,
+  'slime-boss': 0,
+}
+
+
+export const ENEMY_TOKEN_DROP_BASE_COUNT: Record<EnemyId, number> = {
+  slime: 1,
+  'dash-slime': 1,
+  'spark-slime': 1,
+  'splitter-slime': 1,
+  'orbit-slime': 1,
+  'mender-slime': 1,
+  'needle-wasp': 2,
+  'shard-sentinel': 2,
+  'lantern-moth': 2,
+  'void-orb': 2,
+  'mirror-wisp': 2,
+  'prism-slime': 3,
+  'crusher-slime': 3,
+  'siege-toad': 4,
   'slime-boss': 0,
 }
 
@@ -287,12 +310,60 @@ export function getPachinkoStarRangeForPlayerLevel(playerLevel: number): Pachink
   }
 }
 
+export function getPachinkoStarRangeForTokenXp(totalTokenXp: number, playerLevel = 1): PachinkoStarRange {
+  const playerRange = getPachinkoStarRangeForPlayerLevel(playerLevel)
+  const tokenProgress = Math.max(0, Math.min(1, Math.floor(totalTokenXp) / PACHINKO_STAR_20_TARGET_TOKEN_XP))
+  const tokenMaxStar = Math.min(
+    MAX_PACHINKO_REWARD_STAR,
+    Math.max(2, 2 + Math.floor(tokenProgress * (MAX_PACHINKO_REWARD_STAR - 2))),
+  ) as WeaponStar
+  const tokenMinStar = Math.max(
+    1,
+    tokenMaxStar >= 16 ? tokenMaxStar - 4 : tokenMaxStar >= 10 ? tokenMaxStar - 3 : Math.floor(tokenMaxStar / 2),
+  ) as WeaponStar
+
+  return {
+    minStar: Math.max(playerRange.minStar, tokenMinStar) as WeaponStar,
+    maxStar: Math.max(playerRange.maxStar, tokenMaxStar) as WeaponStar,
+  }
+}
+
 export function getTokenXpForEnemy(enemyId: EnemyId): number {
   return ENEMY_TOKEN_XP[enemyId] ?? 0
 }
 
 export function shouldEnemyGrantPachinkoToken(enemyId: EnemyId): boolean {
   return getTokenXpForEnemy(enemyId) > 0
+}
+
+export function getEnemyPachinkoTokenDropCount(enemyId: EnemyId, elapsedMs: number): number {
+  if (!shouldEnemyGrantPachinkoToken(enemyId)) {
+    return 0
+  }
+
+  const baseCount = Math.max(1, ENEMY_TOKEN_DROP_BASE_COUNT[enemyId] ?? 1)
+  const safeElapsedMs = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs)) : 0
+  const timeBonus = safeElapsedMs >= 18 * 60_000
+    ? 3
+    : safeElapsedMs >= 16 * 60_000
+      ? 2
+      : safeElapsedMs >= DOUBLE_TOKEN_DROP_START_MS
+        ? 1
+        : 0
+  return Math.min(8, baseCount + timeBonus)
+}
+
+export function resolveEnemyPachinkoTokenXpMultiplier(
+  random: RandomSource = Math.random,
+  elapsedMs = 0,
+): number {
+  const safeElapsedMs = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs)) : 0
+  const rareChance = safeElapsedMs >= 18 * 60_000
+    ? 0.08
+    : safeElapsedMs >= DOUBLE_TOKEN_DROP_START_MS
+      ? 0.05
+      : RARE_TOKEN_DROP_CHANCE
+  return random() < rareChance ? RARE_TOKEN_XP_MULTIPLIER : 1
 }
 
 export function getPachinkoRewardLevel(totalTokenXp: number): number {
@@ -314,10 +385,17 @@ export function resolveStarForLevel(
   const odds = STAR_ODDS_BY_LEVEL[Math.max(1, Math.min(5, Math.floor(level)))] ?? STAR_ODDS_BY_LEVEL[1]
   const minStar = Math.max(1, Math.min(MAX_PACHINKO_REWARD_STAR, starRange.minStar))
   const maxStar = Math.max(minStar, Math.min(MAX_PACHINKO_REWARD_STAR, starRange.maxStar))
-  const rangedOdds = odds.map((value, index) => {
-    const star = index + 1
-    return star >= minStar && star <= maxStar ? value : 0
-  })
+  const starOptions = Array.from({ length: maxStar - minStar + 1 }, (_, index) => minStar + index)
+  const rangedOdds = maxStar <= odds.length
+    ? odds.map((value, index) => {
+        const star = index + 1
+        return star >= minStar && star <= maxStar ? value : 0
+      })
+    : starOptions.map((star) => {
+        const span = Math.max(1, maxStar - minStar)
+        const bucket = Math.min(odds.length - 1, Math.floor(((star - minStar) / span) * odds.length))
+        return odds[bucket] ?? 0
+      })
   const total = rangedOdds.reduce((sum, value) => sum + value, 0)
   if (total <= 0) {
     const starCount = maxStar - minStar + 1
@@ -328,7 +406,7 @@ export function resolveStarForLevel(
   for (let index = 0; index < rangedOdds.length; index += 1) {
     roll -= rangedOdds[index]
     if (roll <= 0) {
-      return (index + 1) as WeaponStar
+      return (maxStar <= odds.length ? index + 1 : starOptions[index]) as WeaponStar
     }
   }
 
@@ -470,7 +548,7 @@ export function buildPachinkoSlotRewards(
 ): PachinkoSlotReward[] {
   const normalizedSlotCount = Math.max(1, Math.floor(slotCount))
   const level = getPachinkoRewardLevel(totalTokenXp)
-  const starRange = getPachinkoStarRangeForPlayerLevel(playerLevel)
+  const starRange = getPachinkoStarRangeForTokenXp(totalTokenXp, playerLevel)
   const spinProfile = createPachinkoSpinProfile(momentumState)
   const modifiers = activeWeaponId
     ? buildPachinkoSlotModifiers(activeWeaponId, level, normalizedSlotCount, spinProfile)

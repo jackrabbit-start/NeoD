@@ -2,6 +2,11 @@ import type { WeaponDefinition, WeaponId } from '../domain/types.js'
 
 export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   'starter-blaster': {
+    attribute: {
+      element: 'kinetic',
+      elementLabel: '물리',
+      traitLabel: '억제 사격',
+    },
     id: 'starter-blaster',
     name: '마우스 꾹누르기',
     description: '커뮤에서는 김동성이 파친코 대신 마우스를 꾹 누르는 중이라고 놀립니다. 손가락만 고정하면 화면이 알아서 긁히는 도주용 버릇입니다.',
@@ -32,6 +37,19 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'acid-sprayer': {
+    attribute: {
+      element: 'acid',
+      elementLabel: '산성',
+      traitLabel: '오염 확산',
+      statusEffect: {
+        kind: 'poison',
+        label: '중독 1.8초',
+        durationMs: 1800,
+        tickEveryMs: 300,
+        tickDamage: 3,
+        applicationChance: 1,
+      },
+    },
     id: 'acid-sprayer',
     name: '술먹고 난 토',
     description: '술 마신 다음 날 길가에 남긴 토처럼 질척하게 퍼진다는 드립이 붙었습니다. 지나간 자리마다 후회가 묻어나는 김동성식 찝찝함입니다.',
@@ -63,6 +81,19 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'frost-lance': {
+    attribute: {
+      element: 'explosive',
+      elementLabel: '폭발',
+      traitLabel: '화상 파편',
+      statusEffect: {
+        kind: 'burn',
+        label: '화상 1.5초',
+        durationMs: 1500,
+        tickEveryMs: 250,
+        tickDamage: 4,
+        applicationChance: 1,
+      },
+    },
     id: 'frost-lance',
     name: '대충 만든 로켓',
     description: '한 방에 판을 엎고 싶던 김동성의 파친코식 역전 욕망을 닮았습니다. 크게 꽂히는 순간만 믿고 뛰는 무모한 선택입니다.',
@@ -90,6 +121,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'storm-cannon': {
+    attribute: {
+      element: 'kinetic',
+      elementLabel: '물리',
+      traitLabel: '근접 산탄',
+    },
     id: 'storm-cannon',
     name: '골목 빗자루',
     description: '가까이 오면 말보다 먼저 터지는 커뮤식 손절 버튼입니다. 설명보다 반응이 빠른 김동성식 방어 본능입니다.',
@@ -121,6 +157,19 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'arc-loom': {
+    attribute: {
+      element: 'electric',
+      elementLabel: '전기',
+      traitLabel: '스파크 리바운드',
+      statusEffect: {
+        kind: 'shock',
+        label: '감전 0.9초',
+        durationMs: 900,
+        tickEveryMs: 300,
+        tickDamage: 2,
+        applicationChance: 0.65,
+      },
+    },
     id: 'arc-loom',
     name: '낡은 축구공',
     description: '어릴 때 축구는 꽤 했다는 김동성의 오래된 허세가 무기화됐습니다. 한 번 찬 공이 남의 얘기처럼 계속 튕겨 다닙니다.',
@@ -155,6 +204,19 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'spark-carbine': {
+    attribute: {
+      element: 'electric',
+      elementLabel: '전기',
+      traitLabel: '감시 레이저',
+      statusEffect: {
+        kind: 'shock',
+        label: '감전 1초',
+        durationMs: 1000,
+        tickEveryMs: 250,
+        tickDamage: 2,
+        applicationChance: 0.5,
+      },
+    },
     id: 'spark-carbine',
     name: '방범 카메라',
     description: '본인은 뛰고 감시는 기계에 맡기는 요즘식 생존 꼼수입니다. 김동성은 발만 바쁘고 책임은 작은 장치에게 넘깁니다.',
@@ -191,6 +253,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'mist-vortex': {
+    attribute: {
+      element: 'code',
+      elementLabel: '코드',
+      traitLabel: '문장 함정',
+    },
     id: 'mist-vortex',
     name: '컴파일러',
     description: '커뮤 댓글처럼 밟는 순간 터지는 문장 폭탄입니다. 괜히 읽었다가 기분만 상하는 김동성식 함정글입니다.',
@@ -223,6 +290,19 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'slime-glaive': {
+    attribute: {
+      element: 'blood',
+      elementLabel: '혈기',
+      traitLabel: '흡혈 휩쓸기',
+      statusEffect: {
+        kind: 'bleed',
+        label: '출혈 1.4초',
+        durationMs: 1400,
+        tickEveryMs: 280,
+        tickDamage: 3,
+        applicationChance: 1,
+      },
+    },
     id: 'slime-glaive',
     name: '레넥톤 손맛',
     description: '레넥톤은 김동성이 애정 가는 롤 캐릭터라며 끝까지 고집하는 손맛입니다. 맞으면서도 버티는 게 멋있다고 우기는 픽입니다.',
@@ -251,6 +331,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'prism-cutter': {
+    attribute: {
+      element: 'kinetic',
+      elementLabel: '타격',
+      traitLabel: '직선 연타',
+    },
     id: 'prism-cutter',
     name: '동네 주먹',
     description: '말로 해명하다 안 되면 몸이 먼저 나가는 짤 같은 연속기입니다. 짧게 치고 빠지는 척하다가 마지막에 괜히 크게 갑니다.',
@@ -313,6 +398,18 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     },
   },
   'needle-fan': {
+    attribute: {
+      element: 'necro',
+      elementLabel: '강령',
+      traitLabel: '시체 재배치',
+      statusEffect: {
+        kind: 'chill',
+        label: '둔화 1.2초',
+        durationMs: 1200,
+        speedMultiplier: 0.72,
+        applicationChance: 0.55,
+      },
+    },
     id: 'needle-fan',
     name: '다시 출근',
     description: '탈출길에 구경꾼까지 알바로 세우는 김동성식 인력 운용입니다. 방금 쓰러진 애도 다시 출근시키는 야박한 생존법입니다.',

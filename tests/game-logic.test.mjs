@@ -157,6 +157,10 @@ import {
   PACHINKO_FEVER_CHARGE_MAX,
   PACHINKO_FEVER_DURATION_TOKENS,
   PACHINKO_PITY_THRESHOLD,
+  DOUBLE_TOKEN_DROP_START_MS,
+  PACHINKO_STAR_20_TARGET_TOKEN_XP,
+  RARE_TOKEN_XP_MULTIPLIER,
+  ENEMY_TOKEN_DROP_BASE_COUNT,
   MAX_ACTIVE_PACHINKO_TOKENS,
   PACHINKO_SLOT_COUNT,
   PACHINKO_LEVEL_THRESHOLDS,
@@ -170,9 +174,11 @@ import {
   buildPachinkoSlotRewards,
   canLaunchPachinkoToken,
   createInitialPachinkoMomentumState,
+  getEnemyPachinkoTokenDropCount,
   getPachinkoRewardTableSeed,
   getPachinkoRewardLevel,
   getPachinkoStarRangeForPlayerLevel,
+  getPachinkoStarRangeForTokenXp,
   getPachinkoMomentumLabel,
   getPachinkoWeaponFamily,
   getPachinkoWeaponFamilyLabel,
@@ -181,6 +187,7 @@ import {
   isPachinkoFeverActive,
   resolvePachinkoLandingReward,
   resolvePachinkoReward,
+  resolveEnemyPachinkoTokenXpMultiplier,
   resolvePachinkoSlotIndex,
   resolvePachinkoSlotReward,
   resolveStarForLevel,
@@ -478,9 +485,10 @@ test('player level raises pachinko star range before live table rolls stars', ()
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(1), { minStar: 1, maxStar: 2 })
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(5), { minStar: 1, maxStar: 3 })
   assert.deepEqual(getPachinkoStarRangeForPlayerLevel(9), { minStar: 2, maxStar: 4 })
-  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(17), { minStar: 3, maxStar: 5 })
-  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(25), { minStar: 4, maxStar: 5 })
-  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(33), { minStar: 5, maxStar: 5 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(17), { minStar: 3, maxStar: 6 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(25), { minStar: 4, maxStar: 8 })
+  assert.deepEqual(getPachinkoStarRangeForPlayerLevel(33), { minStar: 5, maxStar: 10 })
+  assert.deepEqual(getPachinkoStarRangeForTokenXp(PACHINKO_STAR_20_TARGET_TOKEN_XP, 1), { minStar: 16, maxStar: 20 })
 
   const lowLevelStars = buildPachinkoSlotRewards(4200, PACHINKO_SLOT_COUNT, 0, 1).map((slot) => slot.star)
   const midLevelStars = buildPachinkoSlotRewards(1200, PACHINKO_SLOT_COUNT, 0, 9).map((slot) => slot.star)
@@ -492,6 +500,29 @@ test('player level raises pachinko star range before live table rolls stars', ()
   assert.equal(Math.max(...midLevelStars), 4)
   assert.equal(Math.min(...highLevelStars), 4)
   assert.equal(Math.max(...highLevelStars), 5)
+})
+
+test('enemy token drops scale by time while rare tokens can appear before the late double-drop mark', () => {
+  assert.equal(ENEMY_TOKEN_DROP_BASE_COUNT.slime, 1)
+  assert.equal(ENEMY_TOKEN_DROP_BASE_COUNT['needle-wasp'], 2)
+  assert.equal(ENEMY_TOKEN_DROP_BASE_COUNT['prism-slime'], 3)
+  assert.equal(ENEMY_TOKEN_DROP_BASE_COUNT['siege-toad'], 4)
+  assert.equal(getEnemyPachinkoTokenDropCount('slime', DOUBLE_TOKEN_DROP_START_MS - 1), 1)
+  assert.equal(getEnemyPachinkoTokenDropCount('needle-wasp', DOUBLE_TOKEN_DROP_START_MS - 1), 2)
+  assert.equal(getEnemyPachinkoTokenDropCount('prism-slime', DOUBLE_TOKEN_DROP_START_MS - 1), 3)
+  assert.equal(getEnemyPachinkoTokenDropCount('siege-toad', DOUBLE_TOKEN_DROP_START_MS - 1), 4)
+  assert.equal(getEnemyPachinkoTokenDropCount('slime', DOUBLE_TOKEN_DROP_START_MS), 2)
+  assert.equal(getEnemyPachinkoTokenDropCount('needle-wasp', 16 * 60_000), 4)
+  assert.equal(getEnemyPachinkoTokenDropCount('prism-slime', 18 * 60_000), 6)
+  assert.equal(getEnemyPachinkoTokenDropCount('siege-toad', 20 * 60_000), 7)
+  assert.equal(getEnemyPachinkoTokenDropCount('slime-boss', DOUBLE_TOKEN_DROP_START_MS), 0)
+  assert.equal(resolveEnemyPachinkoTokenXpMultiplier(() => 0), RARE_TOKEN_XP_MULTIPLIER)
+  assert.equal(resolveEnemyPachinkoTokenXpMultiplier(() => 0.99), 1)
+  assert.equal(resolveEnemyPachinkoTokenXpMultiplier(() => 0.04, 13 * 60_000), RARE_TOKEN_XP_MULTIPLIER)
+  assert.equal(resolveEnemyPachinkoTokenXpMultiplier(() => 0.07, 18 * 60_000), RARE_TOKEN_XP_MULTIPLIER)
+
+  const earlyRareProgress = applyEnemyPachinkoTokenProgress({ totalTokenXp: 0, queuedTokenXp: [] }, 'needle-wasp', RARE_TOKEN_XP_MULTIPLIER)
+  assert.equal(earlyRareProgress.grantedTokenXp, getTokenXpForEnemy('needle-wasp') * RARE_TOKEN_XP_MULTIPLIER)
 })
 
 test('enemy defeat token progress feeds the same landing reward resolver as the scene', () => {
@@ -565,7 +596,9 @@ test('player progression starts per run and levels from token pickup xp', () => 
   assert.equal(getPlayerLevelForXp(2200), 3)
   assert.equal(getPlayerLevelForXp(7000), 5)
   assert.equal(getPlayerLevelForXp(10300), 6)
-  assert.equal(getPlayerLevelForXp(99900), 16)
+  assert.equal(getPlayerLevelForXp(99900), 30)
+  assert.equal(getPlayerLevelForXp(240000), 50)
+  assert.equal(getPlayerLevelForXp(340000), 60)
 
   const firstTokenPickup = applyEnemyPlayerXp(initial, 'prism-slime')
   assert.deepEqual(firstTokenPickup.state, { totalXp: 180, level: 1 })
@@ -600,23 +633,23 @@ test('player progression view clamps invalid xp and continues past seeded levels
 
   assert.deepEqual(getPlayerProgressionView(10000), {
     totalXp: 10000,
-    level: 5,
-    currentLevelXp: 7000,
-    xpIntoLevel: 3000,
-    xpToNextLevel: 3300,
-    nextLevelAt: 10300,
-    progressRatio: 3000 / 3300,
+    level: 6,
+    currentLevelXp: 9825,
+    xpIntoLevel: 175,
+    xpToNextLevel: 2855,
+    nextLevelAt: 12680,
+    progressRatio: 175 / 2855,
     isMaxLevel: false,
   })
 
   assert.deepEqual(getPlayerProgressionView(99900), {
     totalXp: 99900,
-    level: 16,
-    currentLevelXp: 92800,
-    xpIntoLevel: 7100,
-    xpToNextLevel: 15400,
-    nextLevelAt: 108200,
-    progressRatio: 7100 / 15400,
+    level: 30,
+    currentLevelXp: 98125,
+    xpIntoLevel: 1775,
+    xpToNextLevel: 5075,
+    nextLevelAt: 103200,
+    progressRatio: 1775 / 5075,
     isMaxLevel: false,
   })
 
@@ -692,7 +725,7 @@ test('pachinko slot modifiers never punish the base reward', () => {
   })
   assert.deepEqual(applyPachinkoSlotModifier(baseReward, 'jackpot', 'spark-carbine'), {
     weaponId: 'spark-carbine',
-    star: 5,
+    star: 6,
   })
 
   const familyLanding = resolvePachinkoLandingReward(1400, 0.75, 0, 1, 'slime-glaive')

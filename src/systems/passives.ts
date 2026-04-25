@@ -1,15 +1,28 @@
 import type { WeaponId } from '../data/contentIds.js'
-import type { WeaponAttackBehavior, WeaponDefinition } from '../domain/types.js'
+import type { WeaponAttackBehavior, WeaponAttributeDefinition, WeaponDefinition } from '../domain/types.js'
 import { getPachinkoWeaponFamily, type PachinkoWeaponFamily } from './pachinkoRewards.js'
 
 interface PassiveEffects {
   damageMultiplier?: number
   fireRateMultiplier?: number
   projectileSpeedMultiplier?: number
+  projectileLifetimeMultiplier?: number
+  projectileSizeMultiplier?: number
   rangeDelta?: number
   knockbackForceMultiplier?: number
   hazardRadiusMultiplier?: number
+  hazardDurationMultiplier?: number
   projectileCountDelta?: number
+  turretDurationMultiplier?: number
+  turretFireRateMultiplier?: number
+  summonDurationMultiplier?: number
+  summonCountDelta?: number
+  ricochetBouncesDelta?: number
+  ricochetRangeMultiplier?: number
+  healOnHitDelta?: number
+  statusDurationMultiplier?: number
+  statusDamageMultiplier?: number
+  statusSlowMultiplier?: number
   critChanceDelta?: number
   critDamageMultiplierDelta?: number
   playerSpeedMultiplier?: number
@@ -256,6 +269,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'runner-instinct',
     name: '런각 본능',
     description: '캐릭터 이동 속도가 올라 카이팅 여지가 커집니다.',
+    kind: 'general',
     weight: { base: 1.08, levelScale: 0.014, repeatPenalty: 0.35 },
     roll(level, random) {
       const [min, max] = createLevelScaledPercentRange(0.03, 0.07, level, 0.003, 0.12)
@@ -283,6 +297,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'vacuum-pocket',
     name: '진공 포켓',
     description: '가까워진 보상을 더 빨리 빨아들이고 획득 판정도 넉넉해집니다.',
+    kind: 'general',
     preferredFamilies: ['spray', 'zone', 'melee'],
     weight: { base: 0.9, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.46 },
     roll(level, random) {
@@ -345,6 +360,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'jackpot-fever',
     name: '잭팟 열기',
     description: '적이 주는 파친코 토큰 XP가 더 크게 불어납니다.',
+    kind: 'general',
     preferredFamilies: ['starter', 'zone', 'rapid'],
     weight: { base: 0.9, levelScale: 0.03, repeatPenalty: 0.44, familyBonus: 0.48 },
     roll(level, random) {
@@ -416,7 +432,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'guard-breaker',
     name: '가드 브레이커',
     description: '강한 적일수록 더 세게 찍어눌러 보스전에 힘을 실어 줍니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['heavy', 'melee', 'precision'],
     weight: { base: 0.78, levelScale: 0.03, repeatPenalty: 0.5, familyBonus: 0.58 },
     roll(level, random) {
@@ -429,7 +445,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'crowd-reaper',
     name: '군중 수확',
     description: '일반 적 무리를 정리하는 화력이 한층 안정적으로 올라갑니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['spray', 'chain', 'zone'],
     weight: { base: 1.0, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.54 },
     roll(level, random) {
@@ -455,7 +471,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'finisher-instinct',
     name: '마무리 본능',
     description: '결정타를 노리는 감각으로 치확과 화력을 함께 보강합니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['precision', 'rapid', 'heavy'],
     weight: { base: 0.78, levelScale: 0.018, repeatPenalty: 0.5, familyBonus: 0.52 },
     roll(level, random) {
@@ -678,6 +694,131 @@ const PASSIVE_CARD_TEMPLATES = [
       }
     },
   },
+  {
+    id: 'linger-protocol',
+    name: '지속 프로토콜',
+    description: '탄이 남는 시간과 장판/함정 유지 시간이 함께 늘어납니다.',
+    kind: 'general',
+    preferredFamilies: ['zone', 'spray', 'precision'],
+    weight: { base: 0.88, levelScale: 0.02, repeatPenalty: 0.34, familyBonus: 0.44 },
+    roll(level, random) {
+      const [lifeMin, lifeMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
+      const [zoneMin, zoneMax] = createLevelScaledPercentRange(0.08, 0.18, level, 0.006, 0.3)
+      const life = rollNumber(random, lifeMin, lifeMax, 2)
+      const zone = rollNumber(random, zoneMin, zoneMax, 2)
+      return {
+        effects: {
+          projectileLifetimeMultiplier: 1 + life.value,
+          hazardDurationMultiplier: 1 + zone.value,
+        },
+        quality: averageQuality(life.quality, zone.quality),
+      }
+    },
+  },
+  {
+    id: 'siege-framework',
+    name: '공성 프레임',
+    description: '설치물과 소환체가 더 오래 버티며 전장을 유지합니다.',
+    kind: 'general',
+    preferredFamilies: ['zone', 'rapid', 'heavy'],
+    weight: { base: 0.76, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.4 },
+    roll(level, random) {
+      const [turretMin, turretMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.3)
+      const [summonMin, summonMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
+      const turret = rollNumber(random, turretMin, turretMax, 2)
+      const summon = rollNumber(random, summonMin, summonMax, 2)
+      return {
+        effects: {
+          turretDurationMultiplier: 1 + turret.value,
+          summonDurationMultiplier: 1 + summon.value,
+        },
+        quality: averageQuality(turret.quality, summon.quality),
+      }
+    },
+  },
+  {
+    id: 'arc-playbook',
+    name: '반사 설계도',
+    description: '튕김 횟수와 반사 거리처럼 경로형 무기의 판을 넓혀 줍니다.',
+    kind: 'general',
+    preferredFamilies: ['chain', 'rapid', 'precision'],
+    weight: { base: 0.7, levelScale: 0.022, repeatPenalty: 0.42, familyBonus: 0.36 },
+    roll(level, random) {
+      const bounce = rollNumber(random, 1, getLevelTier(level) >= 2 ? 2 : 1)
+      const [rangeMin, rangeMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.28)
+      const range = rollNumber(random, rangeMin, rangeMax, 2)
+      return {
+        effects: {
+          ricochetBouncesDelta: bounce.value,
+          ricochetRangeMultiplier: 1 + range.value,
+        },
+        quality: averageQuality(bounce.quality, range.quality),
+      }
+    },
+  },
+  {
+    id: 'hitbox-bloom',
+    name: '히트박스 팽창',
+    description: '투사체 크기가 커져 맞히기 쉬워지고 범위형 무기도 존재감이 커집니다.',
+    kind: 'general',
+    preferredFamilies: ['starter', 'zone', 'heavy'],
+    weight: { base: 0.74, levelScale: 0.02, repeatPenalty: 0.36, familyBonus: 0.34 },
+    roll(level, random) {
+      const [sizeMin, sizeMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.02, 0.05, level, 0.003, 0.1)
+      const size = rollNumber(random, sizeMin, sizeMax, 2)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      return {
+        effects: {
+          projectileSizeMultiplier: 1 + size.value,
+          damageMultiplier: 1 + damage.value,
+        },
+        quality: averageQuality(size.quality, damage.quality),
+      }
+    },
+  },
+  {
+    id: 'status-overclock',
+    name: '상태 오버클럭',
+    description: '화상·중독·출혈 같은 속성 상태가 더 오래 남고 틱 피해도 강해집니다.',
+    kind: 'general',
+    preferredFamilies: ['zone', 'heavy', 'melee'],
+    weight: { base: 0.74, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.34 },
+    roll(level, random) {
+      const [durationMin, durationMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.28)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.24)
+      const duration = rollNumber(random, durationMin, durationMax, 2)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      return {
+        effects: {
+          statusDurationMultiplier: 1 + duration.value,
+          statusDamageMultiplier: 1 + damage.value,
+        },
+        quality: averageQuality(duration.quality, damage.quality),
+      }
+    },
+  },
+  {
+    id: 'cold-logic',
+    name: '냉각 로직',
+    description: '빙결·감전 계열 둔화가 더 오래, 더 강하게 붙습니다.',
+    kind: 'general',
+    preferredFamilies: ['precision', 'rapid', 'zone'],
+    weight: { base: 0.68, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.32 },
+    roll(level, random) {
+      const [durationMin, durationMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
+      const [slowMin, slowMax] = createLevelScaledPercentRange(0.08, 0.18, level, 0.006, 0.28)
+      const duration = rollNumber(random, durationMin, durationMax, 2)
+      const slow = rollNumber(random, slowMin, slowMax, 2)
+      return {
+        effects: {
+          statusDurationMultiplier: 1 + duration.value,
+          statusSlowMultiplier: 1 + slow.value,
+        },
+        quality: averageQuality(duration.quality, slow.quality),
+      }
+    },
+  },
 ] as const satisfies ReadonlyArray<PassiveCardTemplate>
 
 const WEAPON_SPECIALIZATION_TEMPLATES = [
@@ -685,7 +826,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'starter-blaster-special',
     weaponId: 'starter-blaster',
     name: '꾹누름 과열',
-    description: '탄막 기관총이 더 오래 이어지며 연사 리듬이 빨라집니다.',
+    description: '탄막 기관총이 더 오래 이어지며 연사 리듬과 탄막 수가 함께 올라갑니다.',
     kind: 'weapon-specialized',
     maxCount: 2,
     weight: { base: 1.1, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -697,6 +838,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       return {
         effects: {
           fireRateMultiplier: 1 - fire.value,
+          projectileLifetimeMultiplier: 1 + Math.max(0.05, fire.value * 0.9),
           projectileCountDelta: burst.value,
         },
         quality: averageQuality(fire.quality, burst.quality),
@@ -707,7 +849,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'acid-sprayer-special',
     weaponId: 'acid-sprayer',
     name: '구토 역류',
-    description: '산성 분사기가 더 넓게 퍼지고 오염 지대가 크게 남습니다.',
+    description: '산성 분사기가 더 넓게 퍼지고 오염 지대가 더 오래 남습니다.',
     kind: 'weapon-specialized',
     maxCount: 2,
     weight: { base: 1.1, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -718,6 +860,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       return {
         effects: {
           hazardRadiusMultiplier: 1 + radius.value,
+          hazardDurationMultiplier: 1 + Math.max(0.08, radius.value * 0.85),
           projectileCountDelta: extra.value,
         },
         quality: averageQuality(radius.quality, extra.quality),
@@ -728,7 +871,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'frost-lance-special',
     weaponId: 'frost-lance',
     name: '불안정 탄두',
-    description: '로켓포의 폭발 반경과 직격 피해가 함께 커집니다.',
+    description: '로켓포의 비행 거리와 폭발 압력이 함께 커집니다.',
     kind: 'weapon-specialized',
     maxCount: 2,
     weight: { base: 1.06, levelScale: 0.022, repeatPenalty: 0.8 },
@@ -740,6 +883,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       return {
         effects: {
           damageMultiplier: 1 + damage.value,
+          projectileLifetimeMultiplier: 1 + Math.max(0.05, damage.value * 0.8),
           rangeDelta: range.value,
         },
         quality: averageQuality(damage.quality, range.quality),
@@ -771,7 +915,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'arc-loom-special',
     weaponId: 'arc-loom',
     name: '강슛 반사',
-    description: '축구공이 더 멀리 튕기고 공이 살아있는 시간이 늘어납니다.',
+    description: '축구공이 더 멀리 튕기고 더 많이 반사되며 오래 남습니다.',
     kind: 'weapon-specialized',
     maxCount: 2,
     weight: { base: 1.04, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -781,7 +925,9 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       const range = rollNumber(random, 12 + getLevelTier(level) * 2, 22 + getLevelTier(level) * 3)
       return {
         effects: {
-          projectileSpeedMultiplier: 1 + speed.value,
+          projectileLifetimeMultiplier: 1 + Math.max(0.06, speed.value * 0.9),
+          ricochetBouncesDelta: 1,
+          ricochetRangeMultiplier: 1 + Math.max(0.08, speed.value * 1.1),
           rangeDelta: range.value,
         },
         quality: averageQuality(speed.quality, range.quality),
@@ -792,7 +938,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'spark-carbine-special',
     weaponId: 'spark-carbine',
     name: '노드 확장',
-    description: '감시 포탑의 배치 수와 사거리를 밀어 설치 유지력을 높입니다.',
+    description: '감시 포탑의 배치 수, 유지 시간, 사거리를 한 번에 밀어 올립니다.',
     kind: 'weapon-specialized',
     maxCount: 2,
     weight: { base: 1.06, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -803,6 +949,8 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
         effects: {
           rangeDelta: range.value,
           projectileCountDelta: extra.value,
+          turretDurationMultiplier: 1.18,
+          turretFireRateMultiplier: 0.92,
         },
         quality: averageQuality(range.quality, extra.quality),
       }
@@ -812,7 +960,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'mist-vortex-special',
     weaponId: 'mist-vortex',
     name: '문장 증폭',
-    description: '컴파일러 함정의 폭발 범위와 위력이 함께 올라갑니다.',
+    description: '컴파일러 함정의 폭발 범위와 유지 시간이 함께 올라갑니다.',
     kind: 'weapon-specialized',
     maxCount: 2,
     weight: { base: 1.08, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -824,6 +972,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
       return {
         effects: {
           hazardRadiusMultiplier: 1 + radius.value,
+          hazardDurationMultiplier: 1 + Math.max(0.08, radius.value * 0.8),
           damageMultiplier: 1 + damage.value,
         },
         quality: averageQuality(radius.quality, damage.quality),
@@ -834,7 +983,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'slime-glaive-special',
     weaponId: 'slime-glaive',
     name: '사막의 포식',
-    description: '레넥톤 손맛의 회전 반경과 버티는 화력을 동시에 올려줍니다.',
+    description: '레넥톤 손맛의 회전 반경, 난전 화력, 흡혈량을 동시에 올려줍니다.',
     kind: 'weapon-specialized',
     maxCount: 2,
     weight: { base: 1.04, levelScale: 0.022, repeatPenalty: 0.8 },
@@ -846,6 +995,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
         effects: {
           damageMultiplier: 1 + damage.value,
           rangeDelta: range.value,
+          healOnHitDelta: 1,
         },
         quality: averageQuality(damage.quality, range.quality),
       }
@@ -877,7 +1027,7 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
     id: 'needle-fan-special',
     weaponId: 'needle-fan',
     name: '야근 충원',
-    description: '재생술사의 마무리 각과 되살린 병력 운영이 더 매끄러워집니다.',
+    description: '재생술사의 마무리 각과 되살린 병력 유지 시간이 함께 늘어납니다.',
     kind: 'weapon-specialized',
     maxCount: 2,
     weight: { base: 1.06, levelScale: 0.02, repeatPenalty: 0.8 },
@@ -890,6 +1040,8 @@ const WEAPON_SPECIALIZATION_TEMPLATES = [
         effects: {
           projectileSpeedMultiplier: 1 + speed.value,
           damageMultiplier: 1 + damage.value,
+          summonDurationMultiplier: 1.18,
+          summonCountDelta: 1,
         },
         quality: averageQuality(speed.quality, damage.quality),
       }
@@ -909,10 +1061,23 @@ export interface PassiveTotals {
   damageMultiplier: number
   fireRateMultiplier: number
   projectileSpeedMultiplier: number
+  projectileLifetimeMultiplier: number
+  projectileSizeMultiplier: number
   rangeDelta: number
   knockbackForceMultiplier: number
   hazardRadiusMultiplier: number
+  hazardDurationMultiplier: number
   projectileCountDelta: number
+  turretDurationMultiplier: number
+  turretFireRateMultiplier: number
+  summonDurationMultiplier: number
+  summonCountDelta: number
+  ricochetBouncesDelta: number
+  ricochetRangeMultiplier: number
+  healOnHitDelta: number
+  statusDurationMultiplier: number
+  statusDamageMultiplier: number
+  statusSlowMultiplier: number
   critChance: number
   critDamageMultiplier: number
   playerSpeedMultiplier: number
@@ -981,6 +1146,12 @@ function formatEffectSummary(effects: PassiveEffects): string {
   if (effects.projectileSpeedMultiplier !== undefined && effects.projectileSpeedMultiplier > 1) {
     lines.push(`투사체 속도 +${roundPercent(effects.projectileSpeedMultiplier - 1)}%`)
   }
+  if (effects.projectileLifetimeMultiplier !== undefined && effects.projectileLifetimeMultiplier > 1) {
+    lines.push(`투사체 지속 +${roundPercent(effects.projectileLifetimeMultiplier - 1)}%`)
+  }
+  if (effects.projectileSizeMultiplier !== undefined && effects.projectileSizeMultiplier > 1) {
+    lines.push(`투사체 크기 +${roundPercent(effects.projectileSizeMultiplier - 1)}%`)
+  }
   if (effects.rangeDelta) {
     lines.push(`범위 +${Math.round(effects.rangeDelta)}`)
   }
@@ -993,8 +1164,41 @@ function formatEffectSummary(effects: PassiveEffects): string {
   if (effects.hazardRadiusMultiplier !== undefined && effects.hazardRadiusMultiplier > 1) {
     lines.push(`장판 반경 +${roundPercent(effects.hazardRadiusMultiplier - 1)}%`)
   }
+  if (effects.hazardDurationMultiplier !== undefined && effects.hazardDurationMultiplier > 1) {
+    lines.push(`지속시간 +${roundPercent(effects.hazardDurationMultiplier - 1)}%`)
+  }
   if (effects.projectileCountDelta) {
     lines.push(`투사체 +${Math.round(effects.projectileCountDelta)}`)
+  }
+  if (effects.turretDurationMultiplier !== undefined && effects.turretDurationMultiplier > 1) {
+    lines.push(`포탑 지속 +${roundPercent(effects.turretDurationMultiplier - 1)}%`)
+  }
+  if (effects.turretFireRateMultiplier !== undefined && effects.turretFireRateMultiplier < 1) {
+    lines.push(`포탑 공격속도 +${roundPercent(1 - effects.turretFireRateMultiplier)}%`)
+  }
+  if (effects.summonDurationMultiplier !== undefined && effects.summonDurationMultiplier > 1) {
+    lines.push(`소환 지속 +${roundPercent(effects.summonDurationMultiplier - 1)}%`)
+  }
+  if (effects.summonCountDelta) {
+    lines.push(`소환수 +${Math.round(effects.summonCountDelta)}`)
+  }
+  if (effects.ricochetBouncesDelta) {
+    lines.push(`튕김 +${Math.round(effects.ricochetBouncesDelta)}회`)
+  }
+  if (effects.ricochetRangeMultiplier !== undefined && effects.ricochetRangeMultiplier > 1) {
+    lines.push(`튕김 거리 +${roundPercent(effects.ricochetRangeMultiplier - 1)}%`)
+  }
+  if (effects.healOnHitDelta) {
+    lines.push(`흡혈 +${Math.round(effects.healOnHitDelta)}`)
+  }
+  if (effects.statusDurationMultiplier !== undefined && effects.statusDurationMultiplier > 1) {
+    lines.push(`상태시간 +${roundPercent(effects.statusDurationMultiplier - 1)}%`)
+  }
+  if (effects.statusDamageMultiplier !== undefined && effects.statusDamageMultiplier > 1) {
+    lines.push(`지속피해 +${roundPercent(effects.statusDamageMultiplier - 1)}%`)
+  }
+  if (effects.statusSlowMultiplier !== undefined && effects.statusSlowMultiplier > 1) {
+    lines.push(`둔화강도 +${roundPercent(effects.statusSlowMultiplier - 1)}%`)
   }
   if (effects.playerSpeedMultiplier !== undefined && effects.playerSpeedMultiplier > 1) {
     lines.push(`이동속도 +${roundPercent(effects.playerSpeedMultiplier - 1)}%`)
@@ -1041,10 +1245,20 @@ function mergeEffects(existing: PassiveEffects = {}, next: PassiveEffects): Pass
     damageMultiplier: (existing.damageMultiplier ?? 1) * (next.damageMultiplier ?? 1),
     fireRateMultiplier: (existing.fireRateMultiplier ?? 1) * (next.fireRateMultiplier ?? 1),
     projectileSpeedMultiplier: (existing.projectileSpeedMultiplier ?? 1) * (next.projectileSpeedMultiplier ?? 1),
+    projectileLifetimeMultiplier:
+      (existing.projectileLifetimeMultiplier ?? 1) * (next.projectileLifetimeMultiplier ?? 1),
     rangeDelta: (existing.rangeDelta ?? 0) + (next.rangeDelta ?? 0),
     knockbackForceMultiplier: (existing.knockbackForceMultiplier ?? 1) * (next.knockbackForceMultiplier ?? 1),
     hazardRadiusMultiplier: (existing.hazardRadiusMultiplier ?? 1) * (next.hazardRadiusMultiplier ?? 1),
+    hazardDurationMultiplier: (existing.hazardDurationMultiplier ?? 1) * (next.hazardDurationMultiplier ?? 1),
     projectileCountDelta: (existing.projectileCountDelta ?? 0) + (next.projectileCountDelta ?? 0),
+    turretDurationMultiplier: (existing.turretDurationMultiplier ?? 1) * (next.turretDurationMultiplier ?? 1),
+    turretFireRateMultiplier: (existing.turretFireRateMultiplier ?? 1) * (next.turretFireRateMultiplier ?? 1),
+    summonDurationMultiplier: (existing.summonDurationMultiplier ?? 1) * (next.summonDurationMultiplier ?? 1),
+    summonCountDelta: (existing.summonCountDelta ?? 0) + (next.summonCountDelta ?? 0),
+    ricochetBouncesDelta: (existing.ricochetBouncesDelta ?? 0) + (next.ricochetBouncesDelta ?? 0),
+    ricochetRangeMultiplier: (existing.ricochetRangeMultiplier ?? 1) * (next.ricochetRangeMultiplier ?? 1),
+    healOnHitDelta: (existing.healOnHitDelta ?? 0) + (next.healOnHitDelta ?? 0),
     critChanceDelta: (existing.critChanceDelta ?? 0) + (next.critChanceDelta ?? 0),
     critDamageMultiplierDelta: (existing.critDamageMultiplierDelta ?? 0) + (next.critDamageMultiplierDelta ?? 0),
     playerSpeedMultiplier: (existing.playerSpeedMultiplier ?? 1) * (next.playerSpeedMultiplier ?? 1),
@@ -1197,10 +1411,23 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     damageMultiplier: 1,
     fireRateMultiplier: 1,
     projectileSpeedMultiplier: 1,
+    projectileLifetimeMultiplier: 1,
+    projectileSizeMultiplier: 1,
     rangeDelta: 0,
     knockbackForceMultiplier: 1,
     hazardRadiusMultiplier: 1,
+    hazardDurationMultiplier: 1,
     projectileCountDelta: 0,
+    turretDurationMultiplier: 1,
+    turretFireRateMultiplier: 1,
+    summonDurationMultiplier: 1,
+    summonCountDelta: 0,
+    ricochetBouncesDelta: 0,
+    ricochetRangeMultiplier: 1,
+    healOnHitDelta: 0,
+    statusDurationMultiplier: 1,
+    statusDamageMultiplier: 1,
+    statusSlowMultiplier: 1,
     critChance: 0,
     critDamageMultiplier: BASE_CRIT_DAMAGE_MULTIPLIER,
     playerSpeedMultiplier: 1,
@@ -1226,10 +1453,23 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     totals.damageMultiplier *= effects.damageMultiplier ?? 1
     totals.fireRateMultiplier *= effects.fireRateMultiplier ?? 1
     totals.projectileSpeedMultiplier *= effects.projectileSpeedMultiplier ?? 1
+    totals.projectileLifetimeMultiplier *= effects.projectileLifetimeMultiplier ?? 1
+    totals.projectileSizeMultiplier *= effects.projectileSizeMultiplier ?? 1
     totals.rangeDelta += effects.rangeDelta ?? 0
     totals.knockbackForceMultiplier *= effects.knockbackForceMultiplier ?? 1
     totals.hazardRadiusMultiplier *= effects.hazardRadiusMultiplier ?? 1
+    totals.hazardDurationMultiplier *= effects.hazardDurationMultiplier ?? 1
     totals.projectileCountDelta += effects.projectileCountDelta ?? 0
+    totals.turretDurationMultiplier *= effects.turretDurationMultiplier ?? 1
+    totals.turretFireRateMultiplier *= effects.turretFireRateMultiplier ?? 1
+    totals.summonDurationMultiplier *= effects.summonDurationMultiplier ?? 1
+    totals.summonCountDelta += effects.summonCountDelta ?? 0
+    totals.ricochetBouncesDelta += effects.ricochetBouncesDelta ?? 0
+    totals.ricochetRangeMultiplier *= effects.ricochetRangeMultiplier ?? 1
+    totals.healOnHitDelta += effects.healOnHitDelta ?? 0
+    totals.statusDurationMultiplier *= effects.statusDurationMultiplier ?? 1
+    totals.statusDamageMultiplier *= effects.statusDamageMultiplier ?? 1
+    totals.statusSlowMultiplier *= effects.statusSlowMultiplier ?? 1
     totals.critChance += effects.critChanceDelta ?? 0
     totals.critDamageMultiplier += effects.critDamageMultiplierDelta ?? 0
     totals.playerSpeedMultiplier *= effects.playerSpeedMultiplier ?? 1
@@ -1259,6 +1499,7 @@ function applyAttackBehaviorPassives(
       return {
         ...behavior,
         range: Math.max(1, Math.round(behavior.range + totals.rangeDelta)),
+        healOnHit: behavior.healOnHit ? behavior.healOnHit + totals.healOnHitDelta : behavior.healOnHit,
       }
     case 'combo-melee':
       return {
@@ -1267,49 +1508,97 @@ function applyAttackBehaviorPassives(
           ...step,
           range: Math.max(1, Math.round(step.range + totals.rangeDelta)),
           maxTargets: step.maxTargets + (index === behavior.steps.length - 1 ? Math.max(0, totals.projectileCountDelta) : 0),
+          healOnHit: step.healOnHit ? step.healOnHit + totals.healOnHitDelta : step.healOnHit,
         })),
       }
     case 'spray-hazard':
       return {
         ...behavior,
         projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
         hazardRadius: Math.max(1, Math.round(behavior.hazardRadius * totals.hazardRadiusMultiplier)),
+        hazardDurationMs: Math.max(200, Math.round(behavior.hazardDurationMs * totals.hazardDurationMultiplier)),
       }
     case 'split-shot':
       return {
         ...behavior,
         projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
       }
     case 'burst-fire':
       return {
         ...behavior,
         shotsPerBurst: Math.max(1, behavior.shotsPerBurst + totals.projectileCountDelta),
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
       }
     case 'volley':
       return {
         ...behavior,
         projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
       }
     case 'zone-control':
       return {
         ...behavior,
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
         zoneRadius: Math.max(1, Math.round(behavior.zoneRadius * totals.hazardRadiusMultiplier)),
+        zoneDurationMs: Math.max(200, Math.round(behavior.zoneDurationMs * totals.hazardDurationMultiplier)),
       }
     case 'deploy-turret':
       return {
         ...behavior,
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
         deploy: {
           ...behavior.deploy,
           range: Math.max(1, Math.round(behavior.deploy.range + totals.rangeDelta)),
           maxTurrets: Math.max(1, behavior.deploy.maxTurrets + Math.max(0, totals.projectileCountDelta)),
+          durationMs: Math.max(500, Math.round(behavior.deploy.durationMs * totals.turretDurationMultiplier)),
+          fireRateMs: Math.max(100, Math.round(behavior.deploy.fireRateMs * totals.turretFireRateMultiplier)),
+          projectileLifetimeMs: Math.max(
+            120,
+            Math.round(behavior.deploy.projectileLifetimeMs * totals.projectileLifetimeMultiplier),
+          ),
         },
       }
     case 'single':
+      return {
+        ...behavior,
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
+        ricochet: behavior.ricochet
+          ? {
+              ...behavior.ricochet,
+              maxBounces: Math.max(0, behavior.ricochet.maxBounces + totals.ricochetBouncesDelta),
+              bounceRange: Math.max(40, Math.round(behavior.ricochet.bounceRange * totals.ricochetRangeMultiplier)),
+            }
+          : behavior.ricochet,
+        summonOnKill: behavior.summonOnKill
+          ? {
+              ...behavior.summonOnKill,
+              maxMinions: Math.max(1, behavior.summonOnKill.maxMinions + Math.max(0, totals.summonCountDelta)),
+              durationMs: Math.max(500, Math.round(behavior.summonOnKill.durationMs * totals.summonDurationMultiplier)),
+            }
+          : behavior.summonOnKill,
+      }
     case 'pierce':
+      return {
+        ...behavior,
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
+      }
     case 'chain':
+      return {
+        ...behavior,
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
+      }
     case 'impact-burst':
+      return {
+        ...behavior,
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
+      }
     case 'impact-aoe':
-      return behavior
+      return {
+        ...behavior,
+        projectileLifetimeMs: Math.max(80, Math.round(behavior.projectileLifetimeMs * totals.projectileLifetimeMultiplier)),
+      }
     default:
       return behavior
   }
@@ -1321,20 +1610,46 @@ export function applyPassiveWeaponEffects(
 ): WeaponDefinition {
   const totals = getPassiveTotals(state)
   const attackBehavior = applyAttackBehaviorPassives(weapon.attackBehavior, totals)
+  const attribute = applyAttributePassives(weapon.attribute, totals)
 
   return {
     ...weapon,
+    attribute,
     range: typeof weapon.range === 'number'
       ? Math.max(1, Math.round(weapon.range + totals.rangeDelta))
       : weapon.range,
     damage: Math.max(1, Math.round(weapon.damage * totals.damageMultiplier)),
     fireRateMs: Math.max(65, Math.round(weapon.fireRateMs * totals.fireRateMultiplier)),
     projectileSpeed: Math.max(0, Math.round(weapon.projectileSpeed * totals.projectileSpeedMultiplier)),
+    projectileSizeMultiplier: (weapon.projectileSizeMultiplier ?? 1) * totals.projectileSizeMultiplier,
     knockback: {
       ...weapon.knockback,
       force: Math.round(weapon.knockback.force * totals.knockbackForceMultiplier),
     },
     attackBehavior,
+  }
+}
+
+function applyAttributePassives(
+  attribute: WeaponAttributeDefinition | undefined,
+  totals: PassiveTotals,
+): WeaponAttributeDefinition | undefined {
+  if (!attribute?.statusEffect) {
+    return attribute
+  }
+
+  return {
+    ...attribute,
+    statusEffect: {
+      ...attribute.statusEffect,
+      durationMs: Math.max(200, Math.round(attribute.statusEffect.durationMs * totals.statusDurationMultiplier)),
+      tickDamage: attribute.statusEffect.tickDamage !== undefined
+        ? Math.max(1, Math.round(attribute.statusEffect.tickDamage * totals.statusDamageMultiplier))
+        : undefined,
+      speedMultiplier: attribute.statusEffect.speedMultiplier !== undefined
+        ? Math.max(0.2, 1 - (1 - attribute.statusEffect.speedMultiplier) * totals.statusSlowMultiplier)
+        : undefined,
+    },
   }
 }
 

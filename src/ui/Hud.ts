@@ -527,9 +527,11 @@ export class HudController {
     const countText = weapon.count != null ? ` × ${weapon.count}` : ''
     title.textContent = `${weapon.name}${starText ? ` · ${starText}` : ''}${countText}`
     const description = document.createElement('small')
-    description.textContent = weapon.levelUpgradeDescription
-      ? `${weapon.identityLabel} · ${weapon.description} · ${weapon.levelUpgradeDescription}`
-      : `${weapon.identityLabel} · ${weapon.description}`
+    const descriptionSegments = [weapon.identityLabel, weapon.attributeLabel, weapon.description].filter(Boolean)
+    if (weapon.levelUpgradeDescription) {
+      descriptionSegments.push(weapon.levelUpgradeDescription)
+    }
+    description.textContent = descriptionSegments.join(' · ')
 
     const summary = document.createElement('small')
     summary.className = 'hud-modal__weapon-meta'
