@@ -1169,6 +1169,9 @@ test('arena hud injects enemy spawn odds into the visible stats list', () => {
 
   assert.ok(arenaSceneSource.includes('const enemyChanceSummary = enemyChanceLines.join'))
   assert.ok(arenaSceneSource.includes('`적 출현 확률: ${enemyChanceSummary}`'))
+  assert.ok(arenaSceneSource.includes('enemyOddsLabel'))
+  assert.ok(arenaSceneSource.includes('syncEnemyOddsHudText(enemyChanceLines)'))
+  assert.ok(arenaSceneSource.includes('적 출현 확률 · ${phase.minuteIndex + 1}분차'))
 })
 
 test('nearest auto-attack target returns null when no active enemies are available', () => {

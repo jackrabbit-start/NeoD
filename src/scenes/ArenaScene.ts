@@ -207,6 +207,8 @@ interface PlayerHealthBar {
   levelLabel: Phaser.GameObjects.Text
   xpBackground: Phaser.GameObjects.Rectangle
   xpFill: Phaser.GameObjects.Rectangle
+  enemyOddsBackground: Phaser.GameObjects.Rectangle
+  enemyOddsLabel: Phaser.GameObjects.Text
   width: number
   height: number
   xpWidth: number
@@ -2530,6 +2532,27 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(depth + 1)
       .setScrollFactor(0)
 
+    const enemyOddsBackground = this.add
+      .rectangle(viewport.width / 2, xpY + 19, Math.min(viewport.width - 28, 520), 21, 0x020713, 0.72)
+      .setOrigin(0.5)
+      .setStrokeStyle(1, 0xffd866, 0.34)
+      .setDepth(depth + 1)
+      .setScrollFactor(0)
+
+    const enemyOddsLabel = this.add
+      .text(viewport.width / 2, xpY + 19, '', {
+        color: '#ffe28a',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '10px',
+        fontStyle: '900',
+        align: 'center',
+        wordWrap: { width: Math.min(viewport.width - 44, 500) },
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + 2)
+      .setScrollFactor(0)
+      .setShadow(0, 1, '#020713', 3)
+
     return {
       background,
       fill,
@@ -2537,6 +2560,8 @@ export class ArenaScene extends Phaser.Scene {
       levelLabel,
       xpBackground,
       xpFill,
+      enemyOddsBackground,
+      enemyOddsLabel,
       width,
       height,
       xpWidth,
@@ -2565,6 +2590,26 @@ export class ArenaScene extends Phaser.Scene {
     levelLabel.setText(`Lv.${progression.level} · XP ${progression.xpIntoLevel}/${progression.xpToNextLevel}`)
     xpFill.setVisible(xpFillWidth > 0)
     xpFill.setDisplaySize(xpFillWidth, xpHeight - 2)
+    this.syncEnemyOddsHudText()
+  }
+
+  private syncEnemyOddsHudText(enemyChanceLines?: string[]): void {
+    if (!this.playerHealthBar) {
+      return
+    }
+
+    const phase = getRunPhaseByElapsedMs(this.runElapsedMs)
+    const rows = enemyChanceLines ?? getRunEnemySpawnChanceRows(phase).map(
+      (row) => `${row.enemyName} ${row.percentLabel}`,
+    )
+    const cappedRows = rows.slice(0, 4)
+    const extraCount = Math.max(0, rows.length - cappedRows.length)
+    const suffix = extraCount > 0 ? ` 외 ${extraCount}` : ''
+    const text = `적 출현 확률 · ${phase.minuteIndex + 1}분차 · ${cappedRows.join(' · ')}${suffix}`
+
+    this.playerHealthBar.enemyOddsLabel.setText(text)
+    this.playerHealthBar.enemyOddsBackground.setVisible(rows.length > 0)
+    this.playerHealthBar.enemyOddsLabel.setVisible(rows.length > 0)
   }
 
   private destroyPlayerHealthBar(): void {
@@ -2572,7 +2617,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    const { background, fill, label, levelLabel, xpBackground, xpFill } = this.playerHealthBar
+    const { background, fill, label, levelLabel, xpBackground, xpFill, enemyOddsBackground, enemyOddsLabel } = this.playerHealthBar
     if (background.active) {
       background.destroy()
     }
@@ -2590,6 +2635,12 @@ export class ArenaScene extends Phaser.Scene {
     }
     if (xpFill.active) {
       xpFill.destroy()
+    }
+    if (enemyOddsBackground.active) {
+      enemyOddsBackground.destroy()
+    }
+    if (enemyOddsLabel.active) {
+      enemyOddsLabel.destroy()
     }
 
     this.playerHealthBar = undefined
@@ -2781,6 +2832,7 @@ export class ArenaScene extends Phaser.Scene {
       (row) => `${row.enemyName} ${row.percentLabel}`,
     )
     const enemyChanceSummary = enemyChanceLines.join(' · ')
+    this.syncEnemyOddsHudText(enemyChanceLines)
     const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
 
     this.hud.update({
