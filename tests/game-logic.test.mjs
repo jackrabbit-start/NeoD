@@ -16,7 +16,15 @@ import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RA
 import { VECTOR_ASSETS } from '../.tmp-test/src/game/visualManifest.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
+import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../.tmp-test/src/systems/playerHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
+import {
+  getLootAttractionStep,
+  getLootPickupPhase,
+  LOOT_ATTRACTION_RADIUS,
+  LOOT_COLLECT_RADIUS,
+  LEGACY_LOOT_PICKUP_DISTANCE,
+} from '../.tmp-test/src/systems/lootPickup.js'
 import { createInitialArenaRunState } from '../.tmp-test/src/systems/runState.js'
 import {
   describeAvailableRecipes,
@@ -56,6 +64,10 @@ import {
   isBossWaveReady,
   shouldAdvanceWave,
 } from '../.tmp-test/src/systems/waves.js'
+import {
+  createRunResultHudState,
+  createRunResultPresentation,
+} from '../.tmp-test/src/systems/runResult.js'
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -151,6 +163,24 @@ test('invalid combine attempts do not produce upgrades', () => {
   assert.equal(combined, null)
 })
 
+test('loot pickup phase uses a forgiving collect radius and attraction band', () => {
+  assert.equal(LOOT_COLLECT_RADIUS > LEGACY_LOOT_PICKUP_DISTANCE, true)
+  assert.equal(LOOT_ATTRACTION_RADIUS > LOOT_COLLECT_RADIUS, true)
+
+  assert.equal(getLootPickupPhase(LOOT_ATTRACTION_RADIUS + 0.01), 'idle')
+  assert.equal(getLootPickupPhase(LOOT_ATTRACTION_RADIUS), 'attract')
+  assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS + 0.01), 'attract')
+  assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS), 'collect')
+  assert.equal(getLootPickupPhase(Number.POSITIVE_INFINITY), 'idle')
+})
+
+test('loot attraction step is bounded to the attraction phase', () => {
+  assert.equal(getLootAttractionStep(LOOT_ATTRACTION_RADIUS + 1, 16), 0)
+  assert.equal(getLootAttractionStep(LOOT_COLLECT_RADIUS, 16), 0)
+  assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, 16) > 0, true)
+  assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, -16), 0)
+})
+
 test('loot pickup workflow updates inventory and reports the pickup message', () => {
   const result = applyLootPickup({}, 'gel-shard')
 
@@ -192,7 +222,7 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
     nextInventory: {},
     ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
     activeWeaponId: 'acid-sprayer',
-    statusMessage: 'Acid Sprayer 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
+    statusMessage: '산성 분사기 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
   })
 })
 
@@ -599,23 +629,17 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.ok(bossWave)
   assert.deepEqual(
     getWaveSpawnSequence(secondWave),
-    ['slime', 'slime', 'slime', 'slime', 'slime', 'dash-slime', 'dash-slime', 'dash-slime'],
+    [...Array(15).fill('slime'), ...Array(9).fill('dash-slime')],
   )
   assert.deepEqual(
     flattenWaveEntries(thirdWave.entries),
     [
-      'spark-slime',
-      'spark-slime',
-      'spark-slime',
-      'spark-slime',
-      'orbit-slime',
-      'orbit-slime',
-      'orbit-slime',
-      'dash-slime',
-      'dash-slime',
+      ...Array(12).fill('spark-slime'),
+      ...Array(9).fill('orbit-slime'),
+      ...Array(6).fill('dash-slime'),
     ],
   )
-  assert.equal(getWaveSpawnCount(thirdWave), 9)
+  assert.equal(getWaveSpawnCount(thirdWave), 27)
   assert.deepEqual(getWaveSpawnSequence(eliteWave), ['prism-slime'])
   assert.deepEqual(bossWave.entries, [{ enemyId: 'slime-boss', count: 1 }])
   assert.equal(getBossEnemyId(), 'slime-boss')
@@ -623,6 +647,45 @@ test('mixed regular waves resolve deterministic spawn order while boss stays sin
   assert.equal(isBossEnemyId('dash-slime'), false)
   assert.equal(getDefeatedEnemyRunOutcome('slime-boss'), 'win')
   assert.equal(getDefeatedEnemyRunOutcome('dash-slime'), 'continue')
+})
+
+test('boss win result presentation is explicit and reward-neutral', () => {
+  const presentation = createRunResultPresentation({
+    outcome: 'win',
+    weaponName: '스타터 블래스터',
+    wavesCleared: 4,
+  })
+  const hudState = createRunResultHudState({
+    outcome: 'win',
+    weaponName: '스타터 블래스터',
+    wavesCleared: 4,
+  })
+
+  assert.equal(presentation.title, '런 클리어')
+  assert.match(presentation.subtitle, /크라운 슬라임/)
+  assert.match(presentation.restartPrompt, /R 키/)
+  assert.deepEqual(presentation.statLines, [
+    '결과: 클리어',
+    '최종 무기: 스타터 블래스터',
+    '돌파 웨이브: 4',
+  ])
+  assert.ok(presentation.inventoryLines.every((line) => !/해금|unlock/i.test(line)))
+  assert.equal(hudState.title, '런 클리어')
+  assert.equal(hudState.inventoryButtonDisabled, true)
+  assert.equal(hudState.modal.isOpen, false)
+})
+
+test('loss result presentation keeps restart guidance distinct from boss clear', () => {
+  const presentation = createRunResultPresentation({
+    outcome: 'loss',
+    weaponName: '스타터 블래스터',
+    wavesCleared: 2,
+  })
+
+  assert.equal(presentation.title, '런 실패')
+  assert.match(presentation.statLines[0] ?? '', /실패/)
+  assert.match(presentation.objective, /다시 도전/)
+  assert.match(presentation.restartPrompt, /새 런/)
 })
 
 test('elite wave appears before the boss wave', () => {
@@ -1031,6 +1094,22 @@ test('item and weapon visual metadata stays aligned with the external asset pass
 
   assert.deepEqual(
     Object.fromEntries(
+      VECTOR_ASSETS
+        .filter((asset) => Object.values(ITEM_DEFINITIONS).some((item) => item.textureKey === asset.key))
+        .map((asset) => [asset.key, { width: asset.width, height: asset.height, radius: asset.fallback?.radius }]),
+    ),
+    {
+      'gel-shard': { width: 22, height: 22, radius: 10 },
+      'acid-core': { width: 22, height: 22, radius: 10 },
+      'frost-mote': { width: 22, height: 22, radius: 10 },
+      'spark-knot': { width: 22, height: 22, radius: 10 },
+      'mist-bead': { width: 22, height: 22, radius: 10 },
+      'tuning-capsule': { width: 22, height: 22, radius: 10 },
+    },
+  )
+
+  assert.deepEqual(
+    Object.fromEntries(
       Object.entries(WEAPON_DEFINITIONS).map(([weaponId, weapon]) => [
         weaponId,
         {
@@ -1101,4 +1180,22 @@ test('enemy health bar fill width tracks clamped health ratio', () => {
   assert.equal(getEnemyHealthFillWidth(-10, 26, 32), 0)
   assert.equal(getEnemyHealthFillWidth(40, 26, 32), 32)
   assert.equal(getEnemyHealthFillWidth(5, 0, 32), 0)
+})
+
+test('player health bar metrics place a compact bar at the canvas bottom', () => {
+  assert.deepEqual(getPlayerHealthBarMetrics(960, 540), {
+    x: 360,
+    y: 518,
+    width: 240,
+    height: 10,
+  })
+})
+
+test('player health bar fill width tracks clamped health ratio', () => {
+  assert.equal(getPlayerHealthFillWidth(100, 100, 236), 236)
+  assert.equal(getPlayerHealthFillWidth(50, 100, 236), 118)
+  assert.equal(getPlayerHealthFillWidth(0, 100, 236), 0)
+  assert.equal(getPlayerHealthFillWidth(-10, 100, 236), 0)
+  assert.equal(getPlayerHealthFillWidth(140, 100, 236), 236)
+  assert.equal(getPlayerHealthFillWidth(20, 0, 236), 0)
 })

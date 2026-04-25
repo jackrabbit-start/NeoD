@@ -69,15 +69,19 @@ test('enemy pressure constants match the survival pressure pass', () => {
   assert.equal(orbit.speed, 60)
   assert.equal(orbit.contactDamage, 13)
 
-  assert.equal(boss.maxHealth, 220)
-  assert.equal(boss.speed, 48)
-  assert.equal(boss.contactDamage, 22)
+  assert.equal(boss.maxHealth, 620)
+  assert.equal(boss.speed, 56)
+  assert.equal(boss.contactDamage, 26)
   assert.equal(boss.attackBehavior.kind, 'telegraphed-aoe')
-  assert.equal(boss.attackBehavior.damage, 28)
-  assert.equal(boss.attackBehavior.cooldownMs, 2200)
+  assert.equal(boss.attackBehavior.damage, 34)
+  assert.equal(boss.attackBehavior.cooldownMs, 1350)
+  assert.equal(boss.attackBehavior.telegraphMs, 560)
+  assert.equal(boss.attackBehavior.radius, 120)
+  assert.equal(boss.attackBehavior.range, 285)
+  assert.equal(boss.attackBehavior.anchor, 'player')
 })
 
-test('telegraphed aoe uses player or self anchor based on enemy config', () => {
+test('telegraphed aoe uses configured anchors for readable pressure zones', () => {
   const sparkTelegraph = createEnemyTelegraph(
     { x: 10, y: 20 },
     { x: 90, y: 120 },
@@ -88,6 +92,20 @@ test('telegraphed aoe uses player or self anchor based on enemy config', () => {
     { x: 90, y: 120 },
     ENEMY_DEFINITIONS['slime-boss'].attackBehavior,
   )
+  const selfAnchoredTelegraph = createEnemyTelegraph(
+    { x: 44, y: 55 },
+    { x: 90, y: 120 },
+    {
+      kind: 'telegraphed-aoe',
+      cooldownMs: 1000,
+      telegraphMs: 500,
+      radius: 33,
+      damage: 10,
+      range: 100,
+      anchor: 'self',
+      tint: 0xffffff,
+    },
+  )
 
   assert.deepEqual(
     sparkTelegraph && { x: sparkTelegraph.x, y: sparkTelegraph.y, radius: sparkTelegraph.radius },
@@ -95,7 +113,15 @@ test('telegraphed aoe uses player or self anchor based on enemy config', () => {
   )
   assert.deepEqual(
     bossTelegraph && { x: bossTelegraph.x, y: bossTelegraph.y, radius: bossTelegraph.radius },
-    { x: 44, y: 55, radius: 88 },
+    { x: 90, y: 120, radius: 120 },
+  )
+  assert.deepEqual(
+    selfAnchoredTelegraph && {
+      x: selfAnchoredTelegraph.x,
+      y: selfAnchoredTelegraph.y,
+      radius: selfAnchoredTelegraph.radius,
+    },
+    { x: 44, y: 55, radius: 33 },
   )
 })
 

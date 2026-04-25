@@ -33,6 +33,13 @@ import {
   type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import {
+  getLootAttractionStep,
+  getLootPickupPhase,
+  LOOT_COLLECT_RADIUS,
+} from '../systems/lootPickup.js'
+import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
+import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
 import {
   advanceKnockbackState,
@@ -91,6 +98,14 @@ interface EnemyHealthBar {
   offsetY: number
 }
 
+interface PlayerHealthBar {
+  background: Phaser.GameObjects.Rectangle
+  fill: Phaser.GameObjects.Rectangle
+  label: Phaser.GameObjects.Text
+  width: number
+  height: number
+}
+
 interface EnemyTelegraph {
   visual: Phaser.GameObjects.Arc
   x: number
@@ -117,6 +132,9 @@ interface EnemyEntity {
 interface LootEntity {
   sprite: PhysicsImage
   itemId: LootId
+  aura: Phaser.GameObjects.Arc
+  auraTween: Phaser.Tweens.Tween
+  isAttracting: boolean
 }
 
 interface ProjectileEntity {
@@ -152,6 +170,8 @@ export class ArenaScene extends Phaser.Scene {
   private codex!: CodexController
 
   private player!: PhysicsSprite
+
+  private playerHealthBar?: PlayerHealthBar
 
   private enemySprites!: Phaser.Physics.Arcade.Group
 
@@ -203,11 +223,9 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnTimer?: Phaser.Time.TimerEvent
 
-  private resultTransitionTimer?: Phaser.Time.TimerEvent
-
   private isBossActive = false
 
-  private statusMessage = 'Move with WASD and let your weapon auto-fire while you dodge.'
+  private statusMessage = 'WASD로 이동하고 회피하는 동안 무기가 자동으로 발사됩니다.'
 
   private lastPlayerHitAt = 0
 
@@ -247,13 +265,15 @@ export class ArenaScene extends Phaser.Scene {
     this.player.setCircle(PLAYER_COLLISION_RADIUS)
     this.player.setCollideWorldBounds(true)
     this.player.play('player-idle')
+    this.playerHealthBar = this.createPlayerHealthBar()
+    this.syncPlayerHealthBar()
 
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
-      throw new Error('Keyboard input is required for the NeoD prototype.')
+      throw new Error('NeoD 프로토타입에는 키보드 입력이 필요합니다.')
     }
 
     this.cursors = keyboard.addKeys({
@@ -281,6 +301,7 @@ export class ArenaScene extends Phaser.Scene {
     this.handleFiring(time)
     this.updateEnemies(delta)
     this.updateProjectiles(delta)
+    this.updateLootDrops(delta)
     this.updateHazards(delta)
     this.cleanupDestroyedEntities()
 
@@ -312,8 +333,8 @@ export class ArenaScene extends Phaser.Scene {
     this.isCodexOpen = !this.isCodexOpen
     this.applyInteractionPause(this.isCodexOpen)
     this.statusMessage = this.isCodexOpen
-      ? 'Field Codex open. Combat is paused while you inspect shared data.'
-      : 'Field Codex closed. Combat resumed.'
+      ? '현장 코덱스가 열렸습니다. 공유 데이터를 살펴보는 동안 전투가 일시정지됩니다.'
+      : '현장 코덱스가 닫혔습니다. 전투가 재개됩니다.'
     this.updateCodex()
     this.updateHud()
   }
@@ -548,6 +569,10 @@ export class ArenaScene extends Phaser.Scene {
           projectile.hitEnemyIds = hitStep.hitEnemyIds
           projectile.remainingHits = hitStep.remainingHits
           const didDamage = this.damageEnemy(enemy, projectile.damage)
+          if (this.isRunEnding) {
+            return
+          }
+
           if (didDamage && enemy.sprite.active) {
             this.applyDirectProjectileKnockback(enemy, projectile)
           }
@@ -568,25 +593,98 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
 
+  }
+
+  private updateLootDrops(delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
     for (const loot of this.lootDrops) {
       if (!loot.sprite.active) {
+        this.destroyLootDrop(loot)
         continue
       }
 
-      const pickupDistance = 20
-      if (
-        Phaser.Math.Distance.Between(
-          loot.sprite.x,
-          loot.sprite.y,
-          this.player.x,
-          this.player.y,
-        ) <= pickupDistance
-      ) {
+      const distance = Phaser.Math.Distance.Between(
+        loot.sprite.x,
+        loot.sprite.y,
+        this.player.x,
+        this.player.y,
+      )
+      const pickupPhase = getLootPickupPhase(distance)
+
+      if (pickupPhase === 'collect') {
         const pickupResult = applyLootPickup(this.inventory, loot.itemId)
         this.inventory = pickupResult.nextInventory
         this.statusMessage = pickupResult.statusMessage
-        loot.sprite.destroy()
+        this.destroyLootDrop(loot)
+        continue
       }
+
+      if (pickupPhase === 'attract') {
+        this.applyLootAttraction(loot, distance, delta)
+        continue
+      }
+
+      this.setLootAttractionStyle(loot, false)
+      this.syncLootAura(loot)
+    }
+  }
+
+  private applyLootAttraction(loot: LootEntity, distance: number, delta: number): void {
+    this.setLootAttractionStyle(loot, true)
+
+    const attractionStep = getLootAttractionStep(distance, delta)
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    if (distance <= 0 || travelDistance <= 0) {
+      this.syncLootAura(loot)
+      return
+    }
+
+    const travelRatio = travelDistance / distance
+    loot.sprite.setPosition(
+      loot.sprite.x + (this.player.x - loot.sprite.x) * travelRatio,
+      loot.sprite.y + (this.player.y - loot.sprite.y) * travelRatio,
+    )
+    this.syncLootAura(loot)
+  }
+
+  private setLootAttractionStyle(loot: LootEntity, isAttracting: boolean): void {
+    if (loot.isAttracting === isAttracting) {
+      return
+    }
+
+    loot.isAttracting = isAttracting
+    const itemColor = ITEM_DEFINITIONS[loot.itemId].color
+
+    if (isAttracting) {
+      loot.sprite.setScale(1.18)
+      loot.sprite.setTint(0xffffff)
+      loot.aura.setStrokeStyle(3, 0xffffff, 0.95)
+      return
+    }
+
+    loot.sprite.setScale(1.08)
+    loot.sprite.clearTint()
+    loot.aura.setStrokeStyle(2, itemColor, 0.78)
+  }
+
+  private syncLootAura(loot: LootEntity): void {
+    if (loot.aura.active) {
+      loot.aura.setPosition(loot.sprite.x, loot.sprite.y)
+    }
+  }
+
+  private destroyLootDrop(loot: LootEntity): void {
+    loot.auraTween.stop()
+
+    if (loot.aura.active) {
+      loot.aura.destroy()
+    }
+
+    if (loot.sprite.active) {
+      loot.sprite.destroy()
     }
   }
 
@@ -656,6 +754,11 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.enemies = this.enemies.filter((enemy) => enemy.sprite.active)
+    for (const loot of this.lootDrops) {
+      if (!loot.sprite.active) {
+        this.destroyLootDrop(loot)
+      }
+    }
     this.lootDrops = this.lootDrops.filter((loot) => loot.sprite.active)
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
     this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
@@ -763,11 +866,30 @@ export class ArenaScene extends Phaser.Scene {
       const droppedItem = resolveWeightedDrop(enemy.config.drops)
       if (droppedItem) {
         const itemDefinition = ITEM_DEFINITIONS[droppedItem]
+        const aura = this.add.circle(enemy.sprite.x, enemy.sprite.y, 16, itemDefinition.color, 0.18)
+        aura.setStrokeStyle(2, itemDefinition.color, 0.78)
+        aura.setBlendMode(Phaser.BlendModes.ADD)
+        aura.setDepth(3)
+        const auraTween = this.tweens.add({
+          targets: aura,
+          scale: { from: 0.88, to: 1.18 },
+          alpha: { from: 0.48, to: 0.86 },
+          duration: 720,
+          ease: 'Sine.easeInOut',
+          yoyo: true,
+          repeat: -1,
+        })
+
         const loot = this.physics.add.image(enemy.sprite.x, enemy.sprite.y, itemDefinition.textureKey)
-        loot.setCircle(7)
+        loot.setCircle(10)
+        loot.setDepth(4)
+        loot.setScale(1.08)
         this.lootDrops.push({
           sprite: loot,
           itemId: droppedItem,
+          aura,
+          auraTween,
+          isAttracting: false,
         })
       }
     }
@@ -786,7 +908,7 @@ export class ArenaScene extends Phaser.Scene {
       return true
     }
 
-    this.statusMessage = `${enemy.config.name} defeated. Keep collecting drops.`
+    this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
     return true
   }
 
@@ -798,7 +920,8 @@ export class ArenaScene extends Phaser.Scene {
 
     this.lastPlayerHitAt = now
     this.playerHealth = Math.max(0, this.playerHealth - damage)
-    this.statusMessage = `Player hit for ${damage}. Stay mobile.`
+    this.syncPlayerHealthBar()
+    this.statusMessage = `플레이어가 ${damage} 피해를 받았습니다. 계속 움직이세요.`
     this.player.setAlpha(0.55)
     this.tweens.add({
       targets: this.player,
@@ -828,7 +951,7 @@ export class ArenaScene extends Phaser.Scene {
   private openInventory(): void {
     this.isInventoryOpen = true
     this.applyInteractionPause(true)
-    this.statusMessage = 'Inventory opened. Combat is paused while you inspect and combine.'
+    this.statusMessage = '인벤토리가 열렸습니다. 살펴보고 조합하는 동안 전투가 일시정지됩니다.'
     this.updateHud()
   }
 
@@ -839,7 +962,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.isInventoryOpen = false
     this.applyInteractionPause(false)
-    this.statusMessage = 'Inventory closed. Combat resumed.'
+    this.statusMessage = '인벤토리가 닫혔습니다. 전투가 재개됩니다.'
     this.updateHud()
   }
 
@@ -860,8 +983,20 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     setSpawnLoopPaused(this.spawnTimer, shouldPause)
+    this.setLootPulsePaused(shouldPause)
 
     this.freezeCombat(shouldPause)
+  }
+
+  private setLootPulsePaused(shouldPause: boolean): void {
+    for (const loot of this.lootDrops) {
+      if (shouldPause) {
+        loot.auraTween.pause()
+        continue
+      }
+
+      loot.auraTween.resume()
+    }
   }
 
   private handleRecipeSelection(recipeId: RecipeId): void {
@@ -894,13 +1029,13 @@ export class ArenaScene extends Phaser.Scene {
 
     const nextWeaponId = equipOwnedWeapon(this.ownedWeaponIds, this.activeWeaponId, weaponId)
     if (nextWeaponId === this.activeWeaponId) {
-      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} is already equipped.`
+      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name}은 이미 장착 중입니다.`
       this.updateHud()
       return
     }
 
     this.activeWeaponId = nextWeaponId
-    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} equipped.`
+    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} 장착 완료.`
     this.updateHud()
   }
 
@@ -921,7 +1056,7 @@ export class ArenaScene extends Phaser.Scene {
         ownedWeaponIds: this.ownedWeaponIds,
         tuningState: this.tuningState,
       }, weaponId)
-      this.statusMessage = reason ?? 'That weapon cannot be tuned right now.'
+      this.statusMessage = reason ?? '지금은 해당 무기를 튜닝할 수 없습니다.'
       this.updateHud()
       return
     }
@@ -929,7 +1064,7 @@ export class ArenaScene extends Phaser.Scene {
     const effectLabel = getTuningEffectLabel(result.effectId) ?? result.effectId
     this.inventory = result.nextInventory
     this.tuningState = result.nextTuningState
-    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} tuned: ${effectLabel}.`
+    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} 튜닝 완료: ${effectLabel}.`
     this.updateHud()
   }
 
@@ -1002,6 +1137,77 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private createPlayerHealthBar(): PlayerHealthBar {
+    const { x, y, width, height } = getPlayerHealthBarMetrics(GAME_WIDTH, GAME_HEIGHT)
+    const depth = 30
+
+    const background = this.add
+      .rectangle(x, y, width, height, 0x020713, 0.68)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(1, 0x9cb5ff, 0.36)
+      .setDepth(depth)
+
+    const fill = this.add
+      .rectangle(x + 2, y, width - 4, height - 4, 0x43ef9a, 0.92)
+      .setOrigin(0, 0.5)
+      .setDepth(depth + 1)
+
+    const label = this.add
+      .text(GAME_WIDTH / 2, y - 1, '', {
+        color: '#f7fbff',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '10px',
+        fontStyle: '700',
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + 2)
+      .setShadow(0, 1, '#020713', 2)
+
+    return {
+      background,
+      fill,
+      label,
+      width,
+      height,
+    }
+  }
+
+  private syncPlayerHealthBar(): void {
+    if (!this.playerHealthBar) {
+      return
+    }
+
+    const { fill, label, width, height } = this.playerHealthBar
+    const fillAreaWidth = width - 4
+    const fillWidth = getPlayerHealthFillWidth(this.playerHealth, this.playerMaxHealth, fillAreaWidth)
+    const healthRatio = this.playerMaxHealth > 0 ? this.playerHealth / this.playerMaxHealth : 0
+    const fillColor = healthRatio <= 0.3 ? 0xff5c6c : healthRatio <= 0.6 ? 0xffd166 : 0x43ef9a
+
+    fill.setFillStyle(fillColor, 0.92)
+    fill.setVisible(fillWidth > 0)
+    fill.setDisplaySize(fillWidth, height - 4)
+    label.setText(`HP ${this.playerHealth}/${this.playerMaxHealth}`)
+  }
+
+  private destroyPlayerHealthBar(): void {
+    if (!this.playerHealthBar) {
+      return
+    }
+
+    const { background, fill, label } = this.playerHealthBar
+    if (background.active) {
+      background.destroy()
+    }
+    if (fill.active) {
+      fill.destroy()
+    }
+    if (label.active) {
+      label.destroy()
+    }
+
+    this.playerHealthBar = undefined
+  }
+
   private resetRunState(): void {
     this.destroyRunEntities()
     this.physics.world.resume()
@@ -1031,10 +1237,9 @@ export class ArenaScene extends Phaser.Scene {
   private destroyRunEntities(): void {
     this.spawnTimer?.remove(false)
     this.spawnTimer = undefined
-    this.resultTransitionTimer?.remove(false)
-    this.resultTransitionTimer = undefined
     this.enemySpacingCollider?.destroy()
     this.enemySpacingCollider = undefined
+    this.destroyPlayerHealthBar()
 
     if (this.player?.active) {
       this.player.destroy()
@@ -1051,9 +1256,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     for (const loot of this.lootDrops) {
-      if (loot.sprite.active) {
-        loot.sprite.destroy()
-      }
+      this.destroyLootDrop(loot)
     }
 
     for (const projectile of this.projectiles) {
@@ -1078,7 +1281,7 @@ export class ArenaScene extends Phaser.Scene {
     this.hazardZones = []
   }
 
-  private endRun(outcome: 'win' | 'loss'): void {
+  private endRun(outcome: RunOutcome): void {
     if (this.isRunEnding) {
       return
     }
@@ -1091,36 +1294,17 @@ export class ArenaScene extends Phaser.Scene {
     this.codex.update(getCodexState(false))
     this.physics.world.pause()
     this.freezeCombat(true)
-    this.hud.update({
-      title: outcome === 'win' ? 'Run complete' : 'Run failed',
-      subtitle:
-        outcome === 'win'
-          ? 'Boss defeated. Press R to replay.'
-          : 'The slime swarm overwhelmed the player.',
-      stats: [],
-      inventory: [],
-      recipes: [],
-      objective: 'Press R on the result screen to restart.',
-      tip: 'WASD move · Auto-fire nearest enemy · Dodge telegraphs · Open inventory to swap or combine · Q codex',
-      status: this.statusMessage,
-      inventoryButtonLabel: 'Inventory unavailable',
-      inventoryButtonDisabled: true,
-      modal: {
-        isOpen: false,
-        items: [],
-        recipes: [],
-        weapons: [],
-      },
-    })
+    const payload = this.createResultPayload(outcome)
+    this.hud.update(createRunResultHudState(payload))
+    this.scene.start('result', payload)
+  }
 
-    this.resultTransitionTimer?.remove(false)
-    this.resultTransitionTimer = this.time.delayedCall(600, () => {
-      this.scene.start('result', {
-        outcome,
-        weaponName: WEAPON_DEFINITIONS[this.activeWeaponId].name,
-        wavesCleared: this.wavesCleared,
-      })
-    })
+  private createResultPayload(outcome: RunOutcome): RunResultPayload {
+    return {
+      outcome,
+      weaponName: WEAPON_DEFINITIONS[this.activeWeaponId].name,
+      wavesCleared: this.wavesCleared,
+    }
   }
 
   private updateHud(): void {
@@ -1129,22 +1313,22 @@ export class ArenaScene extends Phaser.Scene {
     const tuningText = weapon.tuningLabel ? ` · ${weapon.tuningLabel}` : ''
 
     this.hud.update({
-      title: 'NeoD Prototype',
-      subtitle: this.activeWaveLabel || 'Preparing arena',
+      title: 'NeoD 프로토타입',
+      subtitle: this.activeWaveLabel || '아레나 준비 중',
       stats: [
-        `Health: ${this.playerHealth}/${this.playerMaxHealth}`,
-        `Weapon: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
-        `Enemies alive: ${this.enemies.length}`,
-        `Remaining spawns: ${this.remainingSpawns}`,
+        `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
+        `무기: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
+        `생존한 적: ${this.enemies.length}`,
+        `남은 출현: ${this.remainingSpawns}`,
       ],
       inventory: describeInventoryEntries(this.inventory),
       recipes: describeAvailableRecipes(actionableRecipes),
       objective: this.isBossActive
-        ? 'Defeat the Crown Slime to clear the run.'
-        : 'Survive the waves, collect drops, and open inventory to combine upgrades.',
-      tip: 'WASD move · Auto-fire nearest enemy · Dodge telegraphs · Open inventory to combine or swap weapons · Q codex',
+        ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
+        : '웨이브를 버티고 드롭을 모아 인벤토리에서 업그레이드를 조합하세요.',
+      tip: 'WASD 이동 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리에서 조합 또는 무기 교체 · Q 코덱스',
       status: this.statusMessage,
-      inventoryButtonLabel: this.isInventoryOpen ? 'Resume run' : 'Open inventory',
+      inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen,
       modal: {
         isOpen: this.isInventoryOpen,
@@ -1403,13 +1587,17 @@ export class ArenaScene extends Phaser.Scene {
       chain.maxChains,
     )
 
-    nearbyTargetIds.forEach((runtimeId, chainIndex) => {
+    for (let chainIndex = 0; chainIndex < nearbyTargetIds.length; chainIndex += 1) {
+      const runtimeId = nearbyTargetIds[chainIndex]
       const target = this.enemies.find((enemy) => enemy.runtimeId === runtimeId && enemy.sprite.active)
       if (!target) {
-        return
+        continue
       }
 
       this.damageEnemy(target, getChainDamage(baseDamage, chainIndex + 1, chain.falloff))
-    })
+      if (this.isRunEnding) {
+        return
+      }
+    }
   }
 }

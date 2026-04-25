@@ -137,6 +137,8 @@ The game must support this loop:
 - Player-facing labels, combat prompts, status text, and run-result messaging should default to Korean in V1.
 - Internal ids, code symbols, and developer-facing documentation do not need to be localized unless a later prompt explicitly requires it.
 - Feedback can be debug-first in V1, but it must be readable
+- Moment-to-moment survival feedback should be visible in the gameplay view when it affects dodging or positioning. The shipped player health bar is a compact Phaser canvas element near the bottom of the arena; the external HUD health text may remain as a fallback, but future HUD cleanup should preserve in-combat readability.
+- Fixed player feedback overlays should use dedicated deterministic helper logic when their geometry differs from enemy-attached overlays. The player health bar uses `src/systems/playerHealthBar.ts` for bottom placement and clamped fill width tests.
 
 ## V1 Vertical Slice Bounds
 
@@ -173,6 +175,32 @@ These are hard scope boundaries for the first playable slice.
 - Multiple player characters
 - Multiple regular enemy archetypes
 - Crafting systems outside the enemy-drop/combine loop
+
+## Scoped Revision: Enemy Types Expansion
+
+The enemy-types expansion interview is a later scoped revision to the
+original V1 baseline, not a rewrite of the initial vertical-slice bounds.
+For that slice, the goal is to make combat less linear by adding enemy
+behavior that pressures player movement routes.
+
+Source artifacts:
+
+- `.omx/specs/deep-interview-enemy-types-expansion.md`
+- `.omx/interviews/enemy-types-expansion-20260425T091049Z.md`
+- `.omx/context/post-interview-enemy-types-expansion-20260425T103734Z.md`
+
+Durable decisions for the enemy expansion slice:
+
+- Target two new regular enemies plus mixed waves, but keep that target
+  flexible if a narrower slice better preserves quality and readability.
+- Prefer movement-route pressure behaviors such as charge, split/fragment,
+  flank/encircle, burst movement, or another quality-driven behavior.
+- Do not add new loot IDs, recipes, weapons, package dependencies, or
+  unrelated reward-loop expansion in the first pass.
+- Preserve boss victory flow: defeating the boss must still end the run in
+  a win, and non-boss enemy defeat must not end the run.
+- Keep new enemy data visible through shared data/codex views and cover new
+  enemy/wave behavior in deterministic tests where practical.
 
 ## Technical Requirements
 

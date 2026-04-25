@@ -42,7 +42,7 @@ export function createInitialArenaRunState(): ArenaRunState {
     activeWaveLabel: '',
     wavesCleared: 0,
     isBossActive: false,
-    statusMessage: 'Move with WASD and let your weapon auto-fire while you dodge.',
+    statusMessage: 'WASD로 이동하고 회피하는 동안 무기가 자동으로 발사됩니다.',
     lastPlayerHitAt: 0,
     nextEnemyRuntimeId: 1,
   }

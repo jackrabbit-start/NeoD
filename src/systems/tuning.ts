@@ -8,17 +8,17 @@ export const STARTER_TUNING_INELIGIBLE_WEAPON_ID: WeaponId = 'starter-blaster'
 export const TUNING_EFFECT_DEFINITIONS = [
   {
     id: 'sharpened-core',
-    label: 'Sharpened Core',
+    label: '날카로운 코어',
     damageDelta: 4,
   },
   {
     id: 'quick-loader',
-    label: 'Quick Loader',
+    label: '고속 장전기',
     fireRateMultiplier: 0.9,
   },
   {
     id: 'stabilized-bore',
-    label: 'Stabilized Bore',
+    label: '안정화 총열',
     projectileSpeedDelta: 70,
     meleeRangeDelta: 18,
   },
@@ -60,19 +60,19 @@ export function getWeaponTuningBlockReason(
   weaponId: WeaponId,
 ): string | null {
   if (!state.ownedWeaponIds.includes(weaponId)) {
-    return 'Weapon is not owned.'
+    return '보유한 무기가 아닙니다.'
   }
 
   if (weaponId === STARTER_TUNING_INELIGIBLE_WEAPON_ID) {
-    return 'Craft a weapon before tuning.'
+    return '튜닝하기 전에 무기를 제작하세요.'
   }
 
   if (state.tuningState[weaponId]) {
-    return 'Already tuned this run.'
+    return '이번 런에서 이미 튜닝했습니다.'
   }
 
   if ((state.inventory[TUNING_CAPSULE_ITEM_ID] ?? 0) <= 0) {
-    return 'Needs a Tuning Capsule.'
+    return '튜닝 캡슐이 필요합니다.'
   }
 
   return null

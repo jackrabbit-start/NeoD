@@ -47,7 +47,7 @@ export function startWaveRuntime(
     currentWaveIndex: index,
     activeWaveLabel: wave.label,
     remainingSpawns,
-    statusMessage: `${wave.label} started.`,
+    statusMessage: `${wave.label} 시작.`,
     isBossActive: wave.isBossWave === true,
   })
 

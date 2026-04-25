@@ -7,15 +7,15 @@ import { HudController } from './ui/Hud.js'
 const app = document.querySelector<HTMLDivElement>('#app')
 
 if (!app) {
-  throw new Error('Expected #app root element.')
+  throw new Error('#app 루트 요소가 필요합니다.')
 }
 
 app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
       <div class="game-header__brand">
-        <strong>NeoD · browser-first V1 prototype</strong>
-        <span>Safe fictional slime run · drop + combine loop</span>
+        <strong>NeoD · 브라우저 우선 V1 프로토타입</strong>
+        <span>안전한 가상 슬라임 런 · 드롭 + 조합 루프</span>
       </div>
       <div class="game-header__rails" aria-hidden="true">
         <span></span>
@@ -34,27 +34,27 @@ app.innerHTML = `
 
 const hudElement = document.querySelector<HTMLElement>('#hud')
 if (!hudElement) {
-  throw new Error('Expected #hud root element.')
+  throw new Error('#hud 루트 요소가 필요합니다.')
 }
 
 const codexElement = document.querySelector<HTMLElement>('#codex')
 if (!codexElement) {
-  throw new Error('Expected #codex overlay element.')
+  throw new Error('#codex 오버레이 요소가 필요합니다.')
 }
 
 const hud = new HudController(hudElement)
 const codex = new CodexController(codexElement)
 
 hud.update({
-  title: 'NeoD Prototype',
-  subtitle: 'Loading arena…',
-  stats: ['Booting Phaser runtime'],
-  inventory: ['Waiting for drops'],
-  recipes: ['Waiting for recipe state'],
-  objective: 'Start the run and defeat the slime boss.',
-  tip: 'WASD move · Auto-fire nearest enemy · Dodge telegraphs · Open inventory to combine · Q codex',
-  status: 'Booting',
-  inventoryButtonLabel: 'Open inventory',
+  title: 'NeoD 프로토타입',
+  subtitle: '아레나 불러오는 중…',
+  stats: ['게임 런타임 시작 중'],
+  inventory: ['드롭 대기 중'],
+  recipes: ['조합 상태 대기 중'],
+  objective: '런을 시작하고 슬라임 보스를 쓰러뜨리세요.',
+  tip: 'WASD 이동 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리에서 조합 · Q 코덱스',
+  status: '시작 중',
+  inventoryButtonLabel: '인벤토리 열기',
   inventoryButtonDisabled: false,
   modal: {
     isOpen: false,

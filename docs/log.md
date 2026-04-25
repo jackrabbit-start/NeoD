@@ -26,6 +26,30 @@
 - Updated `docs/index.md` so future agents can find the UI overlay rendering rule.
 - Source artifacts: `.omx/context/post-interview-codex-scroll-reset-20260425T105023Z.md` and PR #24.
 
+## [2026-04-25] gameplay-ui | Captured player health bar placement rule
+
+- Updated `docs/wiki/game-requirements.md` to record that moment-to-moment survival feedback should be visible in the gameplay canvas when it affects dodging/positioning.
+- Recorded the shipped player health bar as a compact Phaser canvas overlay with deterministic placement/fill helpers.
+- Source artifacts: `.omx/specs/deep-interview-health-bar-bottom.md`, `.omx/interviews/health-bar-bottom-20260425T013800Z.md`, `.omx/context/post-interview-health-bar-bottom-20260425T110701Z.md`, and PR #28.
+
+## [2026-04-25] gameplay-ui | Captured dropped loot pickup UX boundary
+
+- Added `docs/wiki/dropped-loot-pickup-ux.md` to preserve the current-loot-only interpretation, pickup radii, magnet feedback, and true-weapon-drop non-goal.
+- Updated `docs/index.md` so future agents can find the dropped loot pickup guidance.
+- Source artifacts: `.omx/specs/deep-interview-dropped-loot-pickup-design.md`, `.omx/interviews/dropped-loot-pickup-design-20260425T100726Z.md`, `.omx/context/post-interview-dropped-loot-pickup-design-20260425T111351Z.md`, and PR #30.
+
+## [2026-04-25] gameplay | Added run result flow rule
+
+- Added `docs/wiki/run-result-flow.md` to preserve the boss-clear result-screen fix and shared presentation boundary.
+- Updated `docs/index.md` so future agents can find the run-ending flow rules.
+- Source artifacts: `.omx/specs/deep-interview-boss-patterns-end-screen.md`, `.omx/context/post-interview-boss-result-screen-20260425T110444Z.md`, and PR #27.
+
+## [2026-04-25] gameplay | Captured enemy boss pressure experiment
+
+- Added `docs/wiki/enemy-boss-pressure.md` to preserve the 3x density extreme-experiment target, boss anti-sponge rule, and follow-up tuning boundaries.
+- Updated `docs/index.md` so future agents can find the enemy/boss pressure guidance.
+- Source artifacts: `.omx/specs/deep-interview-enemy-boss-pressure.md`, `.omx/interviews/enemy-boss-pressure-20260425T111248Z.md`, `.omx/context/post-interview-enemy-boss-pressure-20260425T112833Z.md`, and PR #31.
+
 ## [2026-04-25] gameplay | Captured melee weapon line architecture lesson
 
 - Added `docs/wiki/melee-weapon-line.md` to synthesize the melee-first interview, PRD, test spec, and implementation verification.
