@@ -87,7 +87,7 @@ export class StartScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     this.add
-      .text(width / 2, Math.max(228, height * 0.5), '김동성은 빚과 오해, 끝없는 추격 사이에서 매번 새 출발을 꿈꿨습니다.\n도망칠수록 더 깊은 경기장으로 밀려났지만, 이번 런만큼은 자기 이름을 되찾으려 합니다.\n토큰 하나, 무기 하나가 그의 기구한 일생을 다시 쓰는 증거입니다.', {
+      .text(width / 2, Math.max(228, height * 0.5), '파친코 도박에 빠진 김동성은 매번 ‘이번 한 번만’이라는 말로 자기 삶을 잃어 갔습니다.\n쌓인 빚과 추격을 피해 들어온 이 경기장은, 중독에서 벗어나기 위한 마지막 탈출구입니다.\n토큰을 삼키는 대신 무기로 바꾸고, 그는 오늘 처음으로 도망이 아닌 탈출을 선택합니다.', {
         fontSize: '17px',
         color: '#ffe28a',
         align: 'center',
