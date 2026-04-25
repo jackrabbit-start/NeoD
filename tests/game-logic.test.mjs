@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -665,6 +665,29 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   assert.equal(hudState.title, '런 클리어')
   assert.equal(hudState.inventoryButtonDisabled, true)
   assert.equal(hudState.modal.isOpen, false)
+})
+
+test('arena frame stops immediately after any run-ending combat step', () => {
+  const arenaSceneSource = readFileSync(resolve(TEST_DIR, '../src/scenes/ArenaScene.ts'), 'utf8')
+
+  for (const step of ['updateEnemies(delta)', 'updateProjectiles(delta)', 'updateHazards(delta)']) {
+    assert.ok(
+      arenaSceneSource.includes(`this.${step}
+    if (this.isRunEnding) {
+      return
+    }`),
+      `${step} must be followed by an isRunEnding guard so boss defeat cannot leave a frozen arena frame`,
+    )
+  }
+
+  assert.ok(
+    arenaSceneSource.includes(`for (const enemy of this.enemies) {
+      if (enemy.sprite.active) {
+        enemy.sprite.setVelocity(0, 0)
+      }
+    }`),
+    'freezeCombat must skip destroyed enemy sprites because boss defeat destroys the boss before endRun freezes combat',
+  )
 })
 
 test('loss result presentation keeps restart guidance distinct from boss clear', () => {
