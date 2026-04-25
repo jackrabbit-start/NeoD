@@ -178,10 +178,36 @@ export interface EnemySpreadBurstAttackBehavior {
   projectileTextureKey: string
 }
 
+export interface EnemyLineBeamAttackBehavior {
+  kind: 'line-beam'
+  cooldownMs: number
+  windupMs: number
+  range: number
+  width: number
+  damage: number
+  tint: number
+}
+
+export interface EnemyRadialBurstAttackBehavior {
+  kind: 'radial-burst'
+  cooldownMs: number
+  windupMs: number
+  range: number
+  projectileCount: number
+  projectileSpeed: number
+  projectileLifetimeMs: number
+  projectileRadius: number
+  damage: number
+  tint: number
+  projectileTextureKey: string
+}
+
 export type EnemyAttackBehavior =
   | EnemyContactAttackBehavior
   | EnemyTelegraphedAoeAttackBehavior
   | EnemySpreadBurstAttackBehavior
+  | EnemyLineBeamAttackBehavior
+  | EnemyRadialBurstAttackBehavior
 
 export interface EnemyVisualDefinition {
   portraitKey?: string

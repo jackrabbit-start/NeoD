@@ -459,6 +459,11 @@ test('player progression starts per run and levels from enemy defeat xp', () => 
     'dash-slime': 2,
     'orbit-slime': 2,
     'needle-wasp': 3,
+    'splitter-slime': 2,
+    'shard-sentinel': 3,
+    'mender-slime': 2,
+    'void-orb': 3,
+    'crusher-slime': 4,
     'slime-boss': 0,
   })
 
@@ -1241,6 +1246,11 @@ test('content id catalogs include scoped enemy and reward branches', () => {
     'dash-slime',
     'orbit-slime',
     'needle-wasp',
+    'splitter-slime',
+    'shard-sentinel',
+    'mender-slime',
+    'void-orb',
+    'crusher-slime',
     'slime-boss',
   ])
 })
@@ -1456,7 +1466,7 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
   assert.equal(codex.isOpen, true)
   assert.equal(codex.items.length, 0)
   assert.equal(codex.recipes.length, 0)
-  assert.equal(codex.enemies.length, 7)
+  assert.equal(codex.enemies.length, 12)
   assert.match(codex.hint, /토큰 파친코/)
 
 
@@ -1866,6 +1876,11 @@ test('enemy visual metadata keeps immutable gameplay geometry while adding art h
       'dash-slime': { size: 24, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
       'orbit-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
       'needle-wasp': { size: 24, textureKey: 'needle-wasp', animationKey: 'needle-wasp-idle' },
+      'splitter-slime': { size: 24, textureKey: 'slime', animationKey: 'slime-idle' },
+      'shard-sentinel': { size: 28, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
+      'mender-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
+      'void-orb': { size: 24, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
+      'crusher-slime': { size: 34, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
       'slime-boss': { size: 44, textureKey: 'slime-boss', animationKey: 'slime-boss-idle' },
     },
   )

@@ -22,14 +22,20 @@ import { GAMEPLAY_CONTROL_TIP, GAME_TITLE } from '../ui/controlCopy.js'
 import { getCodexState } from '../systems/codex.js'
 import {
   advanceEnemyCooldown,
+  createEnemyLineBeam,
+  createEnemyRadialBurstProjectiles,
   createEnemySpreadBurstProjectiles,
   createEnemyRuntimeState,
   createEnemyTelegraph,
   getDistanceBetween,
   isPointInsideCircle,
+  isPointInsideLineBeam,
   resolveEnemyVelocityStep,
+  shouldEnemyStartLineBeam,
+  shouldEnemyStartRadialBurst,
   shouldEnemyStartSpreadBurst,
   shouldEnemyStartTelegraph,
+  type EnemyLineBeamSpec,
   type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
 import {
@@ -210,6 +216,13 @@ interface EnemySpreadBurstCharge {
   totalMs: number
 }
 
+interface EnemyLineBeamCharge {
+  visual: Phaser.GameObjects.Graphics
+  beam: EnemyLineBeamSpec
+  remainingMs: number
+  totalMs: number
+}
+
 interface EnemyEntity {
   runtimeId: number
   sprite: PhysicsSprite
@@ -222,6 +235,7 @@ interface EnemyEntity {
   knockback?: KnockbackState
   telegraph?: EnemyTelegraph
   spreadBurst?: EnemySpreadBurstCharge
+  lineBeam?: EnemyLineBeamCharge
 }
 
 interface PachinkoTokenEntity {
@@ -932,7 +946,42 @@ export class ArenaScene extends Phaser.Scene {
 
           enemy.spreadBurst.visual.destroy()
           enemy.spreadBurst = undefined
-          if (enemy.config.attackBehavior.kind === 'spread-burst') {
+          if (
+            enemy.config.attackBehavior.kind === 'spread-burst' ||
+            enemy.config.attackBehavior.kind === 'radial-burst'
+          ) {
+            enemy.attackCooldownMs = enemy.config.attackBehavior.cooldownMs
+          }
+        }
+
+        enemy.sprite.setVelocity(0, 0)
+        this.syncEnemyHealthBar(enemy)
+        continue
+      }
+
+      if (enemy.lineBeam) {
+        enemy.knockback = clearKnockbackForTelegraph()
+        enemy.lineBeam.remainingMs -= delta
+        enemy.lineBeam.visual.setAlpha(
+          Math.max(0.24, 0.9 * (1 - enemy.lineBeam.remainingMs / enemy.lineBeam.totalMs)),
+        )
+
+        if (enemy.lineBeam.remainingMs <= 0) {
+          if (
+            isPointInsideLineBeam(
+              { x: this.player.x, y: this.player.y },
+              enemy.lineBeam.beam,
+            )
+          ) {
+            this.damagePlayer(enemy.lineBeam.beam.damage)
+            if (this.isRunEnding) {
+              return
+            }
+          }
+
+          enemy.lineBeam.visual.destroy()
+          enemy.lineBeam = undefined
+          if (enemy.config.attackBehavior.kind === 'line-beam') {
             enemy.attackCooldownMs = enemy.config.attackBehavior.cooldownMs
           }
         }
@@ -1000,6 +1049,58 @@ export class ArenaScene extends Phaser.Scene {
         if (projectiles.length > 0) {
           enemy.spreadBurst = {
             visual: this.createSpreadBurstWarning(enemy, projectiles),
+            projectiles,
+            remainingMs: attackBehavior.windupMs,
+            totalMs: attackBehavior.windupMs,
+          }
+          enemy.knockback = clearKnockbackForTelegraph()
+          enemy.sprite.setVelocity(0, 0)
+          this.syncEnemyHealthBar(enemy)
+          continue
+        }
+      }
+
+      if (
+        attackBehavior.kind === 'line-beam' &&
+        shouldEnemyStartLineBeam(
+          attackBehavior,
+          distanceToPlayer,
+          enemy.attackCooldownMs,
+        )
+      ) {
+        const beam = createEnemyLineBeam(
+          { x: enemy.sprite.x, y: enemy.sprite.y },
+          { x: this.player.x, y: this.player.y },
+          attackBehavior,
+        )
+
+        if (beam) {
+          enemy.lineBeam = {
+            visual: this.createLineBeamWarning(beam),
+            beam,
+            remainingMs: beam.durationMs,
+            totalMs: beam.durationMs,
+          }
+          enemy.knockback = clearKnockbackForTelegraph()
+          enemy.sprite.setVelocity(0, 0)
+          this.syncEnemyHealthBar(enemy)
+          continue
+        }
+      }
+
+      if (
+        attackBehavior.kind === 'radial-burst' &&
+        shouldEnemyStartRadialBurst(
+          attackBehavior,
+          distanceToPlayer,
+          enemy.attackCooldownMs,
+        )
+      ) {
+        const projectiles = createEnemyRadialBurstProjectiles(attackBehavior)
+
+        if (projectiles.length > 0) {
+          enemy.spreadBurst = {
+            visual: this.createRadialBurstWarning(enemy, projectiles),
             projectiles,
             remainingMs: attackBehavior.windupMs,
             totalMs: attackBehavior.windupMs,
@@ -1155,6 +1256,44 @@ export class ArenaScene extends Phaser.Scene {
     visual.fillStyle(enemy.config.tint, 0.12)
     visual.fillCircle(enemy.sprite.x, enemy.sprite.y, enemy.config.size * 0.62)
     visual.setAlpha(0.28)
+    return visual
+  }
+
+  private createRadialBurstWarning(
+    enemy: EnemyEntity,
+    projectiles: EnemyProjectileSpawnSpec[],
+  ): Phaser.GameObjects.Graphics {
+    const visual = this.add.graphics().setDepth(0.65)
+    const behavior = enemy.config.attackBehavior
+    const range = behavior.kind === 'radial-burst'
+      ? Math.min(behavior.range, behavior.projectileSpeed * (behavior.projectileLifetimeMs / 1000))
+      : 120
+
+    visual.lineStyle(2, enemy.config.tint, 0.76)
+    visual.strokeCircle(enemy.sprite.x, enemy.sprite.y, range)
+    for (const projectile of projectiles) {
+      visual.lineBetween(
+        enemy.sprite.x,
+        enemy.sprite.y,
+        enemy.sprite.x + projectile.direction.x * range,
+        enemy.sprite.y + projectile.direction.y * range,
+      )
+    }
+    visual.fillStyle(enemy.config.tint, 0.1)
+    visual.fillCircle(enemy.sprite.x, enemy.sprite.y, Math.max(enemy.config.size, range * 0.16))
+    visual.setAlpha(0.32)
+    return visual
+  }
+
+  private createLineBeamWarning(beam: EnemyLineBeamSpec): Phaser.GameObjects.Graphics {
+    const visual = this.add.graphics().setDepth(0.66)
+    visual.lineStyle(beam.width, beam.tint, 0.18)
+    visual.lineBetween(beam.start.x, beam.start.y, beam.end.x, beam.end.y)
+    visual.lineStyle(2, beam.tint, 0.88)
+    visual.lineBetween(beam.start.x, beam.start.y, beam.end.x, beam.end.y)
+    visual.fillStyle(beam.tint, 0.12)
+    visual.fillCircle(beam.start.x, beam.start.y, Math.max(10, beam.width * 0.5))
+    visual.setAlpha(0.36)
     return visual
   }
 
@@ -1699,6 +1838,10 @@ export class ArenaScene extends Phaser.Scene {
     if (enemy.spreadBurst?.visual.active) {
       enemy.spreadBurst.visual.destroy()
       enemy.spreadBurst = undefined
+    }
+    if (enemy.lineBeam?.visual.active) {
+      enemy.lineBeam.visual.destroy()
+      enemy.lineBeam = undefined
     }
     enemy.knockback = undefined
     this.destroyEnemyHealthBar(enemy)
@@ -2348,6 +2491,9 @@ export class ArenaScene extends Phaser.Scene {
       }
       if (enemy.spreadBurst?.visual.active) {
         enemy.spreadBurst.visual.destroy()
+      }
+      if (enemy.lineBeam?.visual.active) {
+        enemy.lineBeam.visual.destroy()
       }
       this.destroyEnemyHealthBar(enemy)
       if (enemy.sprite.active) {

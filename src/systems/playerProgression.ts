@@ -15,6 +15,11 @@ export const ENEMY_PLAYER_XP: Record<EnemyId, number> = {
   'dash-slime': 2,
   'orbit-slime': 2,
   'needle-wasp': 3,
+  'splitter-slime': 2,
+  'shard-sentinel': 3,
+  'mender-slime': 2,
+  'void-orb': 3,
+  'crusher-slime': 4,
   'slime-boss': 0,
 }
 
