@@ -327,7 +327,7 @@ export class HudController {
 
       const output = document.createElement('span')
       output.className = 'hud-modal__recipe-output'
-      output.textContent = `${recipe.outputWeaponName} · ${recipe.damage} dmg`
+      output.textContent = `${recipe.outputWeaponName} · ${recipe.damage} dmg · ${recipe.identity}`
 
       button.append(textGroup, output)
       return button
@@ -355,7 +355,7 @@ export class HudController {
 
       const meta = document.createElement('span')
       meta.className = 'hud-modal__weapon-meta'
-      meta.textContent = `${weapon.isEquipped ? 'Equipped' : 'Equip'} · ${weapon.damage} dmg`
+      meta.textContent = `${weapon.isEquipped ? 'Equipped' : 'Equip'} · ${weapon.damage} dmg · ${weapon.identity}`
 
       button.append(textGroup, meta)
       return button

@@ -9,6 +9,42 @@ export interface ItemDefinition {
   color: number
 }
 
+export interface WeaponSingleBehavior {
+  kind: 'single'
+  projectileLifetimeMs: number
+}
+
+export interface WeaponSprayHazardBehavior {
+  kind: 'spray-hazard'
+  projectileCount: number
+  spreadDegrees: number
+  projectileLifetimeMs: number
+  hazardRadius: number
+  hazardDurationMs: number
+  hazardTickMs: number
+  hazardDamage: number
+}
+
+export interface WeaponPierceBehavior {
+  kind: 'pierce'
+  projectileLifetimeMs: number
+  maxHits: number
+}
+
+export interface WeaponChainBehavior {
+  kind: 'chain'
+  projectileLifetimeMs: number
+  maxChains: number
+  chainRange: number
+  chainFalloff: number
+}
+
+export type WeaponAttackBehavior =
+  | WeaponSingleBehavior
+  | WeaponSprayHazardBehavior
+  | WeaponPierceBehavior
+  | WeaponChainBehavior
+
 export interface WeaponDefinition {
   id: WeaponId
   name: string
@@ -17,6 +53,7 @@ export interface WeaponDefinition {
   fireRateMs: number
   projectileSpeed: number
   projectileTint: number
+  attackBehavior: WeaponAttackBehavior
 }
 
 export interface RecipeDefinition {
@@ -75,6 +112,7 @@ export interface HudRecipeView {
   outputWeaponId: WeaponId
   outputWeaponName: string
   damage: number
+  identity: string
   inputs: string[]
 }
 
@@ -83,6 +121,7 @@ export interface HudOwnedWeaponView {
   name: string
   description: string
   damage: number
+  identity: string
   isEquipped: boolean
 }
 
