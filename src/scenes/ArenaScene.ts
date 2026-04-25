@@ -3231,6 +3231,19 @@ export class ArenaScene extends Phaser.Scene {
     return Math.min(fallbackInsideX, Math.max(leftmostVisibleCenter, preferredOutsideX))
   }
 
+  private getPachinkoOddsHudPosition(index: number): { x: number; y: number } {
+    const viewport = this.getViewportSize()
+    const metrics = getPlayerHealthBarMetrics(viewport.width, viewport.height)
+    const startX = Math.min(viewport.width - 120, metrics.x + metrics.width + 28)
+    const startY = metrics.y + 2
+    const column = index % 5
+    const row = Math.floor(index / 5)
+    return {
+      x: startX + column * 52,
+      y: startY + row * 18,
+    }
+  }
+
   private syncPachinkoBoard(): RectBounds {
     const rect = this.getPachinkoWorldRect()
     const previousRect = this.pachinkoBoardRect
@@ -3397,7 +3410,7 @@ export class ArenaScene extends Phaser.Scene {
     this.syncPachinkoBoard()
   }
 
-  private createPachinkoOddsVisuals(rect: RectBounds): void {
+  private createPachinkoOddsVisuals(_rect: RectBounds): void {
     const rows = getPachinkoWeaponOddsRows(
       this.pachinkoTokenXp,
       PACHINKO_SLOT_COUNT,
@@ -3409,26 +3422,24 @@ export class ArenaScene extends Phaser.Scene {
 
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index]
-      const column = index % 5
-      const line = Math.floor(index / 5)
-      const x = rect.x + 24 + column * ((rect.width - 48) / 4)
-      const y = rect.y + 72 + line * 28
+      const { x, y } = this.getPachinkoOddsHudPosition(index)
       const icon = this.add.image(x, y, row.iconKey)
         .setDepth(63)
         .setDisplaySize(14, 14)
+        .setScrollFactor(0)
       const label = this.add.text(x + 12, y, row.percentLabel, {
         color: '#dbeafe',
         fontFamily: 'Inter, system-ui, sans-serif',
         fontSize: '8px',
         fontStyle: '700',
-      }).setOrigin(0, 0.5).setDepth(63)
+      }).setOrigin(0, 0.5).setDepth(63).setScrollFactor(0)
 
       this.pachinkoOddsVisuals.push({ icon, label })
       this.pachinkoVisuals.push(icon, label)
     }
   }
 
-  private syncPachinkoOddsVisuals(rect: RectBounds): void {
+  private syncPachinkoOddsVisuals(_rect: RectBounds): void {
     const rows = getPachinkoWeaponOddsRows(
       this.pachinkoTokenXp,
       PACHINKO_SLOT_COUNT,
@@ -3445,10 +3456,7 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
-      const column = index % 5
-      const line = Math.floor(index / 5)
-      const x = rect.x + 24 + column * ((rect.width - 48) / 4)
-      const y = rect.y + 72 + line * 28
+      const { x, y } = this.getPachinkoOddsHudPosition(index)
       visual.icon.setTexture(row.iconKey).setPosition(x, y).setDisplaySize(14, 14)
       visual.label.setPosition(x + 12, y).setText(row.percentLabel)
     }

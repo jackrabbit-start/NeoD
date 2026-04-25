@@ -1966,8 +1966,8 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
     })
 
     const weaponList = controller.weaponList
-    const firstWeaponGroup = weaponList.children[0]
-    const firstWeaponRow = firstWeaponGroup.children[0]
+    const firstWeaponEntry = weaponList.children[0]
+    const firstWeaponRow = firstWeaponEntry.children[1] ? firstWeaponEntry : firstWeaponEntry.children[0]
     const actions = firstWeaponRow.children[1]
     const meta = actions.children[0]
 
