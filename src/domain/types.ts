@@ -11,6 +11,18 @@ export interface WeaponStack {
   count: number
 }
 
+export interface HudEnemyOddsRow {
+  enemyId: EnemyId
+  enemyName: string
+  iconKey: string
+  percentLabel: string
+}
+
+export interface HudEnemyOddsState {
+  stageLabel: string
+  rows: HudEnemyOddsRow[]
+}
+
 export interface PachinkoHudState {
   level: number
   totalTokenXp: number
@@ -20,7 +32,7 @@ export interface PachinkoHudState {
   isTokenInFlight: boolean
   latestReward: string | null
   synergy?: string
-  enemyOdds?: string[]
+  enemyOdds?: HudEnemyOddsState
 }
 
 export type EnemyAnimationKey =

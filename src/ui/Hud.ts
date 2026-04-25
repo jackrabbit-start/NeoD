@@ -1,5 +1,6 @@
 import type {
   HudCharacterStatView,
+  HudEnemyOddsRow,
   HudModalState,
   HudOwnedWeaponView,
   HudStageSelectionState,
@@ -7,7 +8,7 @@ import type {
   HudState,
   WeaponStackKey,
 } from '../domain/types.js'
-import { getHudWeaponAssetPath } from '../game/visualManifest.js'
+import { getHudEnemyAssetPath, getHudWeaponAssetPath } from '../game/visualManifest.js'
 import { formatWeaponStarLabel } from '../systems/weaponOwnership.js'
 
 export interface HudControllerHandlers {
@@ -46,17 +47,23 @@ const renderSummarySection = (title: string, content: string, className = '') =>
   </section>
 `
 
-const renderTitleEnemyOdds = (enemyOdds?: string[]) => {
-  if (!enemyOdds || enemyOdds.length === 0) {
+const renderEnemyOddsChip = (row: HudEnemyOddsRow) => `
+  <span class="hud-summary__enemy-odds-chip" title="${escapeHtml(row.enemyName)} ${escapeHtml(row.percentLabel)}" aria-label="${escapeHtml(row.enemyName)} ${escapeHtml(row.percentLabel)}">
+    <img src="${escapeHtml(getHudEnemyAssetPath(row.iconKey))}" alt="" aria-hidden="true" loading="lazy" />
+    <strong>${escapeHtml(row.percentLabel)}</strong>
+  </span>
+`
+
+const renderEnemyOddsPanel = (enemyOdds?: NonNullable<HudState['pachinko']>['enemyOdds']) => {
+  if (!enemyOdds || enemyOdds.rows.length === 0) {
     return ''
   }
 
-  const [phaseLabel = '현재', ...enemyRows] = enemyOdds
   return `
     <div class="hud-summary__enemy-odds" aria-label="현재 적 출현 확률">
-      <span class="hud-summary__enemy-odds-label">적 출현 확률 · ${escapeHtml(phaseLabel)}</span>
+      <span class="hud-summary__enemy-odds-label">적 출현 확률 · ${escapeHtml(enemyOdds.stageLabel)}</span>
       <div class="hud-summary__enemy-odds-chips">
-        ${enemyRows.map((row) => `<span>${escapeHtml(row)}</span>`).join('')}
+        ${enemyOdds.rows.map(renderEnemyOddsChip).join('')}
       </div>
     </div>
   `
@@ -326,7 +333,7 @@ export class HudController {
           <div class="hud-summary__title-block">
             <h1>${escapeHtml(state.title)}</h1>
             <p>${escapeHtml(state.subtitle)}</p>
-            ${renderTitleEnemyOdds(state.pachinko?.enemyOdds)}
+            ${renderEnemyOddsPanel(state.pachinko?.enemyOdds)}
           </div>
           ${renderStatusPanel(state)}
           <button
@@ -339,10 +346,10 @@ export class HudController {
         <div class="hud-summary__grid">
           ${renderSummarySection('능력치', renderList(state.stats), 'hud-summary__section--stats')}
           ${renderSummarySection('패시브', renderList(state.passives ?? []), 'hud-summary__section--stats')}
-          ${(state.pachinko?.enemyOdds ?? []).length > 0
+          ${state.pachinko?.enemyOdds
             ? renderSummarySection(
-                `적 출현 확률 · ${state.pachinko?.enemyOdds?.[0] ?? '현재'}`,
-                renderList(state.pachinko?.enemyOdds?.slice(1) ?? []),
+                `적 출현 확률 · ${state.pachinko.enemyOdds.stageLabel}`,
+                renderEnemyOddsPanel(state.pachinko.enemyOdds),
                 'hud-summary__section--enemy-odds',
               )
             : ''}

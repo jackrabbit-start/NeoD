@@ -103,7 +103,7 @@ function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
   }
 
   const surgeIndex = (phaseIndex + minuteIndex) % entries.length
-  const surgeAmount = Math.max(1, Math.ceil((minuteIndex + 1) / 6))
+  const surgeAmount = Math.max(2, Math.ceil((minuteIndex + 2) / 2))
   entries[surgeIndex] = {
     ...entries[surgeIndex],
     count: entries[surgeIndex].count + surgeAmount,

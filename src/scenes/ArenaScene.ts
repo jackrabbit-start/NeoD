@@ -3164,10 +3164,16 @@ export class ArenaScene extends Phaser.Scene {
     )
     const playerProgression = getPlayerProgressionView(this.playerProgression.totalXp)
     const currentPhase = getRunPhaseByElapsedMs(this.runElapsedMs)
-    const enemyChanceLines = getRunEnemySpawnChanceRows(currentPhase).map(
+    const enemyChanceRows = getRunEnemySpawnChanceRows(currentPhase).map((row) => ({
+      ...row,
+      iconKey: ENEMY_DEFINITIONS[row.enemyId].textureKey,
+    }))
+    const enemyChanceLines = enemyChanceRows.map(
       (row) => `${row.enemyName} ${row.percentLabel}`,
     )
-    const visibleEnemyChanceLines = enemyChanceLines.slice(0, 5)
+    const visibleEnemyChanceLines = enemyChanceRows.slice(0, 5).map(
+      (row) => `${row.percentLabel} ${row.enemyName}`,
+    )
     this.syncEnemyOddsHudText(enemyChanceLines)
     const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
 
@@ -3228,7 +3234,10 @@ export class ArenaScene extends Phaser.Scene {
         isTokenInFlight: this.activePachinkoTokens.length > 0,
         latestReward: this.latestPachinkoReward,
         synergy: getPachinkoWeaponSynergySummary(weaponId),
-        enemyOdds: [this.getRunStageOddsLabel(currentPhase), ...enemyChanceLines],
+        enemyOdds: {
+          stageLabel: this.getRunStageOddsLabel(currentPhase),
+          rows: enemyChanceRows,
+        },
       },
       modal: {
         isOpen: this.isInventoryOpen,

@@ -19,6 +19,8 @@ export interface AnimationDefinition {
 
 export const getHudWeaponAssetPath = (iconKey: string) => `assets/hud/weapons/${iconKey.replace(/^weapon-/, '')}.svg`
 
+export const getHudEnemyAssetPath = (iconKey: string) => `assets/units/${iconKey}-idle-0.svg`
+
 export const VECTOR_ASSETS: VectorAssetDefinition[] = [
   {
     key: 'player',

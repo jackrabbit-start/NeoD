@@ -1234,7 +1234,7 @@ test('run progression spawn sequence interleaves weighted enemies early', () => 
   const firstBackPhase = getRunPhaseByElapsedMs(30_000)
   const sequence = flattenRunPhaseEntries(firstBackPhase)
 
-  assert.equal(sequence.length, 11)
+  assert.equal(sequence.length, 12)
   assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
 })
 
@@ -1242,11 +1242,13 @@ test('hud places enemy spawn odds beside the game title for visibility', () => {
   const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
   const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
 
-  assert.ok(hudSource.includes('renderTitleEnemyOdds(state.pachinko?.enemyOdds)'))
+  assert.ok(hudSource.includes('renderEnemyOddsPanel(state.pachinko?.enemyOdds)'))
   assert.ok(hudSource.includes("hud-summary__section--enemy-odds"))
   assert.ok(hudSource.includes('hud-summary__enemy-odds'))
+  assert.ok(hudSource.includes('getHudEnemyAssetPath(row.iconKey)'))
   assert.ok(hudSource.includes('적 출현 확률 ·'))
   assert.ok(styleSource.includes('.hud-summary__enemy-odds'))
+  assert.ok(styleSource.includes('.hud-summary__enemy-odds-chip img'))
 })
 
 test('arena hud injects enemy spawn odds into the visible stats list', () => {
@@ -1254,13 +1256,15 @@ test('arena hud injects enemy spawn odds into the visible stats list', () => {
   const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
   const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
 
-  assert.ok(arenaSceneSource.includes('const visibleEnemyChanceLines = enemyChanceLines.slice(0, 5)'))
+  assert.ok(arenaSceneSource.includes('const visibleEnemyChanceLines = enemyChanceRows.slice(0, 5).map'))
   assert.ok(arenaSceneSource.includes('`적 출현 확률 (${this.getRunStageOddsLabel(currentPhase)})`'))
   assert.ok(arenaSceneSource.includes('...visibleEnemyChanceLines'))
   assert.ok(arenaSceneSource.includes('currentTimeLabel: formatRunTime(this.runElapsedMs)'))
   assert.ok(arenaSceneSource.includes('자석 효과 활성화'))
   assert.ok(arenaSceneSource.includes('enemyOddsLabel'))
   assert.ok(arenaSceneSource.includes('syncEnemyOddsHudText(enemyChanceLines)'))
+  assert.ok(arenaSceneSource.includes('iconKey: ENEMY_DEFINITIONS[row.enemyId].textureKey'))
+  assert.ok(arenaSceneSource.includes('rows: enemyChanceRows'))
   assert.ok(arenaSceneSource.includes('const currentTimeLabel = formatRunTime(this.runElapsedMs)'))
   assert.ok(arenaSceneSource.includes('getRunStageOddsLabel(phase'))
   assert.ok(arenaSceneSource.includes('현재 시간 ${currentTimeLabel} · 적 출현 확률 · ${stageLabel} ·'))
