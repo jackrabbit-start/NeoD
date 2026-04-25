@@ -13,8 +13,8 @@ if (!app) {
 app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
-      <strong>NeoD · browser-first V1 prototype</strong>
-      <span>Safe fictional slime run · drop + combine loop</span>
+      <strong>NeoD · 브라우저 우선 V1 프로토타입</strong>
+      <span>안전한 가상 슬라임 런 · 드롭 + 조합 루프</span>
     </header>
     <section class="game-stage-shell">
       <section class="game-frame">
@@ -40,15 +40,15 @@ const hud = new HudController(hudElement)
 const codex = new CodexController(codexElement)
 
 hud.update({
-  title: 'NeoD Prototype',
-  subtitle: 'Loading arena…',
-  stats: ['Booting Phaser runtime'],
-  inventory: ['Waiting for drops'],
-  recipes: ['Waiting for recipe state'],
-  objective: 'Start the run and defeat the slime boss.',
-  tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to combine · Q codex',
-  status: 'Booting',
-  inventoryButtonLabel: 'Open inventory',
+  title: 'NeoD 프로토타입',
+  subtitle: '전장을 불러오는 중…',
+  stats: ['Phaser 런타임 시작 중'],
+  inventory: ['드롭 대기 중'],
+  recipes: ['조합 정보 대기 중'],
+  objective: '런을 시작하고 슬라임 보스를 처치하세요.',
+  tip: 'WASD 이동 · 마우스 조준 · 클릭 유지 사격 · I 인벤토리 · Q 코덱스',
+  status: '시작 중',
+  inventoryButtonLabel: '인벤토리 열기',
   inventoryButtonDisabled: false,
   modal: {
     isOpen: false,

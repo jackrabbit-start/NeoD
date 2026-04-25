@@ -64,29 +64,29 @@ export class HudController {
     this.modalLayer.className = 'hud-modal-layer'
     this.modalLayer.innerHTML = `
       <div class="hud-modal__backdrop" data-action="inventory-close"></div>
-      <section class="hud-modal" role="dialog" aria-modal="true" aria-label="Inventory">
+      <section class="hud-modal" role="dialog" aria-modal="true" aria-label="인벤토리">
         <header class="hud-modal__header">
           <div>
-            <p class="hud-modal__eyebrow">Inventory pause</p>
-            <h2>Owned items and weapons</h2>
+            <p class="hud-modal__eyebrow">인벤토리 일시정지</p>
+            <h2>보유 아이템과 무기</h2>
           </div>
-          <button type="button" class="hud-button hud-button--secondary" data-action="inventory-close">Resume run</button>
+          <button type="button" class="hud-button hud-button--secondary" data-action="inventory-close">런 재개</button>
         </header>
         <div class="hud-modal__grid">
           <section class="hud-modal__section">
-            <h3>Owned items</h3>
+            <h3>보유 아이템</h3>
             <div class="hud-modal__list" data-region="items"></div>
           </section>
           <section class="hud-modal__section hud-modal__detail">
-            <h3>Item detail</h3>
+            <h3>아이템 상세</h3>
             <div data-region="item-detail"></div>
           </section>
           <section class="hud-modal__section">
-            <h3>Craftable combines</h3>
+            <h3>가능한 조합</h3>
             <div class="hud-modal__list" data-region="recipes"></div>
           </section>
           <section class="hud-modal__section">
-            <h3>Owned weapons</h3>
+            <h3>보유 무기</h3>
             <div class="hud-modal__list" data-region="weapons"></div>
           </section>
         </div>
@@ -201,7 +201,7 @@ export class HudController {
         <div class="hud-summary__title-block">
           <p class="hud-summary__eyebrow">${escapeHtml(state.title)}</p>
           <p class="hud-summary__subtitle">${escapeHtml(state.subtitle)}</p>
-          <p class="hud-summary__status"><strong>Status:</strong> ${escapeHtml(state.status)}</p>
+          <p class="hud-summary__status"><strong>상태:</strong> ${escapeHtml(state.status)}</p>
         </div>
         <div class="hud-summary__action-block">
           <button
@@ -215,19 +215,19 @@ export class HudController {
       </div>
       <div class="hud-summary__grid">
         <section class="hud-summary__section">
-          <h2>Stats</h2>
+          <h2>상태 정보</h2>
           ${renderList(state.stats)}
         </section>
         <section class="hud-summary__section">
-          <h2>Inventory</h2>
+          <h2>인벤토리</h2>
           ${renderList(state.inventory)}
         </section>
         <section class="hud-summary__section">
-          <h2>Available combines</h2>
+          <h2>가능한 조합</h2>
           ${renderList(state.recipes)}
         </section>
         <section class="hud-summary__section">
-          <h2>Objective</h2>
+          <h2>목표</h2>
           <p>${escapeHtml(state.objective)}</p>
         </section>
       </div>
@@ -243,7 +243,7 @@ export class HudController {
       this.hoveredItemId = null
       this.modalSignature = ''
       this.itemList.replaceChildren()
-      this.itemDetail.replaceChildren(this.createEmptyText('No collected item selected.'))
+      this.itemDetail.replaceChildren(this.createEmptyText('선택된 획득 아이템이 없습니다.'))
       this.recipeList.replaceChildren()
       this.weaponList.replaceChildren()
       return
@@ -291,13 +291,13 @@ export class HudController {
 
     const hoveredItem = this.modalState.items.find((item) => item.id === this.hoveredItemId)
     this.itemDetail.replaceChildren(
-      ...(hoveredItem ? this.createItemDetailNodes(hoveredItem) : [this.createEmptyText('No collected item selected.')]),
+      ...(hoveredItem ? this.createItemDetailNodes(hoveredItem) : [this.createEmptyText('선택된 획득 아이템이 없습니다.')]),
     )
   }
 
   private createItemButtons(items: HudOwnedItemView[]): HTMLElement[] {
     if (items.length === 0) {
-      return [this.createEmptyText('No drops collected yet.')]
+      return [this.createEmptyText('아직 획득한 드롭이 없습니다.')]
     }
 
     return items.map((item) => {
@@ -319,7 +319,7 @@ export class HudController {
 
   private createRecipeButtons(recipes: HudRecipeView[]): HTMLElement[] {
     if (recipes.length === 0) {
-      return [this.createEmptyText('No actionable combine yet.')]
+      return [this.createEmptyText('지금 바로 가능한 조합이 없습니다.')]
     }
 
     return recipes.map((recipe) => {
@@ -338,7 +338,7 @@ export class HudController {
 
       const output = document.createElement('span')
       output.className = 'hud-modal__recipe-output'
-      output.textContent = `${recipe.outputWeaponName} · ${recipe.damage} dmg · ${recipe.identity}`
+      output.textContent = `${recipe.outputWeaponName} · 피해 ${recipe.damage} · ${recipe.identity}`
 
       button.append(textGroup, output)
       return button
@@ -347,7 +347,7 @@ export class HudController {
 
   private createWeaponButtons(weapons: HudOwnedWeaponView[]): HTMLElement[] {
     if (weapons.length === 0) {
-      return [this.createEmptyText('No owned weapons yet.')]
+      return [this.createEmptyText('아직 보유한 무기가 없습니다.')]
     }
 
     return weapons.map((weapon) => {
@@ -366,7 +366,7 @@ export class HudController {
 
       const meta = document.createElement('span')
       meta.className = 'hud-modal__weapon-meta'
-      meta.textContent = `${weapon.isEquipped ? 'Equipped' : 'Equip'} · ${weapon.damage} dmg · ${weapon.identity}`
+      meta.textContent = `${weapon.isEquipped ? '장착 중' : '장착'} · 피해 ${weapon.damage} · ${weapon.identity}`
 
       button.append(textGroup, meta)
       return button
@@ -386,7 +386,7 @@ export class HudController {
 
     const count = document.createElement('p')
     count.className = 'hud-modal__detail-meta'
-    count.textContent = `Owned: ${item.count}`
+    count.textContent = `보유 수량: ${item.count}`
 
     wrapper.append(name, description, count)
     return [wrapper]

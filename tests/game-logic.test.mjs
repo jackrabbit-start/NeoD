@@ -75,7 +75,7 @@ test('loot pickup workflow updates inventory and reports the pickup message', ()
 
   assert.deepEqual(result, {
     nextInventory: { 'gel-shard': 1 },
-    statusMessage: 'Collected Gel Shard.',
+    statusMessage: '젤 파편 획득.',
   })
 })
 
@@ -90,7 +90,7 @@ test('recipe selection workflow reports the current not-actionable status messag
 
   assert.deepEqual(result, {
     kind: 'not-actionable',
-    statusMessage: 'That combine is no longer actionable. Choose another option.',
+    statusMessage: '해당 조합은 더 이상 실행할 수 없습니다. 다른 옵션을 선택하세요.',
   })
 })
 
@@ -111,17 +111,17 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
     nextInventory: {},
     ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
     activeWeaponId: 'acid-sprayer',
-    statusMessage: 'Acid Sprayer crafted and equipped. Resume the run when ready.',
+    statusMessage: '산성 분사기 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
   })
 })
 
 test('inventory presenter mirrors the arena summary strings', () => {
-  assert.deepEqual(describeInventoryEntries({}), ['No drops collected yet.'])
-  assert.deepEqual(describeInventoryEntries({ 'gel-shard': 2 }), ['Gel Shard × 2'])
+  assert.deepEqual(describeInventoryEntries({}), ['아직 획득한 드롭이 없습니다.'])
+  assert.deepEqual(describeInventoryEntries({ 'gel-shard': 2 }), ['젤 파편 × 2'])
 })
 
 test('recipe presenter mirrors the actionable combine summary strings', () => {
-  assert.deepEqual(describeAvailableRecipes([]), ['No actionable combine yet.'])
+  assert.deepEqual(describeAvailableRecipes([]), ['지금 바로 가능한 조합이 없습니다.'])
 
   const recipes = getActionableRecipes(
     {
@@ -132,7 +132,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(recipes), [
-    'Acid Sprayer → 20 dmg · 4 shots/s · Acid spray (Turns stable slime matter into corrosive firepower.)',
+    '산성 분사기 → 피해 20 · 초당 4발 · 산성 분사 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
   ])
 })
 

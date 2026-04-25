@@ -147,7 +147,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private statusMessage = 'Move with WASD, aim with the mouse, and click to fire.'
+  private statusMessage = 'WASD로 이동하고, 마우스로 조준한 뒤, 클릭으로 사격하세요.'
 
   private lastPlayerHitAt = 0
 
@@ -189,7 +189,7 @@ export class ArenaScene extends Phaser.Scene {
     arena.setStrokeStyle(2, 0x214266, 0.9)
 
     this.add
-      .text(40, GAME_HEIGHT - 36, 'Prototype goal: survive the slime waves and beat the boss', {
+      .text(40, GAME_HEIGHT - 36, '프로토타입 목표: 슬라임 웨이브를 버티고 보스를 쓰러뜨리기', {
         fontSize: '16px',
         color: '#9bb5ff',
       })
@@ -259,8 +259,8 @@ export class ArenaScene extends Phaser.Scene {
     this.isCodexOpen = !this.isCodexOpen
     this.applyInteractionPause(this.isCodexOpen)
     this.statusMessage = this.isCodexOpen
-      ? 'Field Codex open. Combat is paused while you inspect shared data.'
-      : 'Field Codex closed. Combat resumed.'
+      ? '현장 코덱스를 열었습니다. 공유 데이터를 보는 동안 전투가 일시정지됩니다.'
+      : '현장 코덱스를 닫았습니다. 전투를 다시 진행합니다.'
     this.updateCodex()
     this.updateHud()
   }
@@ -525,7 +525,7 @@ export class ArenaScene extends Phaser.Scene {
     this.currentWaveIndex = index
     this.activeWaveLabel = wave.label
     this.remainingSpawns = wave.count
-    this.statusMessage = `${wave.label} started.`
+    this.statusMessage = `${wave.label} 시작.`
 
     if (wave.isBossWave) {
       this.isBossActive = true
@@ -647,7 +647,7 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    this.statusMessage = `${enemy.config.name} defeated. Keep collecting drops.`
+    this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
   }
 
   private damagePlayer(damage: number): void {
@@ -658,7 +658,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.lastPlayerHitAt = now
     this.playerHealth = Math.max(0, this.playerHealth - damage)
-    this.statusMessage = `Player hit for ${damage}. Stay mobile.`
+    this.statusMessage = `${damage} 피해를 입었습니다. 계속 움직이세요.`
     this.player.setTint(0xffa8a8)
 
     this.time.delayedCall(120, () => {
@@ -686,7 +686,7 @@ export class ArenaScene extends Phaser.Scene {
   private openInventory(): void {
     this.isInventoryOpen = true
     this.applyInteractionPause(true)
-    this.statusMessage = 'Inventory opened. Combat is paused while you inspect and combine.'
+    this.statusMessage = '인벤토리를 열었습니다. 확인하고 조합하는 동안 전투가 일시정지됩니다.'
     this.updateHud()
   }
 
@@ -697,7 +697,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.isInventoryOpen = false
     this.applyInteractionPause(false)
-    this.statusMessage = 'Inventory closed. Combat resumed.'
+    this.statusMessage = '인벤토리를 닫았습니다. 전투를 다시 진행합니다.'
     this.updateHud()
   }
 
@@ -746,13 +746,13 @@ export class ArenaScene extends Phaser.Scene {
 
     const nextWeaponId = equipOwnedWeapon(this.ownedWeaponIds, this.activeWeaponId, weaponId)
     if (nextWeaponId === this.activeWeaponId) {
-      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} is already equipped.`
+      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name}는 이미 장착 중입니다.`
       this.updateHud()
       return
     }
 
     this.activeWeaponId = nextWeaponId
-    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} equipped.`
+    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} 장착 완료.`
     this.updateHud()
   }
 
@@ -829,18 +829,18 @@ export class ArenaScene extends Phaser.Scene {
     this.codex.update(getCodexState(false))
     this.freezeCombat(true)
     this.hud.update({
-      title: outcome === 'win' ? 'Run complete' : 'Run failed',
+      title: outcome === 'win' ? '런 완료' : '런 실패',
       subtitle:
         outcome === 'win'
-          ? 'Boss defeated. Press R to replay.'
-          : 'The slime swarm overwhelmed the player.',
+          ? '보스를 처치했습니다. R 키를 눌러 다시 플레이하세요.'
+          : '슬라임 무리가 플레이어를 압도했습니다.',
       stats: [],
       inventory: [],
       recipes: [],
-      objective: 'Press R on the result screen to restart.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to swap or combine · Q codex',
+      objective: '결과 화면에서 R 키를 눌러 다시 시작하세요.',
+      tip: 'WASD 이동 · 마우스 조준 · 클릭 유지 사격 · I 인벤토리 · Q 코덱스',
       status: this.statusMessage,
-      inventoryButtonLabel: 'Inventory unavailable',
+      inventoryButtonLabel: '인벤토리 사용 불가',
       inventoryButtonDisabled: true,
       modal: {
         isOpen: false,
@@ -864,22 +864,22 @@ export class ArenaScene extends Phaser.Scene {
     const actionableRecipes = getActionableRecipes(this.inventory, this.ownedWeaponIds)
 
     this.hud.update({
-      title: 'NeoD Prototype',
-      subtitle: this.activeWaveLabel || 'Preparing arena',
+      title: 'NeoD 프로토타입',
+      subtitle: this.activeWaveLabel || '전장 준비 중',
       stats: [
-        `Health: ${this.playerHealth}/${this.playerMaxHealth}`,
-        `Weapon: ${weapon.name} · ${getWeaponSummary(weapon)}`,
-        `Enemies alive: ${this.enemies.length}`,
-        `Remaining spawns: ${this.remainingSpawns}`,
+        `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
+        `무기: ${weapon.name} · ${getWeaponSummary(weapon)}`,
+        `생존 적 수: ${this.enemies.length}`,
+        `남은 등장 수: ${this.remainingSpawns}`,
       ],
       inventory: describeInventoryEntries(this.inventory),
       recipes: describeAvailableRecipes(actionableRecipes),
       objective: this.isBossActive
-        ? 'Defeat the Crown Slime to clear the run.'
-        : 'Survive the waves, collect drops, and open inventory to combine upgrades.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to combine or swap weapons · Q codex',
+        ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
+        : '웨이브를 버티고, 드롭을 모아, 인벤토리에서 조합해 강화하세요.',
+      tip: 'WASD 이동 · 마우스 조준 · 클릭 유지 사격 · I 인벤토리 · Q 코덱스',
       status: this.statusMessage,
-      inventoryButtonLabel: this.isInventoryOpen ? 'Resume run' : 'Open inventory',
+      inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen,
       modal: {
         isOpen: this.isInventoryOpen,
