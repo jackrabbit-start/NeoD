@@ -6,6 +6,8 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
     name: '산성 분사기',
     inputs: ['gel-shard', 'acid-core'],
     outputWeaponId: 'acid-sprayer',
+    identityLabel: '부식 압박',
+    identityHint: '산성 재료를 넓은 분사와 잔류 피해로 바꾸는 근접 압박 분기입니다.',
     note: '안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.',
   },
   {
@@ -13,6 +15,8 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
     name: '서리 랜스',
     inputs: ['gel-shard', 'frost-mote'],
     outputWeaponId: 'frost-lance',
+    identityLabel: '정밀 관통',
+    identityHint: '차가운 집중력으로 적 줄을 꿰뚫는 빠른 관통 분기입니다.',
     note: '얼어붙은 에너지를 빠르고 정밀한 무기로 끌어냅니다.',
   },
   {
@@ -20,6 +24,8 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
     name: '폭풍 캐넌',
     inputs: ['acid-core', 'frost-mote'],
     outputWeaponId: 'storm-cannon',
+    identityLabel: '혼합 중화력',
+    identityHint: '산성과 서리를 균형 있게 묶어 묵직한 단발 화력을 만드는 분기입니다.',
     note: '불안정한 산성과 서리를 결합해 더 강한 혼합 무기를 만듭니다.',
   },
   {
@@ -27,6 +33,26 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
     name: '아크 룸',
     inputs: ['spark-knot', 'mist-bead'],
     outputWeaponId: 'arc-loom',
+    identityLabel: '연쇄 제압',
+    identityHint: '전하와 안개를 엮어 몰려 있는 적 사이로 피해를 번지게 하는 분기입니다.',
     note: '밝은 전하와 차가운 안개를 엮어 더 빠른 격자형 무기를 만듭니다.',
+  },
+  {
+    id: 'spark-carbine-recipe',
+    name: '스파크 카빈',
+    inputs: ['gel-shard', 'spark-knot'],
+    outputWeaponId: 'spark-carbine',
+    identityLabel: '고속 전격',
+    identityHint: '젤 결속력을 전하 추진으로 바꿔 빠른 정밀 사격을 이어가는 분기입니다.',
+    note: '안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.',
+  },
+  {
+    id: 'mist-vortex-recipe',
+    name: '안개 소용돌이',
+    inputs: ['frost-mote', 'mist-bead'],
+    outputWeaponId: 'mist-vortex',
+    identityLabel: '안개 제어',
+    identityHint: '차가운 안개를 넓게 머물게 해 전장을 늦추고 구역을 장악하는 분기입니다.',
+    note: '서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.',
   },
 ]

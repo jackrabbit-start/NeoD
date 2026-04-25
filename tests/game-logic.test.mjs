@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
 import { ITEM_DEFINITIONS } from '../.tmp-test/src/data/items.js'
+import { RECIPE_DEFINITIONS } from '../.tmp-test/src/data/recipes.js'
 import { WEAPON_DEFINITIONS } from '../.tmp-test/src/data/weapons.js'
+import { RECIPE_IDS, WEAPON_IDS } from '../.tmp-test/src/data/contentIds.js'
 import { resolveCombine, getAvailableRecipes } from '../.tmp-test/src/systems/combine.js'
 import { getCodexState } from '../.tmp-test/src/systems/codex.js'
 import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RADIUS, PROJECTILE_HIT_PADDING } from '../.tmp-test/src/game/combatGeometry.js'
@@ -83,6 +85,40 @@ test('new arc recipe resolves from the new sample drops', () => {
   assert.deepEqual(combined?.nextInventory, {})
 })
 
+test('spark carbine recipe resolves from existing gel and spark drops', () => {
+  let inventory = {}
+  inventory = addItem(inventory, 'gel-shard')
+  inventory = addItem(inventory, 'spark-knot')
+
+  const availableRecipes = getAvailableRecipes(inventory)
+  assert.ok(availableRecipes.some(({ recipe }) => recipe.id === 'spark-carbine-recipe'))
+
+  const actionableRecipes = getActionableRecipes(inventory, ['starter-blaster'])
+  assert.ok(actionableRecipes.some(({ recipe }) => recipe.id === 'spark-carbine-recipe'))
+
+  const combined = resolveCombine(inventory, 'spark-carbine-recipe')
+  assert.ok(combined)
+  assert.equal(combined?.weaponId, 'spark-carbine')
+  assert.deepEqual(combined?.nextInventory, {})
+})
+
+test('mist vortex recipe resolves from existing frost and mist drops', () => {
+  let inventory = {}
+  inventory = addItem(inventory, 'frost-mote')
+  inventory = addItem(inventory, 'mist-bead')
+
+  const availableRecipes = getAvailableRecipes(inventory)
+  assert.ok(availableRecipes.some(({ recipe }) => recipe.id === 'mist-vortex-recipe'))
+
+  const actionableRecipes = getActionableRecipes(inventory, ['starter-blaster'])
+  assert.ok(actionableRecipes.some(({ recipe }) => recipe.id === 'mist-vortex-recipe'))
+
+  const combined = resolveCombine(inventory, 'mist-vortex-recipe')
+  assert.ok(combined)
+  assert.equal(combined?.weaponId, 'mist-vortex')
+  assert.deepEqual(combined?.nextInventory, {})
+})
+
 test('invalid combine attempts do not produce upgrades', () => {
   const combined = resolveCombine({ 'gel-shard': 1 }, 'acid-sprayer-recipe')
   assert.equal(combined, null)
@@ -141,7 +177,7 @@ test('inventory presenter mirrors the arena summary strings', () => {
 test('recipe presenter mirrors the actionable combine summary strings', () => {
   assert.deepEqual(describeAvailableRecipes([]), ['지금 바로 가능한 조합이 없습니다.'])
 
-  const recipes = getActionableRecipes(
+  const acidRecipes = getActionableRecipes(
     {
       'gel-shard': 1,
       'acid-core': 1,
@@ -149,8 +185,30 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
 
-  assert.deepEqual(describeAvailableRecipes(recipes), [
-    '산성 분사기 → 피해 20 · 초당 4발 · 산성 분사 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
+  assert.deepEqual(describeAvailableRecipes(acidRecipes), [
+    '산성 분사기 [부식 압박] → 피해 20 · 초당 4발 · 부식 압박 (안정적인 슬라임 물질을 부식성 화력으로 바꿉니다.)',
+  ])
+
+  const sparkRecipes = getActionableRecipes(
+    {
+      'gel-shard': 1,
+      'spark-knot': 1,
+    },
+    ['starter-blaster'],
+  )
+  const mistRecipes = getActionableRecipes(
+    {
+      'frost-mote': 1,
+      'mist-bead': 1,
+    },
+    ['starter-blaster'],
+  )
+
+  assert.deepEqual(describeAvailableRecipes(sparkRecipes), [
+    '스파크 카빈 [고속 전격] → 피해 15 · 초당 7발 · 고속 전격 (안정적인 젤 코어로 전하를 붙잡아 가벼운 고속 무기로 만듭니다.)',
+  ])
+  assert.deepEqual(describeAvailableRecipes(mistRecipes), [
+    '안개 소용돌이 [안개 제어] → 피해 14 · 초당 4발 · 안개 제어 (서리 입자와 안개 구슬을 회전시켜 오래 남는 제어 지대를 만듭니다.)',
   ])
 })
 
@@ -200,6 +258,38 @@ test('new recipe selection adds the new owned weapon path', () => {
   assert.equal(result?.activeWeaponId, 'arc-loom')
 })
 
+test('branch recipe selections add the new owned weapon paths', () => {
+  const sparkResult = applyRecipeSelection(
+    {
+      inventory: {
+        'gel-shard': 1,
+        'spark-knot': 1,
+      },
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'spark-carbine-recipe',
+  )
+
+  assert.ok(sparkResult)
+  assert.deepEqual(sparkResult?.ownedWeaponIds, ['starter-blaster', 'spark-carbine'])
+  assert.equal(sparkResult?.activeWeaponId, 'spark-carbine')
+
+  const mistResult = applyRecipeSelection(
+    {
+      inventory: {
+        'frost-mote': 1,
+        'mist-bead': 1,
+      },
+      ownedWeaponIds: ['starter-blaster'],
+    },
+    'mist-vortex-recipe',
+  )
+
+  assert.ok(mistResult)
+  assert.deepEqual(mistResult?.ownedWeaponIds, ['starter-blaster', 'mist-vortex'])
+  assert.equal(mistResult?.activeWeaponId, 'mist-vortex')
+})
+
 test('duplicate-output recipe selections do not consume inventory', () => {
   const result = applyRecipeSelection(
     {
@@ -213,6 +303,36 @@ test('duplicate-output recipe selections do not consume inventory', () => {
   )
 
   assert.equal(result, null)
+})
+
+test('duplicate-output branch recipe selections do not consume inventory', () => {
+  assert.equal(
+    applyRecipeSelection(
+      {
+        inventory: {
+          'gel-shard': 1,
+          'spark-knot': 1,
+        },
+        ownedWeaponIds: ['starter-blaster', 'spark-carbine'],
+      },
+      'spark-carbine-recipe',
+    ),
+    null,
+  )
+
+  assert.equal(
+    applyRecipeSelection(
+      {
+        inventory: {
+          'frost-mote': 1,
+          'mist-bead': 1,
+        },
+        ownedWeaponIds: ['starter-blaster', 'mist-vortex'],
+      },
+      'mist-vortex-recipe',
+    ),
+    null,
+  )
 })
 
 test('equipping an owned weapon only changes the active weapon id', () => {
@@ -371,14 +491,32 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
 
   assert.equal(codex.isOpen, true)
   assert.equal(codex.items.length, 6)
-  assert.equal(codex.recipes.length, 4)
+  assert.equal(codex.recipes.length, 6)
   assert.equal(codex.enemies.length, 4)
 
   const arcRecipe = codex.recipes.find((recipe) => recipe.id === 'arc-loom-recipe')
+  assert.equal(arcRecipe?.identityLabel, '연쇄 제압')
+  assert.match(arcRecipe?.identityHint ?? '', /전하/)
   assert.deepEqual(
     arcRecipe?.inputs.map((input) => input.id),
     ['spark-knot', 'mist-bead'],
   )
+
+  const sparkRecipe = codex.recipes.find((recipe) => recipe.id === 'spark-carbine-recipe')
+  assert.equal(sparkRecipe?.identityLabel, '고속 전격')
+  assert.deepEqual(
+    sparkRecipe?.inputs.map((input) => input.id),
+    ['gel-shard', 'spark-knot'],
+  )
+  assert.equal(sparkRecipe?.output.id, 'spark-carbine')
+
+  const mistRecipe = codex.recipes.find((recipe) => recipe.id === 'mist-vortex-recipe')
+  assert.equal(mistRecipe?.identityLabel, '안개 제어')
+  assert.deepEqual(
+    mistRecipe?.inputs.map((input) => input.id),
+    ['frost-mote', 'mist-bead'],
+  )
+  assert.equal(mistRecipe?.output.id, 'mist-vortex')
 
   const voltSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
   assert.ok(voltSlime)
@@ -393,6 +531,24 @@ test('codex selectors expose shared items, recipes, and enemies', () => {
     prismSlime?.drops.map((drop) => drop.id),
     ['tuning-capsule'],
   )
+})
+
+test('recipe identity metadata stays aligned with known ids and weapon outputs', () => {
+  const recipeIds = new Set(RECIPE_IDS)
+  const weaponIds = new Set(WEAPON_IDS)
+
+  assert.equal(RECIPE_DEFINITIONS.length, RECIPE_IDS.length)
+
+  for (const recipe of RECIPE_DEFINITIONS) {
+    assert.ok(recipeIds.has(recipe.id), `${recipe.id} should be registered`)
+    assert.ok(weaponIds.has(recipe.outputWeaponId), `${recipe.outputWeaponId} should be registered`)
+    assert.ok(recipe.identityLabel.trim(), `${recipe.id} should expose an identity label`)
+    assert.ok(recipe.identityHint.trim(), `${recipe.id} should expose an identity hint`)
+    assert.equal(WEAPON_DEFINITIONS[recipe.outputWeaponId].identityLabel, recipe.identityLabel)
+  }
+
+  assert.ok(WEAPON_DEFINITIONS['spark-carbine'].identityLabel?.trim())
+  assert.ok(WEAPON_DEFINITIONS['mist-vortex'].identityLabel?.trim())
 })
 
 test('elite drop table returns a tuning capsule', () => {
@@ -417,6 +573,36 @@ test('tuning consumes one capsule and records a deterministic effect', () => {
   assert.deepEqual(result?.nextInventory, { 'tuning-capsule': 1 })
   assert.deepEqual(result?.nextTuningState, { 'acid-sprayer': 'sharpened-core' })
   assert.equal(result?.effectId, 'sharpened-core')
+})
+
+test('branch weapons remain eligible for tuning as crafted weapons', () => {
+  const sparkResult = resolveTuningSelection(
+    {
+      inventory: { 'tuning-capsule': 1 },
+      ownedWeaponIds: ['starter-blaster', 'spark-carbine'],
+      tuningState: {},
+    },
+    'spark-carbine',
+    () => 0.34,
+  )
+
+  assert.ok(sparkResult)
+  assert.deepEqual(sparkResult?.nextInventory, {})
+  assert.deepEqual(sparkResult?.nextTuningState, { 'spark-carbine': 'quick-loader' })
+
+  const mistResult = resolveTuningSelection(
+    {
+      inventory: { 'tuning-capsule': 1 },
+      ownedWeaponIds: ['starter-blaster', 'mist-vortex'],
+      tuningState: {},
+    },
+    'mist-vortex',
+    () => 0.99,
+  )
+
+  assert.ok(mistResult)
+  assert.deepEqual(mistResult?.nextInventory, {})
+  assert.deepEqual(mistResult?.nextTuningState, { 'mist-vortex': 'stabilized-bore' })
 })
 
 test('tuning rejects invalid selections without consuming capsules', () => {
@@ -570,6 +756,14 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'arc-loom': {
         projectileTextureKey: 'arc-projectile',
         hudIconKey: 'weapon-arc-loom',
+      },
+      'spark-carbine': {
+        projectileTextureKey: 'spark-projectile',
+        hudIconKey: 'weapon-spark-carbine',
+      },
+      'mist-vortex': {
+        projectileTextureKey: 'mist-projectile',
+        hudIconKey: 'weapon-mist-vortex',
       },
     },
   )
