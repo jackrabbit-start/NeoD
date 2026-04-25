@@ -288,11 +288,6 @@ export interface HudOwnedWeaponView {
   fireRateMs: number
   projectileSpeed: number
   isEquipped: boolean
-  tuningLabel: string | null
-  canTune: boolean
-  tuneDisabledReason: string | null
-  canFuse?: boolean
-  fuseDisabledReason?: string | null
   hudIconKey?: string
   accentColor?: number
 }

@@ -57,7 +57,7 @@ export function createRunResultPresentation(payload: RunResultPayload): RunResul
       `피날레 진입: ${payload.finaleReached ? '예' : '아니오'}`,
     ],
     inventoryLines: [isWin ? '보스는 추가 토큰을 주지 않고 클리어를 확정합니다.' : '미해결 토큰은 런 종료와 함께 정리됩니다.'],
-    recipeLines: ['같은 무기·같은 별 2개 합성으로 다음 별 등급을 노리는 루프입니다.'],
+    recipeLines: ['같은 무기·같은 별 3개 자동 합성으로 다음 별 등급을 노리는 루프입니다.'],
     restartPrompt,
   }
 }

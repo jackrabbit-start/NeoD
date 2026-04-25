@@ -78,6 +78,7 @@ import { getWeaponAttackRange } from '../.tmp-test/src/systems/weaponBehaviors.j
 import {
   STARTER_WEAPON_STACK_KEY,
   addWeaponStack,
+  addWeaponStackWithAutoFusion,
   applyRecipeSelection,
   canFuseWeaponStack,
   createWeaponStackKey,
@@ -638,30 +639,35 @@ test('pachinko launch capacity respects active cap, queue, and cadence', () => {
     lastLaunchAt: 1000 - PACHINKO_TOKEN_LAUNCH_INTERVAL_MS,
   }), true)
 })
-test('weapon star stacks fuse only same weapon and same star into the next grade', () => {
+test('weapon star stacks auto-fuse three matching weapons into the next grade', () => {
   let stacks = seedWeaponStacks()
   stacks = addWeaponStack(stacks, 'starter-blaster', 1, 1)
-  stacks = addWeaponStack(stacks, 'acid-sprayer', 2, 2)
+  stacks = addWeaponStack(stacks, 'acid-sprayer', 2, 3)
 
   const starterKey = createWeaponStackKey('starter-blaster', 1)
   const acidTwoKey = createWeaponStackKey('acid-sprayer', 2)
-  assert.equal(canFuseWeaponStack(stacks, starterKey), true)
+  assert.equal(canFuseWeaponStack(stacks, starterKey), false)
   assert.equal(canFuseWeaponStack(stacks, acidTwoKey), true)
   assert.equal(equipWeaponStack(stacks, starterKey, acidTwoKey), acidTwoKey)
 
-  const fusedStarter = fuseWeaponStack({ weaponStacks: stacks, activeWeaponKey: starterKey }, starterKey)
-  assert.ok(fusedStarter)
-  assert.equal(fusedStarter?.activeWeaponKey, createWeaponStackKey('starter-blaster', 2))
+  const fusedStarter = addWeaponStackWithAutoFusion(
+    { weaponStacks: stacks, activeWeaponKey: starterKey },
+    'starter-blaster',
+    1,
+    1,
+  )
+  assert.equal(fusedStarter.activeWeaponKey, createWeaponStackKey('starter-blaster', 2))
   assert.deepEqual(
-    fusedStarter?.weaponStacks.find((stack) => stack.weaponId === 'starter-blaster' && stack.star === 2),
+    fusedStarter.weaponStacks.find((stack) => stack.weaponId === 'starter-blaster' && stack.star === 2),
     { weaponId: 'starter-blaster', star: 2, count: 1 },
   )
+  assert.equal(fusedStarter.fusions.length, 2)
   assert.ok(
-    deriveEffectiveWeaponStats(fusedStarter.weaponId, {}, fusedStarter.resultStar).damage
-      > deriveEffectiveWeaponStats(fusedStarter.weaponId, {}, 1).damage,
+    deriveEffectiveWeaponStats(fusedStarter.fusions[0].weaponId, {}, fusedStarter.fusions[0].resultStar).damage
+      > deriveEffectiveWeaponStats(fusedStarter.fusions[0].weaponId, {}, 1).damage,
   )
 
-  const highStar = addWeaponStack([], 'arc-loom', 5, 2)
+  const highStar = addWeaponStack([], 'arc-loom', 5, 3)
   const arcFiveKey = createWeaponStackKey('arc-loom', 5)
   const fusedArc = fuseWeaponStack({ weaponStacks: highStar, activeWeaponKey: arcFiveKey }, arcFiveKey)
   assert.equal(canFuseWeaponStack(highStar, arcFiveKey), true)
@@ -1583,11 +1589,9 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
       this.assignments += 1
       this.#innerHTML = value
 
-      if (value.includes('data-region="items"')) {
+      if (value.includes('data-region="equipped-weapons"')) {
         this.#regions.set('button[data-action="inventory-close"]', new FakeElement('button'))
-        this.#regions.set('[data-region="items"]', new FakeElement('div'))
-        this.#regions.set('[data-region="item-detail"]', new FakeElement('div'))
-        this.#regions.set('[data-region="recipes"]', new FakeElement('div'))
+        this.#regions.set('[data-region="equipped-weapons"]', new FakeElement('div'))
         this.#regions.set('[data-region="weapons"]', new FakeElement('div'))
       }
       if (value.includes('data-region="stages"')) {
