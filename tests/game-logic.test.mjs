@@ -34,15 +34,18 @@ import {
   ARENA_WORLD_BOUNDS,
   ENEMY_SPAWN_MIN_DISTANCE,
   HEART_ITEM_RADIUS,
+  MAGNET_ITEM_RADIUS,
   PLAYER_SAFE_RADIUS,
   createMapLayout,
   getAmbientItemSpawnPoints,
   getHeartItemSpawnPoints,
+  getMagnetItemSpawnPoints,
   getWorldCenter,
   isCircleClearOfObstacles,
   isPointWithinWorld,
   selectAmbientItemSpawnPoint,
   selectHeartItemSpawnPoint,
+  selectMagnetItemSpawnPoint,
   selectEnemySpawnPoint,
 } from '../.tmp-test/src/systems/mapLayout.js'
 import {
@@ -56,6 +59,18 @@ import {
   getNextHeartPickupSpawnAt,
   shouldSpawnHeartPickup,
 } from '../.tmp-test/src/systems/healthPickups.js'
+import {
+  MAGNET_PICKUP_ATTRACTION_RADIUS,
+  MAGNET_PICKUP_DURATION_MS,
+  MAGNET_PICKUP_INITIAL_DELAY_MS,
+  MAGNET_PICKUP_INTERVAL_MS,
+  MAGNET_PICKUP_MAX_ACTIVE,
+  getInitialMagnetPickupSpawnAt,
+  getMagnetizedUntil,
+  getNextMagnetPickupSpawnAt,
+  isMagnetActive,
+  shouldSpawnMagnetPickup,
+} from '../.tmp-test/src/systems/magnetPickups.js'
 import {
   getTopRightMiniMapBounds,
   projectWorldPointToMiniMap,
@@ -295,6 +310,8 @@ test('loot pickup phase uses a forgiving collect radius and attraction band', ()
   assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS + 0.01), 'attract')
   assert.equal(getLootPickupPhase(LOOT_COLLECT_RADIUS), 'collect')
   assert.equal(getLootPickupPhase(Number.POSITIVE_INFINITY), 'idle')
+  assert.equal(getLootPickupPhase(MAGNET_PICKUP_ATTRACTION_RADIUS, MAGNET_PICKUP_ATTRACTION_RADIUS), 'attract')
+  assert.equal(getLootPickupPhase(MAGNET_PICKUP_ATTRACTION_RADIUS + 1, MAGNET_PICKUP_ATTRACTION_RADIUS), 'idle')
 })
 
 test('loot attraction step is bounded to the attraction phase', () => {
@@ -302,6 +319,7 @@ test('loot attraction step is bounded to the attraction phase', () => {
   assert.equal(getLootAttractionStep(LOOT_COLLECT_RADIUS, 16), 0)
   assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, 16) > 0, true)
   assert.equal(getLootAttractionStep((LOOT_ATTRACTION_RADIUS + LOOT_COLLECT_RADIUS) / 2, -16), 0)
+  assert.equal(getLootAttractionStep(MAGNET_PICKUP_ATTRACTION_RADIUS - 1, 16, MAGNET_PICKUP_ATTRACTION_RADIUS) > 0, true)
 })
 
 test('loot pickup workflow updates inventory and reports the pickup message', () => {
@@ -832,6 +850,23 @@ test('heart item spawn points are sparse map pickups outside inventory loot', ()
   assert.deepEqual(selectHeartItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
 })
 
+
+test('magnet item spawn points are map utility pickups outside inventory loot', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawnPoints = getMagnetItemSpawnPoints(layout.worldBounds, layout.obstacles)
+
+  assert.equal(spawnPoints.length >= 4, true)
+  assert.equal(LOOT_IDS.includes('magnet-pickup'), false)
+  for (const spawn of spawnPoints) {
+    assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 56), true)
+    assert.equal(isCircleClearOfObstacles(spawn, MAGNET_ITEM_RADIUS, layout.obstacles), true)
+  }
+
+  assert.deepEqual(layout.magnetItemSpawns, spawnPoints)
+  assert.deepEqual(selectMagnetItemSpawnPoint(spawnPoints, () => 0), spawnPoints[0])
+  assert.deepEqual(selectMagnetItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
+})
+
 test('enemy map spawn selection respects player distance, world bounds, and obstacle clearance', () => {
   const layout = createMapLayout(ARENA_WORLD_BOUNDS)
   const spawn = selectEnemySpawnPoint(
@@ -852,7 +887,7 @@ test('enemy map spawn selection respects player distance, world bounds, and obst
 
 test('heart pickup healing and intermittent spawn gates stay deterministic', () => {
   assert.equal(HEART_PICKUP_HEAL_AMOUNT, 24)
-  assert.equal(HEART_PICKUP_MAX_ACTIVE, 3)
+  assert.equal(HEART_PICKUP_MAX_ACTIVE, 4)
   assert.equal(getHealedPlayerHealth(40, 100), 64)
   assert.equal(getHealedPlayerHealth(90, 100), 100)
   assert.equal(getHealedPlayerHealth(-5, 100), 24)
@@ -860,11 +895,29 @@ test('heart pickup healing and intermittent spawn gates stay deterministic', () 
   assert.equal(getNextHeartPickupSpawnAt(1_000, () => 0), 1_000 + HEART_PICKUP_INTERVAL_MS)
   assert.equal(
     getNextHeartPickupSpawnAt(1_000, () => 0.999),
-    1_000 + HEART_PICKUP_INTERVAL_MS + 3_996,
+    1_000 + HEART_PICKUP_INTERVAL_MS + 2_997,
   )
   assert.equal(shouldSpawnHeartPickup(6_999, 7_000, 0), false)
   assert.equal(shouldSpawnHeartPickup(7_000, 7_000, HEART_PICKUP_MAX_ACTIVE), false)
   assert.equal(shouldSpawnHeartPickup(7_000, 7_000, HEART_PICKUP_MAX_ACTIVE - 1), true)
+})
+
+
+test('magnet pickup timing and duration stay deterministic', () => {
+  assert.equal(MAGNET_PICKUP_MAX_ACTIVE, 2)
+  assert.equal(MAGNET_PICKUP_DURATION_MS, 5_000)
+  assert.equal(getInitialMagnetPickupSpawnAt(1_000), 1_000 + MAGNET_PICKUP_INITIAL_DELAY_MS)
+  assert.equal(getNextMagnetPickupSpawnAt(1_000, () => 0), 1_000 + MAGNET_PICKUP_INTERVAL_MS)
+  assert.equal(
+    getNextMagnetPickupSpawnAt(1_000, () => 0.999),
+    1_000 + MAGNET_PICKUP_INTERVAL_MS + 5_994,
+  )
+  assert.equal(getMagnetizedUntil(3_000), 8_000)
+  assert.equal(isMagnetActive(7_999, 8_000), true)
+  assert.equal(isMagnetActive(8_000, 8_000), false)
+  assert.equal(shouldSpawnMagnetPickup(10_999, 11_000, 0), false)
+  assert.equal(shouldSpawnMagnetPickup(11_000, 11_000, MAGNET_PICKUP_MAX_ACTIVE), false)
+  assert.equal(shouldSpawnMagnetPickup(11_000, 11_000, MAGNET_PICKUP_MAX_ACTIVE - 1), true)
 })
 
 test('minimap projects world points and viewport into the top-right overlay', () => {
@@ -1153,19 +1206,14 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
     {
       enemyId: 'slime',
       enemyName: '진흙 슬라임',
-      count: 17,
-      ratio: 17 / 19,
-      percentLabel: '89%',
-    },
-    {
-      enemyId: 'dash-slime',
-      enemyName: '대시 슬라임',
-      count: 2,
-      ratio: 2 / 19,
-      percentLabel: '11%',
+      count: 16,
+      ratio: 1,
+      percentLabel: '100%',
     },
   ])
-  assert.ok(firstRows.some((row) => row.enemyId === 'dash-slime'))
+  const firstBackRows = getRunEnemySpawnChanceRows(getRunPhaseByElapsedMs(30_000))
+  assert.ok(firstBackRows.some((row) => row.enemyId === 'dash-slime'))
+  assert.notDeepEqual(firstRows, firstBackRows)
   assert.notDeepEqual(thirdMinuteFrontRows, thirdMinuteBackRows)
   assert.ok(lateRows.length > 4)
   assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
@@ -1176,8 +1224,8 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
 
 
 test('run progression spawn sequence interleaves weighted enemies early', () => {
-  const firstPhase = getRunPhaseByElapsedMs(0)
-  const sequence = flattenRunPhaseEntries(firstPhase)
+  const firstBackPhase = getRunPhaseByElapsedMs(30_000)
+  const sequence = flattenRunPhaseEntries(firstBackPhase)
 
   assert.equal(sequence.length, 19)
   assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
@@ -1203,6 +1251,7 @@ test('arena hud injects enemy spawn odds into the visible stats list', () => {
   assert.ok(arenaSceneSource.includes("`적 출현 확률 (${currentPhase.label.split(' · ')[0]"))
   assert.ok(arenaSceneSource.includes('...visibleEnemyChanceLines'))
   assert.ok(arenaSceneSource.includes('currentTimeLabel: formatRunTime(this.runElapsedMs)'))
+  assert.ok(arenaSceneSource.includes('자석 효과 활성화'))
   assert.ok(arenaSceneSource.includes('enemyOddsLabel'))
   assert.ok(arenaSceneSource.includes('syncEnemyOddsHudText(enemyChanceLines)'))
   assert.ok(arenaSceneSource.includes('const currentTimeLabel = formatRunTime(this.runElapsedMs)'))
