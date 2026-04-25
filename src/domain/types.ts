@@ -230,6 +230,7 @@ export interface RunProgressionPhaseDefinition {
   spawnIntervalMs: number
   burstSize: number
   softEnemyCap: number
+  healthMultiplier: number
   oneTimeSpawns?: EnemyId[]
   isFinale?: boolean
 }

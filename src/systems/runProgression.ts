@@ -55,7 +55,7 @@ export function getRunStageStartElapsedMs(stageIndex: number): number | null {
 }
 
 export function getRunStageIndex(elapsedMs: number): number {
-  return Math.min(5, Math.floor(clampRunElapsedMs(elapsedMs) / RUN_STAGE_DURATION_MS))
+  return Math.min(29, Math.floor(clampRunElapsedMs(elapsedMs) / RUN_STAGE_DURATION_MS))
 }
 
 export function getRunStageReachedLabel(elapsedMs: number): string {
@@ -108,7 +108,9 @@ export function getRunStageSelectionViews(currentElapsedMs: number): HudStageVie
     const entrySummary = phase.entries
       .map((entry) => `${ENEMY_DEFINITIONS[entry.enemyId]?.name ?? entry.enemyId} × ${entry.count}`)
       .join(' · ')
-    const finaleLabel = phase.startMs === FINAL_STAGE_START_MS ? '보스 결전' : `${phase.softEnemyCap}체 상한 압박`
+    const finaleLabel = phase.startMs === FINAL_STAGE_START_MS
+      ? '보스 결전'
+      : `${phase.softEnemyCap}체 상한 · 체력 ×${phase.healthMultiplier}`
 
     return {
       index: phase.stageIndex,
