@@ -41,6 +41,7 @@ import {
   resolveKnockbackHit,
   type KnockbackState,
 } from '../systems/knockback.js'
+import { shouldApplyPlayerDamage } from '../systems/playerDamageRules.js'
 import {
   advanceHazardState,
   applyProjectileHitState,
@@ -785,7 +786,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private damagePlayer(damage: number): void {
     const now = this.time.now
-    if (now - this.lastPlayerHitAt < 450 || this.isInteractionBlocked()) {
+    if (!shouldApplyPlayerDamage(now, this.lastPlayerHitAt, this.isInteractionBlocked())) {
       return
     }
 

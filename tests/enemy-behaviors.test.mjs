@@ -38,6 +38,45 @@ test('orbit movement makes spark slime circle while backing off when too close',
   assert.ok(velocity.y > 0)
 })
 
+test('enemy pressure constants match the survival pressure pass', () => {
+  const slime = ENEMY_DEFINITIONS.slime
+  const spark = ENEMY_DEFINITIONS['spark-slime']
+  const prism = ENEMY_DEFINITIONS['prism-slime']
+  const dash = ENEMY_DEFINITIONS['dash-slime']
+  const orbit = ENEMY_DEFINITIONS['orbit-slime']
+  const boss = ENEMY_DEFINITIONS['slime-boss']
+
+  assert.equal(slime.maxHealth, 26)
+  assert.equal(slime.speed, 66)
+  assert.equal(slime.contactDamage, 12)
+
+  assert.equal(spark.maxHealth, 34)
+  assert.equal(spark.speed, 76)
+  assert.equal(spark.contactDamage, 14)
+  assert.equal(spark.attackBehavior.kind, 'telegraphed-aoe')
+  assert.equal(spark.attackBehavior.damage, 18)
+  assert.equal(spark.attackBehavior.cooldownMs, 1600)
+
+  assert.equal(prism.maxHealth, 88)
+  assert.equal(prism.speed, 68)
+  assert.equal(prism.contactDamage, 20)
+
+  assert.equal(dash.maxHealth, 38)
+  assert.equal(dash.speed, 64)
+  assert.equal(dash.contactDamage, 15)
+
+  assert.equal(orbit.maxHealth, 32)
+  assert.equal(orbit.speed, 60)
+  assert.equal(orbit.contactDamage, 13)
+
+  assert.equal(boss.maxHealth, 220)
+  assert.equal(boss.speed, 48)
+  assert.equal(boss.contactDamage, 22)
+  assert.equal(boss.attackBehavior.kind, 'telegraphed-aoe')
+  assert.equal(boss.attackBehavior.damage, 28)
+  assert.equal(boss.attackBehavior.cooldownMs, 2200)
+})
+
 test('telegraphed aoe uses player or self anchor based on enemy config', () => {
   const sparkTelegraph = createEnemyTelegraph(
     { x: 10, y: 20 },
