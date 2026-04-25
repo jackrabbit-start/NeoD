@@ -48,6 +48,173 @@ test('weapon attack range helper uses ranged metadata and melee behavior authori
   assert.equal(Object.hasOwn(glaive, 'range'), false)
 })
 
+test('weapon refresh preserves protected gameplay fields and stable asset keys', () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(WEAPON_DEFINITIONS).map(([weaponId, weapon]) => [
+        weaponId,
+        {
+          range: Object.hasOwn(weapon, 'range') ? weapon.range : undefined,
+          damage: weapon.damage,
+          fireRateMs: weapon.fireRateMs,
+          projectileSpeed: weapon.projectileSpeed,
+          projectileTextureKey: weapon.projectileTextureKey,
+          hudIconKey: weapon.visual.hudIconKey,
+          knockback: weapon.knockback,
+          attackBehavior: weapon.attackBehavior,
+        },
+      ]),
+    ),
+    {
+      'starter-blaster': {
+        range: 420,
+        damage: 10,
+        fireRateMs: 320,
+        projectileSpeed: 460,
+        projectileTextureKey: 'starter-projectile',
+        hudIconKey: 'weapon-starter-blaster',
+        knockback: { force: 90, durationMs: 110 },
+        attackBehavior: { kind: 'single', projectileLifetimeMs: 1000 },
+      },
+      'acid-sprayer': {
+        range: 130,
+        damage: 20,
+        fireRateMs: 230,
+        projectileSpeed: 500,
+        projectileTextureKey: 'acid-projectile',
+        hudIconKey: 'weapon-acid-sprayer',
+        knockback: { force: 70, durationMs: 95 },
+        attackBehavior: {
+          kind: 'spray-hazard',
+          projectileCount: 3,
+          spreadDegrees: 28,
+          projectileLifetimeMs: 250,
+          hazardRadius: 24,
+          hazardDurationMs: 950,
+          hazardTickMs: 220,
+          hazardDamage: 6,
+        },
+      },
+      'frost-lance': {
+        range: 520,
+        damage: 18,
+        fireRateMs: 190,
+        projectileSpeed: 620,
+        projectileTextureKey: 'frost-projectile',
+        hudIconKey: 'weapon-frost-lance',
+        knockback: { force: 55, durationMs: 80 },
+        attackBehavior: { kind: 'pierce', projectileLifetimeMs: 900, maxHits: 3 },
+      },
+      'storm-cannon': {
+        range: 500,
+        damage: 28,
+        fireRateMs: 210,
+        projectileSpeed: 560,
+        projectileTextureKey: 'storm-projectile',
+        hudIconKey: 'weapon-storm-cannon',
+        knockback: { force: 125, durationMs: 130 },
+        attackBehavior: { kind: 'single', projectileLifetimeMs: 1050 },
+      },
+      'arc-loom': {
+        range: 500,
+        damage: 24,
+        fireRateMs: 175,
+        projectileSpeed: 590,
+        projectileTextureKey: 'arc-projectile',
+        hudIconKey: 'weapon-arc-loom',
+        knockback: { force: 85, durationMs: 100 },
+        attackBehavior: {
+          kind: 'chain',
+          projectileLifetimeMs: 900,
+          maxChains: 2,
+          chainRange: 130,
+          chainFalloff: 0.65,
+        },
+      },
+      'spark-carbine': {
+        range: 560,
+        damage: 15,
+        fireRateMs: 145,
+        projectileSpeed: 720,
+        projectileTextureKey: 'spark-projectile',
+        hudIconKey: 'weapon-spark-carbine',
+        knockback: { force: 60, durationMs: 75 },
+        attackBehavior: { kind: 'single', projectileLifetimeMs: 820 },
+      },
+      'mist-vortex': {
+        range: 190,
+        damage: 14,
+        fireRateMs: 260,
+        projectileSpeed: 430,
+        projectileTextureKey: 'mist-projectile',
+        hudIconKey: 'weapon-mist-vortex',
+        knockback: { force: 45, durationMs: 90 },
+        attackBehavior: {
+          kind: 'spray-hazard',
+          projectileCount: 5,
+          spreadDegrees: 18,
+          projectileLifetimeMs: 360,
+          hazardRadius: 36,
+          hazardDurationMs: 1450,
+          hazardTickMs: 300,
+          hazardDamage: 4,
+        },
+      },
+      'slime-glaive': {
+        range: undefined,
+        damage: 30,
+        fireRateMs: 520,
+        projectileSpeed: 0,
+        projectileTextureKey: 'arc-projectile',
+        hudIconKey: 'weapon-slime-glaive',
+        knockback: { force: 115, durationMs: 120 },
+        attackBehavior: {
+          kind: 'melee-cleave',
+          range: 94,
+          arcDegrees: 105,
+          visualDurationMs: 150,
+          maxTargets: 4,
+        },
+      },
+      'prism-cutter': {
+        range: undefined,
+        damage: 22,
+        fireRateMs: 330,
+        projectileSpeed: 0,
+        projectileTextureKey: 'frost-projectile',
+        hudIconKey: 'weapon-prism-cutter',
+        knockback: { force: 80, durationMs: 85 },
+        attackBehavior: {
+          kind: 'melee-cleave',
+          range: 72,
+          arcDegrees: 62,
+          visualDurationMs: 105,
+          maxTargets: 2,
+        },
+      },
+      'needle-fan': {
+        range: 210,
+        damage: 16,
+        fireRateMs: 210,
+        projectileSpeed: 610,
+        projectileTextureKey: 'needle-projectile',
+        hudIconKey: 'weapon-needle-fan',
+        knockback: { force: 65, durationMs: 80 },
+        attackBehavior: {
+          kind: 'spray-hazard',
+          projectileCount: 4,
+          spreadDegrees: 16,
+          projectileLifetimeMs: 320,
+          hazardRadius: 20,
+          hazardDurationMs: 700,
+          hazardTickMs: 240,
+          hazardDamage: 3,
+        },
+      },
+    },
+  )
+})
+
 test('frost lance plan preserves a piercing projectile', () => {
   const plan = buildAttackPlan(WEAPON_DEFINITIONS['frost-lance'], { x: 0, y: 0 }, { x: 0, y: 10 })
 
@@ -55,11 +222,11 @@ test('frost lance plan preserves a piercing projectile', () => {
   assert.equal(plan.projectiles[0]?.maxHits, 3)
   assert.deepEqual(plan.projectiles[0]?.knockback, WEAPON_DEFINITIONS['frost-lance'].knockback)
   assert.equal(plan.projectiles[0]?.hazardOnHit, undefined)
-  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['frost-lance']), '정밀 관통')
+  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['frost-lance']), '기대컨 관통')
 })
 
 test('weapon identity labels prefer metadata and retain behavior fallback', () => {
-  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['arc-loom']), '연쇄 제압')
+  assert.equal(getWeaponIdentityLabel(WEAPON_DEFINITIONS['arc-loom']), '감다살 연쇄')
 
   const fallbackFrost = {
     ...WEAPON_DEFINITIONS['frost-lance'],
@@ -73,7 +240,7 @@ test('arc loom summary and chain damage expose crowd-control identity', () => {
   const weapon = WEAPON_DEFINITIONS['arc-loom']
   const summary = getWeaponSummary(weapon)
 
-  assert.match(summary, /연쇄 제압/)
+  assert.match(summary, /감다살 연쇄/)
   assert.equal(getChainDamage(24, 1, 0.65), 16)
   assert.equal(getChainDamage(24, 2, 0.65), 10)
 })
@@ -85,7 +252,7 @@ test('spark carbine is a fast single-shot electric branch', () => {
   const plan = buildAttackPlan(spark, { x: 0, y: 0 }, { x: 100, y: 0 })
 
   assert.equal(spark.attackBehavior.kind, 'single')
-  assert.equal(getWeaponIdentityLabel(spark), '고속 전격')
+  assert.equal(getWeaponIdentityLabel(spark), '오버드라이브 속사')
   assert.ok(spark.fireRateMs < starter.fireRateMs)
   assert.ok(spark.fireRateMs < storm.fireRateMs)
   assert.ok(spark.projectileSpeed > starter.projectileSpeed)
@@ -120,7 +287,7 @@ test('mist vortex is a distinct spray hazard control branch', () => {
   const plan = buildAttackPlan(mist, { x: 0, y: 0 }, { x: 100, y: 0 })
   const center = plan.projectiles[Math.floor(plan.projectiles.length / 2)]
 
-  assert.equal(getWeaponIdentityLabel(mist), '안개 제어')
+  assert.equal(getWeaponIdentityLabel(mist), '멘탈 안개')
   assert.ok(differingDimensions >= 2)
   assert.ok(mistBehavior.hazardRadius > acidBehavior.hazardRadius)
   assert.ok(mistBehavior.hazardDurationMs > acidBehavior.hazardDurationMs)
@@ -220,7 +387,7 @@ test('needle fan reuses spray-hazard behavior for a bounded reward branch', () =
   const plan = buildAttackPlan(needleFan, { x: 0, y: 0 }, { x: 100, y: 0 })
 
   assert.equal(needleFan.attackBehavior.kind, 'spray-hazard')
-  assert.equal(getWeaponIdentityLabel(needleFan), '산탄 견제')
+  assert.equal(getWeaponIdentityLabel(needleFan), '간바레 산탄')
   assert.equal(plan.projectiles.length, 4)
   assert.equal(plan.cooldownMs, needleFan.fireRateMs)
   assert.equal(plan.projectiles[0]?.maxTravelDistance, getWeaponAttackRange(needleFan))
@@ -316,9 +483,11 @@ test('pause and cooldown gating block firing before scene spawn dispatch', () =>
   assert.equal(shouldWeaponFire(false, true, 100, 100), true)
 })
 
-test('codex summaries include weapon identity beyond raw stats', () => {
+test('codex summaries describe token rewards instead of hidden recipe output cards', () => {
   const codex = getCodexState(true)
-  const arcRecipe = codex.recipes.find((recipe) => recipe.output.id === 'arc-loom')
+  const sparkSlime = codex.enemies.find((enemy) => enemy.id === 'spark-slime')
 
-  assert.match(arcRecipe?.output.summary ?? '', /연쇄 제압/)
+  assert.equal(codex.recipes.length, 0)
+  assert.match(codex.hint, /토큰 파친코/)
+  assert.ok(sparkSlime?.stats.some((stat) => /보상 경험치 \+2/.test(stat)))
 })

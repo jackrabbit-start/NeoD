@@ -5,7 +5,9 @@ const colorHex = (value: number) => `#${value.toString(16).padStart(6, '0')}`
 const renderSwatch = (color: number) =>
   `<span class="codex-swatch" style="--swatch:${colorHex(color)}"></span>`
 
-const renderItems = (items: CodexItemEntry[]) => `
+const renderItems = (items: CodexItemEntry[]) => items.length === 0
+  ? '<p class="codex-empty">재료 아이콘 드롭은 숨김 처리되었습니다. 적 처치 토큰이 파친코 보상으로 전환됩니다.</p>'
+  : `
   <div class="codex-grid">
     ${items
       .map(
@@ -20,7 +22,9 @@ const renderItems = (items: CodexItemEntry[]) => `
   </div>
 `
 
-const renderRecipes = (recipes: CodexRecipeEntry[]) => `
+const renderRecipes = (recipes: CodexRecipeEntry[]) => recipes.length === 0
+  ? '<p class="codex-empty">기존 조합식은 호환 데이터로 남지만, 이번 루프에서는 같은 무기·같은 별 2개 합성이 우선입니다.</p>'
+  : `
   <div class="codex-grid">
     ${recipes
       .map(
@@ -54,10 +58,10 @@ const renderEnemies = (enemies: CodexEnemyEntry[]) => `
             <p>${enemy.description}</p>
             <p class="codex-meta">${enemy.stats.join(' · ')}</p>
             <p class="codex-inline-list">
-              <span class="codex-label">드롭</span>
+              <span class="codex-label">보상</span>
               ${enemy.drops.length > 0
                 ? enemy.drops.map((drop) => `${renderSwatch(drop.color)}${drop.name}`).join('')
-                : '<span>보스 전용 종료 목표</span>'}
+                : `<span>${enemy.stats.at(-1) ?? '토큰 보상 없음'}</span>`}
             </p>
           </article>
         `,
@@ -76,11 +80,11 @@ const renderCodex = (state: CodexState) => `
           <span class="codex-hint">${state.hint}</span>
         </header>
         <section class="codex-section">
-          <h3>아이템</h3>
+          <h3>숨긴 재료</h3>
           ${renderItems(state.items)}
         </section>
         <section class="codex-section">
-          <h3>조합식</h3>
+          <h3>별 합성 안내</h3>
           ${renderRecipes(state.recipes)}
         </section>
         <section class="codex-section">

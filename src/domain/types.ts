@@ -2,6 +2,24 @@ import type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
 export type { EnemyId, LootId, RecipeId, WeaponId } from '../data/contentIds.js'
 
+export type WeaponStar = 1 | 2 | 3 | 4 | 5
+export type WeaponStackKey = `${WeaponId}:${WeaponStar}`
+
+export interface WeaponStack {
+  weaponId: WeaponId
+  star: WeaponStar
+  count: number
+}
+
+export interface PachinkoHudState {
+  level: number
+  totalTokenXp: number
+  droppedTokens: number
+  queuedTokens: number
+  isTokenInFlight: boolean
+  latestReward: string | null
+}
+
 export type EnemyAnimationKey =
   | 'slime-idle'
   | 'spark-slime-idle'
@@ -236,8 +254,11 @@ export interface HudRecipeView {
 
 export interface HudOwnedWeaponView {
   id: WeaponId
+  stackKey?: WeaponStackKey
   name: string
   description: string
+  star?: WeaponStar
+  count?: number
   damage: number
   fireRateMs: number
   projectileSpeed: number
@@ -245,6 +266,8 @@ export interface HudOwnedWeaponView {
   tuningLabel: string | null
   canTune: boolean
   tuneDisabledReason: string | null
+  canFuse?: boolean
+  fuseDisabledReason?: string | null
   hudIconKey?: string
   accentColor?: number
 }
@@ -283,6 +306,7 @@ export interface HudState {
   stageButtonLabel: string
   stageButtonDisabled: boolean
   stageSelection: HudStageSelectionState
+  pachinko?: PachinkoHudState
   modal: HudModalState
 }
 

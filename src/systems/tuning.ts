@@ -1,5 +1,5 @@
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
-import type { InventoryState, WeaponDefinition, WeaponId } from '../domain/types.js'
+import type { InventoryState, WeaponDefinition, WeaponId, WeaponStar } from '../domain/types.js'
 import { consumeItems } from './inventory.js'
 
 export const TUNING_CAPSULE_ITEM_ID = 'tuning-capsule'
@@ -40,9 +40,15 @@ export interface TuningSelectionResult {
   effectId: TuningEffectId
 }
 
+export const STAR_DAMAGE_MULTIPLIER_STEP = 0.18
+export const STAR_FIRE_RATE_MULTIPLIER_STEP = 0.06
+export const STAR_PROJECTILE_SPEED_MULTIPLIER_STEP = 0.08
+export const STAR_MELEE_RANGE_STEP = 6
+
 export interface EffectiveWeaponStats extends WeaponDefinition {
   tuningEffectId?: TuningEffectId
   tuningLabel?: string
+  star?: WeaponStar
 }
 
 export type RandomSource = () => number
@@ -102,35 +108,48 @@ export function resolveTuningSelection(
 export function deriveEffectiveWeaponStats(
   weaponId: WeaponId,
   tuningState: WeaponTuningState,
+  star: WeaponStar = 1,
 ): EffectiveWeaponStats {
   const weapon = WEAPON_DEFINITIONS[weaponId]
   const effectId = tuningState[weaponId]
   const effect = TUNING_EFFECT_DEFINITIONS.find((candidate) => candidate.id === effectId)
+  const starBonusSteps = Math.max(0, star - 1)
+  const tunedDamage = weapon.damage + (effect && 'damageDelta' in effect ? effect.damageDelta : 0)
+  const tunedFireRateMs = Math.round(
+    weapon.fireRateMs * (effect && 'fireRateMultiplier' in effect ? effect.fireRateMultiplier : 1),
+  )
+  const tunedProjectileSpeed = weapon.projectileSpeed + (effect && 'projectileSpeedDelta' in effect ? effect.projectileSpeedDelta : 0)
+  const baseAttackBehavior = effect && weapon.attackBehavior.kind === 'melee-cleave' && 'meleeRangeDelta' in effect
+    ? {
+        ...weapon.attackBehavior,
+        range: weapon.attackBehavior.range + effect.meleeRangeDelta,
+      }
+    : weapon.attackBehavior
+  const attackBehavior = baseAttackBehavior.kind === 'melee-cleave' && starBonusSteps > 0
+    ? {
+        ...baseAttackBehavior,
+        range: baseAttackBehavior.range + STAR_MELEE_RANGE_STEP * starBonusSteps,
+      }
+    : baseAttackBehavior
 
-  if (!effect) {
-    return { ...weapon }
-  }
-
-  const attackBehavior =
-    weapon.attackBehavior.kind === 'melee-cleave' && 'meleeRangeDelta' in effect
-      ? {
-          ...weapon.attackBehavior,
-          range: weapon.attackBehavior.range + effect.meleeRangeDelta,
-        }
-      : weapon.attackBehavior
-
-  return {
+  const effectiveWeapon: EffectiveWeaponStats = {
     ...weapon,
-    damage: weapon.damage + ('damageDelta' in effect ? effect.damageDelta : 0),
-    fireRateMs: Math.round(
-      weapon.fireRateMs * ('fireRateMultiplier' in effect ? effect.fireRateMultiplier : 1),
-    ),
-    projectileSpeed:
-      weapon.projectileSpeed + ('projectileSpeedDelta' in effect ? effect.projectileSpeedDelta : 0),
+    damage: Math.round(tunedDamage * (1 + STAR_DAMAGE_MULTIPLIER_STEP * starBonusSteps)),
+    fireRateMs: Math.max(70, Math.round(tunedFireRateMs * (1 - STAR_FIRE_RATE_MULTIPLIER_STEP * starBonusSteps))),
+    projectileSpeed: Math.round(tunedProjectileSpeed * (1 + STAR_PROJECTILE_SPEED_MULTIPLIER_STEP * starBonusSteps)),
     attackBehavior,
-    tuningEffectId: effect.id,
-    tuningLabel: effect.label,
   }
+
+  if (effect) {
+    effectiveWeapon.tuningEffectId = effect.id
+    effectiveWeapon.tuningLabel = effect.label
+  }
+
+  if (star > 1) {
+    effectiveWeapon.star = star
+  }
+
+  return effectiveWeapon
 }
 
 function selectTuningEffect(random: RandomSource): TuningEffectId {
