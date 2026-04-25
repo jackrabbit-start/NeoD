@@ -157,7 +157,7 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['rapid', 'starter'],
     weight: { base: 1.25, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.52 },
     roll(level, random) {
-      const [min, max] = createLevelScaledPercentRange(0.06, 0.11, level, 0.005, 0.18)
+      const [min, max] = createLevelScaledPercentRange(0.08, 0.13, level, 0.005, 0.2)
       const result = rollNumber(random, min, max, 2)
       return { effects: { fireRateMultiplier: 1 - result.value }, quality: result.quality }
     },
@@ -170,7 +170,7 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['precision', 'rapid'],
     weight: { base: 1.12, levelScale: 0.018, repeatPenalty: 0.42, familyBonus: 0.44 },
     roll(level, random) {
-      const [min, max] = createLevelScaledPercentRange(0.04, 0.09, level, 0.004, 0.16)
+      const [min, max] = createLevelScaledPercentRange(0.05, 0.1, level, 0.004, 0.18)
       const result = rollNumber(random, min, max, 2)
       return { effects: { critChanceDelta: result.value }, quality: result.quality }
     },
@@ -183,7 +183,7 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['heavy', 'precision'],
     weight: { base: 0.9, levelScale: 0.02, repeatPenalty: 0.5, familyBonus: 0.46 },
     roll(level, random) {
-      const [min, max] = createLevelScaledPercentRange(0.18, 0.34, level, 0.012, 0.55)
+      const [min, max] = createLevelScaledPercentRange(0.22, 0.38, level, 0.012, 0.6)
       const result = rollNumber(random, min, max, 2)
       return { effects: { critDamageMultiplierDelta: result.value }, quality: result.quality }
     },
@@ -196,10 +196,10 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['pierce', 'precision', 'rapid'],
     weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.5 },
     roll(level, random) {
-      const [speedMin, speedMax] = createLevelScaledPercentRange(0.05, 0.1, level, 0.005, 0.18)
+      const [speedMin, speedMax] = createLevelScaledPercentRange(0.06, 0.11, level, 0.005, 0.2)
       const speed = rollNumber(random, speedMin, speedMax, 2)
       const rangeTier = getLevelTier(level)
-      const range = rollNumber(random, 16 + rangeTier * 3, 28 + rangeTier * 4)
+      const range = rollNumber(random, 20 + rangeTier * 4, 34 + rangeTier * 5)
       return {
         effects: {
           projectileSpeedMultiplier: 1 + speed.value,
@@ -218,7 +218,7 @@ const PASSIVE_CARD_TEMPLATES = [
     weight: { base: 0.94, levelScale: 0.018, repeatPenalty: 0.4, familyBonus: 0.46 },
     roll(level, random) {
       const tier = getLevelTier(level)
-      const range = rollNumber(random, 18 + tier * 4, 34 + tier * 6)
+      const range = rollNumber(random, 24 + tier * 4, 40 + tier * 6)
       return {
         effects: {
           rangeDelta: range.value,
@@ -235,8 +235,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['heavy', 'melee'],
     weight: { base: 0.9, levelScale: 0.018, repeatPenalty: 0.45, familyBonus: 0.5 },
     roll(level, random) {
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.03, 0.07, level, 0.005, 0.14)
-      const [pushMin, pushMax] = createLevelScaledPercentRange(0.08, 0.15, level, 0.006, 0.24)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.04, 0.08, level, 0.005, 0.16)
+      const [pushMin, pushMax] = createLevelScaledPercentRange(0.1, 0.17, level, 0.006, 0.26)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       const push = rollNumber(random, pushMin, pushMax, 2)
       return {
@@ -256,10 +256,10 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['spray', 'zone', 'melee'],
     weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.56 },
     roll(level, random) {
-      const [radiusMin, radiusMax] = createLevelScaledPercentRange(0.06, 0.14, level, 0.006, 0.22)
+      const [radiusMin, radiusMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.24)
       const radius = rollNumber(random, radiusMin, radiusMax, 2)
       const rangeTier = getLevelTier(level)
-      const range = rollNumber(random, 8 + rangeTier * 2, 16 + rangeTier * 3)
+      const range = rollNumber(random, 10 + rangeTier * 3, 20 + rangeTier * 4)
       return {
         effects: {
           rangeDelta: range.value,
@@ -290,7 +290,7 @@ const PASSIVE_CARD_TEMPLATES = [
     kind: 'general',
     weight: { base: 1.08, levelScale: 0.014, repeatPenalty: 0.35 },
     roll(level, random) {
-      const [min, max] = createLevelScaledPercentRange(0.03, 0.07, level, 0.003, 0.12)
+      const [min, max] = createLevelScaledPercentRange(0.04, 0.08, level, 0.003, 0.14)
       const result = rollNumber(random, min, max, 2)
       return { effects: { playerSpeedMultiplier: 1 + result.value }, quality: result.quality }
     },
@@ -303,7 +303,7 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['starter', 'zone', 'rapid'],
     weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.36, familyBonus: 0.42 },
     roll(level, random) {
-      const [min, max] = createLevelScaledPercentRange(0.18, 0.34, level, 0.01, 0.5)
+      const [min, max] = createLevelScaledPercentRange(0.2, 0.36, level, 0.01, 0.54)
       const result = rollNumber(random, min, max, 2)
       return {
         effects: { lootAttractionRadiusMultiplier: 1 + result.value },
@@ -319,8 +319,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['spray', 'zone', 'melee'],
     weight: { base: 0.9, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.46 },
     roll(level, random) {
-      const [collectMin, collectMax] = createLevelScaledPercentRange(0.12, 0.24, level, 0.008, 0.36)
-      const [speedMin, speedMax] = createLevelScaledPercentRange(0.12, 0.26, level, 0.01, 0.42)
+      const [collectMin, collectMax] = createLevelScaledPercentRange(0.14, 0.26, level, 0.008, 0.4)
+      const [speedMin, speedMax] = createLevelScaledPercentRange(0.14, 0.28, level, 0.01, 0.46)
       const collect = rollNumber(random, collectMin, collectMax, 2)
       const speed = rollNumber(random, speedMin, speedMax, 2)
       return {
@@ -340,8 +340,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['heavy', 'melee', 'starter'],
     weight: { base: 0.84, levelScale: 0.018, repeatPenalty: 0.4, familyBonus: 0.38 },
     roll(level, random) {
-      const [healMin, healMax] = createLevelScaledPercentRange(0.1, 0.2, level, 0.008, 0.32)
-      const [collectMin, collectMax] = createLevelScaledPercentRange(0.06, 0.12, level, 0.006, 0.2)
+      const [healMin, healMax] = createLevelScaledPercentRange(0.12, 0.22, level, 0.008, 0.36)
+      const [collectMin, collectMax] = createLevelScaledPercentRange(0.08, 0.14, level, 0.006, 0.24)
       const heal = rollNumber(random, healMin, healMax, 2)
       const collect = rollNumber(random, collectMin, collectMax, 2)
       return {
@@ -480,7 +480,7 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['melee', 'heavy', 'starter'],
     weight: { base: 0.92, levelScale: 0.022, repeatPenalty: 0.36, familyBonus: 0.42 },
     roll(level, random) {
-      const [min, max] = createLevelScaledPercentRange(0.05, 0.1, level, 0.004, 0.18)
+      const [min, max] = createLevelScaledPercentRange(0.06, 0.11, level, 0.004, 0.2)
       const result = rollNumber(random, min, max, 2)
       return { effects: { incomingDamageMultiplier: 1 - result.value }, quality: result.quality }
     },
@@ -578,8 +578,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['precision', 'rapid', 'heavy'],
     weight: { base: 0.68, levelScale: 0.02, repeatPenalty: 0.56, familyBonus: 0.54 },
     roll(level, random) {
-      const [critMin, critMax] = createLevelScaledPercentRange(0.02, 0.05, level, 0.003, 0.09)
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.12, 0.24, level, 0.01, 0.4)
+      const [critMin, critMax] = createLevelScaledPercentRange(0.03, 0.06, level, 0.003, 0.11)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.14, 0.26, level, 0.01, 0.44)
       const crit = rollNumber(random, critMin, critMax, 2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       return {
@@ -683,8 +683,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['starter', 'rapid', 'melee'],
     weight: { base: 0.9, levelScale: 0.024, repeatPenalty: 0.34, familyBonus: 0.36 },
     roll(level, random) {
-      const [xpMin, xpMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.28)
-      const [moveMin, moveMax] = createLevelScaledPercentRange(0.01, 0.04, level, 0.002, 0.08)
+      const [xpMin, xpMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.32)
+      const [moveMin, moveMax] = createLevelScaledPercentRange(0.02, 0.05, level, 0.002, 0.1)
       const xp = rollNumber(random, xpMin, xpMax, 2)
       const move = rollNumber(random, moveMin, moveMax, 2)
       return {
@@ -704,7 +704,7 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['rapid', 'zone', 'heavy'],
     weight: { base: 0.84, levelScale: 0.022, repeatPenalty: 0.38, familyBonus: 0.4 },
     roll(level, random) {
-      const [tokenMin, tokenMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.28)
+      const [tokenMin, tokenMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.32)
       const token = rollNumber(random, tokenMin, tokenMax, 2)
       return {
         effects: {
@@ -723,8 +723,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['zone', 'spray', 'precision'],
     weight: { base: 0.88, levelScale: 0.02, repeatPenalty: 0.34, familyBonus: 0.44 },
     roll(level, random) {
-      const [lifeMin, lifeMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
-      const [zoneMin, zoneMax] = createLevelScaledPercentRange(0.08, 0.18, level, 0.006, 0.3)
+      const [lifeMin, lifeMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.3)
+      const [zoneMin, zoneMax] = createLevelScaledPercentRange(0.1, 0.2, level, 0.006, 0.34)
       const life = rollNumber(random, lifeMin, lifeMax, 2)
       const zone = rollNumber(random, zoneMin, zoneMax, 2)
       return {
@@ -785,8 +785,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['starter', 'zone', 'heavy'],
     weight: { base: 0.74, levelScale: 0.02, repeatPenalty: 0.36, familyBonus: 0.34 },
     roll(level, random) {
-      const [sizeMin, sizeMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.02, 0.05, level, 0.003, 0.1)
+      const [sizeMin, sizeMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.3)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.03, 0.06, level, 0.003, 0.12)
       const size = rollNumber(random, sizeMin, sizeMax, 2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       return {
@@ -806,8 +806,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['zone', 'heavy', 'melee'],
     weight: { base: 0.74, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.34 },
     roll(level, random) {
-      const [durationMin, durationMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.28)
-      const [damageMin, damageMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.24)
+      const [durationMin, durationMax] = createLevelScaledPercentRange(0.12, 0.2, level, 0.006, 0.32)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.28)
       const duration = rollNumber(random, durationMin, durationMax, 2)
       const damage = rollNumber(random, damageMin, damageMax, 2)
       return {
@@ -827,8 +827,8 @@ const PASSIVE_CARD_TEMPLATES = [
     preferredFamilies: ['precision', 'rapid', 'zone'],
     weight: { base: 0.68, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.32 },
     roll(level, random) {
-      const [durationMin, durationMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
-      const [slowMin, slowMax] = createLevelScaledPercentRange(0.08, 0.18, level, 0.006, 0.28)
+      const [durationMin, durationMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.3)
+      const [slowMin, slowMax] = createLevelScaledPercentRange(0.1, 0.2, level, 0.006, 0.32)
       const duration = rollNumber(random, durationMin, durationMax, 2)
       const slow = rollNumber(random, slowMin, slowMax, 2)
       return {
