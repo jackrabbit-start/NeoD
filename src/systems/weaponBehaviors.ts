@@ -309,11 +309,11 @@ export function isProjectileOutOfBounds(position: Point, width: number, height: 
 
 export function shouldWeaponFire(
   isInteractionBlocked: boolean,
-  isPointerDown: boolean,
+  hasTarget: boolean,
   time: number,
   nextFireAt: number,
 ): boolean {
-  return !isInteractionBlocked && isPointerDown && time >= nextFireAt
+  return !isInteractionBlocked && hasTarget && time >= nextFireAt
 }
 
 export function advanceRepeatingTimer(

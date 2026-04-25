@@ -19,6 +19,15 @@ import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import {
+  advanceEnemyCooldown,
+  createEnemyTelegraph,
+  getDistanceBetween,
+  isPointInsideCircle,
+  resolveEnemyVelocity,
+  selectAutoFireTarget,
+  shouldEnemyStartTelegraph,
+} from '../systems/enemyBehaviors.js'
+import {
   advanceHazardState,
   applyProjectileHitState,
   buildAttackPlan,
@@ -60,6 +69,8 @@ interface EnemyEntity {
   currentHealth: number
   healthBar: EnemyHealthBar
   lastHitAt: number
+  attackCooldownMs: number
+  telegraph?: EnemyTelegraph
 }
 
 interface LootEntity {
@@ -90,6 +101,16 @@ interface HazardZoneEntity {
   totalLifetimeMs: number
   tickEveryMs: number
   tickCountdownMs: number
+}
+
+interface EnemyTelegraph {
+  visual: Phaser.GameObjects.Arc
+  x: number
+  y: number
+  radius: number
+  damage: number
+  remainingMs: number
+  totalMs: number
 }
 
 export class ArenaScene extends Phaser.Scene {
@@ -147,7 +168,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private statusMessage = 'Move with WASD, aim with the mouse, and click to fire.'
+  private statusMessage = 'Move with WASD and let your weapon auto-fire while you dodge.'
 
   private lastPlayerHitAt = 0
 
@@ -226,7 +247,7 @@ export class ArenaScene extends Phaser.Scene {
     this.handleCodexToggle()
     this.handlePlayerMovement()
     this.handleFiring(time)
-    this.updateEnemies()
+    this.updateEnemies(delta)
     this.updateProjectiles(delta)
     this.updateHazards(delta)
     this.cleanupDestroyedEntities()
@@ -284,15 +305,27 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleFiring(time: number): void {
-    if (!shouldWeaponFire(this.isInteractionBlocked(), this.input.activePointer.isDown, time, this.nextFireAt)) {
+    const target = selectAutoFireTarget(
+      {
+        x: this.player.x,
+        y: this.player.y,
+      },
+      this.enemies
+        .filter((enemy) => enemy.sprite.active)
+        .map((enemy) => ({
+          id: enemy.runtimeId,
+          x: enemy.sprite.x,
+          y: enemy.sprite.y,
+        })),
+    )
+
+    if (!shouldWeaponFire(this.isInteractionBlocked(), Boolean(target), time, this.nextFireAt) || !target) {
       return
     }
 
     const weapon = WEAPON_DEFINITIONS[this.activeWeaponId]
-    const pointer = this.input.activePointer
-    const target = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY)
     const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
-    const attackPlan = buildAttackPlan(weapon, origin, target)
+    const attackPlan = buildAttackPlan(weapon, origin, new Phaser.Math.Vector2(target.x, target.y))
     if (attackPlan.projectiles.length === 0) {
       return
     }
@@ -304,7 +337,7 @@ export class ArenaScene extends Phaser.Scene {
     this.nextFireAt = time + attackPlan.cooldownMs
   }
 
-  private updateEnemies(): void {
+  private updateEnemies(delta: number): void {
     for (const enemy of this.enemies) {
       if (!enemy.sprite.active) {
         continue
@@ -316,28 +349,110 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
-      const direction = new Phaser.Math.Vector2(
-        this.player.x - enemy.sprite.x,
-        this.player.y - enemy.sprite.y,
-      )
+      enemy.attackCooldownMs = advanceEnemyCooldown(enemy.attackCooldownMs, delta)
 
-      if (direction.lengthSq() === 0) {
+      if (enemy.telegraph) {
+        enemy.telegraph.remainingMs -= delta
+        enemy.telegraph.visual.setFillStyle(
+          enemy.telegraph.visual.fillColor,
+          Math.max(0.18, 0.42 * (enemy.telegraph.remainingMs / enemy.telegraph.totalMs)),
+        )
+
+        if (enemy.telegraph.remainingMs <= 0) {
+          if (
+            isPointInsideCircle(
+              {
+                x: this.player.x,
+                y: this.player.y,
+              },
+              {
+                x: enemy.telegraph.x,
+                y: enemy.telegraph.y,
+              },
+              enemy.telegraph.radius,
+            )
+          ) {
+            this.damagePlayer(enemy.telegraph.damage)
+          }
+
+          enemy.telegraph.visual.destroy()
+          enemy.telegraph = undefined
+          if (enemy.config.attackBehavior.kind === 'telegraphed-aoe') {
+            enemy.attackCooldownMs = enemy.config.attackBehavior.cooldownMs
+          }
+        }
+
         enemy.sprite.setVelocity(0, 0)
         this.syncEnemyHealthBar(enemy)
         continue
       }
 
-      direction.normalize().scale(enemy.config.speed)
-      enemy.sprite.setVelocity(direction.x, direction.y)
+      const distanceToPlayer = getDistanceBetween(
+        {
+          x: enemy.sprite.x,
+          y: enemy.sprite.y,
+        },
+        {
+          x: this.player.x,
+          y: this.player.y,
+        },
+      )
+
+      if (
+        shouldEnemyStartTelegraph(
+          enemy.config.attackBehavior,
+          distanceToPlayer,
+          enemy.attackCooldownMs,
+        )
+      ) {
+        const telegraphSpec = createEnemyTelegraph(
+          {
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+          },
+          {
+            x: this.player.x,
+            y: this.player.y,
+          },
+          enemy.config.attackBehavior,
+        )
+
+        if (telegraphSpec) {
+          const visual = this.add
+            .circle(telegraphSpec.x, telegraphSpec.y, telegraphSpec.radius, telegraphSpec.tint, 0.25)
+            .setStrokeStyle(2, telegraphSpec.tint, 0.9)
+            .setDepth(0.5)
+          enemy.telegraph = {
+            visual,
+            x: telegraphSpec.x,
+            y: telegraphSpec.y,
+            radius: telegraphSpec.radius,
+            damage: telegraphSpec.damage,
+            remainingMs: telegraphSpec.durationMs,
+            totalMs: telegraphSpec.durationMs,
+          }
+          enemy.sprite.setVelocity(0, 0)
+          this.syncEnemyHealthBar(enemy)
+          continue
+        }
+      }
+
+      const velocity = resolveEnemyVelocity(
+        {
+          x: enemy.sprite.x,
+          y: enemy.sprite.y,
+        },
+        {
+          x: this.player.x,
+          y: this.player.y,
+        },
+        enemy.config.speed,
+        enemy.config.movementBehavior,
+      )
+      enemy.sprite.setVelocity(velocity.x, velocity.y)
 
       const touchingPlayer =
-        Phaser.Math.Distance.Between(
-          enemy.sprite.x,
-          enemy.sprite.y,
-          this.player.x,
-          this.player.y,
-        ) <
-        enemy.config.size / 2 + 16
+        distanceToPlayer < enemy.config.size / 2 + 16
 
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
@@ -593,6 +708,10 @@ export class ArenaScene extends Phaser.Scene {
       currentHealth: config.maxHealth,
       healthBar: this.createEnemyHealthBar(sprite, config),
       lastHitAt: 0,
+      attackCooldownMs:
+        config.attackBehavior.kind === 'telegraphed-aoe'
+          ? Math.round(config.attackBehavior.cooldownMs * 0.35)
+          : 0,
     }
 
     this.nextEnemyRuntimeId += 1
@@ -639,6 +758,10 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     const wasBoss = enemy.config.id === 'slime-boss'
+    if (enemy.telegraph?.visual.active) {
+      enemy.telegraph.visual.destroy()
+      enemy.telegraph = undefined
+    }
     this.destroyEnemyHealthBar(enemy)
     enemy.sprite.destroy()
 
@@ -838,7 +961,7 @@ export class ArenaScene extends Phaser.Scene {
       inventory: [],
       recipes: [],
       objective: 'Press R on the result screen to restart.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to swap or combine · Q codex',
+      tip: 'WASD move · Auto-fire nearest enemy · Dodge telegraphs · Open inventory to swap or combine · Q codex',
       status: this.statusMessage,
       inventoryButtonLabel: 'Inventory unavailable',
       inventoryButtonDisabled: true,
@@ -877,7 +1000,7 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isBossActive
         ? 'Defeat the Crown Slime to clear the run.'
         : 'Survive the waves, collect drops, and open inventory to combine upgrades.',
-      tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to combine or swap weapons · Q codex',
+      tip: 'WASD move · Auto-fire nearest enemy · Dodge telegraphs · Open inventory to combine or swap weapons · Q codex',
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? 'Resume run' : 'Open inventory',
       inventoryButtonDisabled: this.isCodexOpen,

@@ -3,6 +3,7 @@ import { ITEM_DEFINITIONS } from '../data/items.js'
 import { RECIPE_DEFINITIONS } from '../data/recipes.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import type { CodexState } from '../domain/types.js'
+import { getEnemyBehaviorSummary } from './enemyBehaviors.js'
 import { getWeaponSummary } from './weaponBehaviors.js'
 
 export function getCodexState(isOpen: boolean): CodexState {
@@ -43,6 +44,7 @@ export function getCodexState(isOpen: boolean): CodexState {
         `HP ${enemy.maxHealth}`,
         `SPD ${enemy.speed}`,
         `DMG ${enemy.contactDamage}`,
+        getEnemyBehaviorSummary(enemy),
       ],
       drops: (enemy.drops ?? []).map((drop) => {
         const item = ITEM_DEFINITIONS[drop.itemId]

@@ -12,6 +12,13 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     tint: 0x7cff8f,
     size: 20,
     textureKey: 'slime',
+    movementBehavior: {
+      kind: 'direct-chase',
+    },
+    attackBehavior: {
+      kind: 'contact',
+    },
+    behaviorSummary: 'Direct chase contact pressure.',
     drops: [
       { itemId: 'gel-shard', weight: 5 },
       { itemId: 'acid-core', weight: 3 },
@@ -29,6 +36,23 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     tint: 0xffdb6e,
     size: 22,
     textureKey: 'slime',
+    movementBehavior: {
+      kind: 'orbit',
+      preferredDistance: 152,
+      distanceTolerance: 28,
+      orbitDirection: 1,
+    },
+    attackBehavior: {
+      kind: 'telegraphed-aoe',
+      cooldownMs: 1700,
+      telegraphMs: 700,
+      radius: 54,
+      damage: 12,
+      range: 230,
+      anchor: 'player',
+      tint: 0xffdb6e,
+    },
+    behaviorSummary: 'Keeps distance, circles, and drops a telegraphed shock burst.',
     drops: [
       { itemId: 'spark-knot', weight: 4 },
       { itemId: 'mist-bead', weight: 4 },
@@ -46,5 +70,19 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     tint: 0xd3a0ff,
     size: 44,
     textureKey: 'boss',
+    movementBehavior: {
+      kind: 'direct-chase',
+    },
+    attackBehavior: {
+      kind: 'telegraphed-aoe',
+      cooldownMs: 2400,
+      telegraphMs: 900,
+      radius: 88,
+      damage: 18,
+      range: 190,
+      anchor: 'self',
+      tint: 0xd3a0ff,
+    },
+    behaviorSummary: 'Chases directly, then winds up a heavy self-centered slam.',
   },
 }

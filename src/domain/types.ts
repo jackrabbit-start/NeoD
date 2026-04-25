@@ -69,6 +69,38 @@ export interface WeightedDropEntry {
   weight: number
 }
 
+export interface EnemyDirectChaseMovementBehavior {
+  kind: 'direct-chase'
+}
+
+export interface EnemyOrbitMovementBehavior {
+  kind: 'orbit'
+  preferredDistance: number
+  distanceTolerance: number
+  orbitDirection: -1 | 1
+}
+
+export type EnemyMovementBehavior =
+  | EnemyDirectChaseMovementBehavior
+  | EnemyOrbitMovementBehavior
+
+export interface EnemyContactAttackBehavior {
+  kind: 'contact'
+}
+
+export interface EnemyTelegraphedAoeAttackBehavior {
+  kind: 'telegraphed-aoe'
+  cooldownMs: number
+  telegraphMs: number
+  radius: number
+  damage: number
+  range: number
+  anchor: 'self' | 'player'
+  tint: number
+}
+
+export type EnemyAttackBehavior = EnemyContactAttackBehavior | EnemyTelegraphedAoeAttackBehavior
+
 export interface EnemyDefinition {
   id: EnemyId
   name: string
@@ -80,6 +112,9 @@ export interface EnemyDefinition {
   tint: number
   size: number
   textureKey: 'slime' | 'boss'
+  movementBehavior: EnemyMovementBehavior
+  attackBehavior: EnemyAttackBehavior
+  behaviorSummary: string
   drops?: WeightedDropEntry[]
 }
 
