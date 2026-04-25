@@ -64,6 +64,37 @@ export interface AvailableRecipe {
   weapon: WeaponDefinition
 }
 
+export interface HudOwnedItemView {
+  id: LootId
+  name: string
+  description: string
+  count: number
+}
+
+export interface HudRecipeView {
+  id: string
+  name: string
+  outputWeaponId: WeaponId
+  outputWeaponName: string
+  damage: number
+  inputs: string[]
+}
+
+export interface HudOwnedWeaponView {
+  id: WeaponId
+  name: string
+  description: string
+  damage: number
+  isEquipped: boolean
+}
+
+export interface HudModalState {
+  isOpen: boolean
+  items: HudOwnedItemView[]
+  recipes: HudRecipeView[]
+  weapons: HudOwnedWeaponView[]
+}
+
 export interface HudState {
   title: string
   subtitle: string
@@ -73,4 +104,7 @@ export interface HudState {
   objective: string
   tip: string
   status: string
+  inventoryButtonLabel: string
+  inventoryButtonDisabled: boolean
+  modal: HudModalState
 }

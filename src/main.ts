@@ -36,8 +36,16 @@ hud.update({
   inventory: ['Waiting for drops'],
   recipes: ['Waiting for recipe state'],
   objective: 'Start the run and defeat the slime boss.',
-  tip: 'WASD move · Mouse aim · Hold click shoot · C combine',
+  tip: 'WASD move · Mouse aim · Hold click shoot · Open inventory to combine',
   status: 'Booting',
+  inventoryButtonLabel: 'Open inventory',
+  inventoryButtonDisabled: false,
+  modal: {
+    isOpen: false,
+    items: [],
+    recipes: [],
+    weapons: [],
+  },
 })
 
 const game = new Phaser.Game(createGameConfig('game-root'))
