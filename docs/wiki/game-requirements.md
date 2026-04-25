@@ -174,6 +174,32 @@ These are hard scope boundaries for the first playable slice.
 - Multiple regular enemy archetypes
 - Crafting systems outside the enemy-drop/combine loop
 
+## Scoped Revision: Enemy Types Expansion
+
+The enemy-types expansion interview is a later scoped revision to the
+original V1 baseline, not a rewrite of the initial vertical-slice bounds.
+For that slice, the goal is to make combat less linear by adding enemy
+behavior that pressures player movement routes.
+
+Source artifacts:
+
+- `.omx/specs/deep-interview-enemy-types-expansion.md`
+- `.omx/interviews/enemy-types-expansion-20260425T091049Z.md`
+- `.omx/context/post-interview-enemy-types-expansion-20260425T103734Z.md`
+
+Durable decisions for the enemy expansion slice:
+
+- Target two new regular enemies plus mixed waves, but keep that target
+  flexible if a narrower slice better preserves quality and readability.
+- Prefer movement-route pressure behaviors such as charge, split/fragment,
+  flank/encircle, burst movement, or another quality-driven behavior.
+- Do not add new loot IDs, recipes, weapons, package dependencies, or
+  unrelated reward-loop expansion in the first pass.
+- Preserve boss victory flow: defeating the boss must still end the run in
+  a win, and non-boss enemy defeat must not end the run.
+- Keep new enemy data visible through shared data/codex views and cover new
+  enemy/wave behavior in deterministic tests where practical.
+
 ## Technical Requirements
 
 ### Stack Requirements

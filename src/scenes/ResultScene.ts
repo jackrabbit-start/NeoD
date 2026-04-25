@@ -1,28 +1,30 @@
 import Phaser from 'phaser'
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
-
-interface ResultPayload {
-  outcome: 'win' | 'loss'
-  weaponName: string
-  wavesCleared: number
-}
+import {
+  createRunResultHudState,
+  createRunResultPresentation,
+  type RunResultPayload,
+} from '../systems/runResult.js'
+import type { HudController } from '../ui/Hud.js'
 
 export class ResultScene extends Phaser.Scene {
   constructor() {
     super('result')
   }
 
-  create(payload: ResultPayload): void {
-    const isWin = payload.outcome === 'win'
-    const title = isWin ? '런 클리어' : '런 실패'
-    const subtitle = isWin
-      ? '슬라임 보스를 쓰러뜨렸습니다. 프로토타입 루프가 성립합니다.'
-      : '런이 중간에 종료되었습니다. 다시 도전해 더 강한 조합을 노리세요.'
+  create(payload: RunResultPayload): void {
+    const presentation = createRunResultPresentation(payload)
+    const hud = this.game.registry.get('hud') as HudController | undefined
+    hud?.update(createRunResultHudState(payload))
 
-    this.cameras.main.setBackgroundColor(isWin ? '#1d1735' : '#2b1220')
+    this.cameras.main.setBackgroundColor(presentation.backgroundColor)
 
     this.add
-      .text(GAME_WIDTH / 2, 140, title, {
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH - 96, GAME_HEIGHT - 96, 0x081426, 0.84)
+      .setStrokeStyle(3, Number.parseInt(presentation.accentColor.slice(1), 16), 0.85)
+
+    this.add
+      .text(GAME_WIDTH / 2, 128, presentation.title, {
         fontSize: '40px',
         color: '#f8fafc',
         fontStyle: 'bold',
@@ -30,7 +32,7 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     this.add
-      .text(GAME_WIDTH / 2, 208, subtitle, {
+      .text(GAME_WIDTH / 2, 198, presentation.subtitle, {
         fontSize: '20px',
         color: '#d8e2ff',
         wordWrap: { width: 720 },
@@ -42,7 +44,7 @@ export class ResultScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         292,
-        `최종 무기: ${payload.weaponName}\n돌파 웨이브: ${payload.wavesCleared}`,
+        presentation.statLines.join('\n'),
         {
           fontSize: '22px',
           color: '#b9c7ff',
@@ -54,11 +56,25 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(
         GAME_WIDTH / 2,
-        GAME_HEIGHT - 120,
-        'R 키를 눌러 프로토타입 런을 다시 시작하세요',
+        390,
+        presentation.objective,
         {
           fontSize: '20px',
-          color: '#a6ffd0',
+          color: presentation.accentColor,
+          align: 'center',
+          wordWrap: { width: 720 },
+        },
+      )
+      .setOrigin(0.5)
+
+    this.add
+      .text(
+        GAME_WIDTH / 2,
+        GAME_HEIGHT - 120,
+        presentation.restartPrompt,
+        {
+          fontSize: '20px',
+          color: '#f8fafc',
         },
       )
       .setOrigin(0.5)
