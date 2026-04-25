@@ -7,6 +7,7 @@ import type {
   RecipeId,
   WeaponId,
 } from '../domain/types.js'
+import { getHudWeaponAssetPath } from '../game/visualManifest.js'
 
 export interface HudControllerHandlers {
   onInventoryToggle: () => void
@@ -23,10 +24,20 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
 
-const renderList = (items: string[]) =>
+const renderList = (items: string[], className = 'hud-summary__list') =>
   items.length > 0
-    ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
-    : '<p>—</p>'
+    ? `<ul class="${className}">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+    : '<p class="hud-empty">—</p>'
+
+const renderSummarySection = (title: string, content: string, className = '') => `
+  <section class="hud-summary__section${className ? ` ${className}` : ''}">
+    <h2>${escapeHtml(title)}</h2>
+    ${content}
+  </section>
+`
+
+const getHudIconSrc = (iconKey?: string) =>
+  iconKey ? getHudWeaponAssetPath(iconKey) : null
 
 export class HudController {
   private readonly summaryElement: HTMLDivElement
@@ -198,28 +209,36 @@ export class HudController {
 
   private renderSummary(state: HudState): void {
     this.summaryElement.innerHTML = `
-      <h1>${escapeHtml(state.title)}</h1>
-      <p>${escapeHtml(state.subtitle)}</p>
-      <h2>Status</h2>
-      <p>${escapeHtml(state.status)}</p>
-      <h2>Stats</h2>
-      ${renderList(state.stats)}
-      <div class="hud-summary__inventory-header">
-        <h2>Inventory</h2>
-        <button
-          type="button"
-          class="hud-button"
-          data-action="inventory-toggle"
-          ${state.inventoryButtonDisabled ? 'disabled' : ''}
-        >${escapeHtml(state.inventoryButtonLabel)}</button>
+      <div class="hud-summary__shell">
+        <header class="hud-summary__hero">
+          <div class="hud-summary__title-block">
+            <h1>${escapeHtml(state.title)}</h1>
+            <p>${escapeHtml(state.subtitle)}</p>
+          </div>
+          <div class="hud-summary__status">
+            <h2>Status</h2>
+            <p>${escapeHtml(state.status)}</p>
+          </div>
+        </header>
+        <div class="hud-summary__grid">
+          ${renderSummarySection('Stats', renderList(state.stats), 'hud-summary__section--stats')}
+          <section class="hud-summary__section hud-summary__section--inventory">
+            <div class="hud-summary__inventory-header">
+              <h2>Inventory</h2>
+              <button
+                type="button"
+                class="hud-button"
+                data-action="inventory-toggle"
+                ${state.inventoryButtonDisabled ? 'disabled' : ''}
+              >${escapeHtml(state.inventoryButtonLabel)}</button>
+            </div>
+            ${renderList(state.inventory)}
+          </section>
+          ${renderSummarySection('Available combines', renderList(state.recipes))}
+          ${renderSummarySection('Objective', `<p class="hud-summary__body">${escapeHtml(state.objective)}</p>`)}
+          ${renderSummarySection('Controls', `<p class="hud-tip">${escapeHtml(state.tip)}</p>`, 'hud-summary__section--controls')}
+        </div>
       </div>
-      ${renderList(state.inventory)}
-      <h2>Available combines</h2>
-      ${renderList(state.recipes)}
-      <h2>Objective</h2>
-      <p>${escapeHtml(state.objective)}</p>
-      <h2>Controls</h2>
-      <p class="hud-tip">${escapeHtml(state.tip)}</p>
     `
   }
 
@@ -319,17 +338,29 @@ export class HudController {
       button.dataset.recipeId = recipe.id
 
       const textGroup = document.createElement('span')
+      textGroup.className = 'hud-modal__content'
       const title = document.createElement('strong')
       title.textContent = recipe.name
       const inputs = document.createElement('small')
       inputs.textContent = recipe.inputs.join(' + ')
       textGroup.append(title, inputs)
 
+      const left = document.createElement('div')
+      left.className = 'hud-modal__left'
+      const icon = this.createHudIcon(recipe.outputWeaponHudIconKey, recipe.outputWeaponName)
+      if (icon) {
+        left.append(icon)
+      }
+      left.append(textGroup)
+
       const output = document.createElement('span')
       output.className = 'hud-modal__recipe-output'
       output.textContent = `${recipe.outputWeaponName} · ${recipe.damage} dmg`
+      if (recipe.outputWeaponAccentColor != null) {
+        output.style.color = `#${recipe.outputWeaponAccentColor.toString(16).padStart(6, '0')}`
+      }
 
-      button.append(textGroup, output)
+      button.append(left, output)
       return button
     })
   }
@@ -347,17 +378,29 @@ export class HudController {
       button.dataset.weaponId = weapon.id
 
       const textGroup = document.createElement('span')
+      textGroup.className = 'hud-modal__content'
       const title = document.createElement('strong')
       title.textContent = weapon.name
       const description = document.createElement('small')
       description.textContent = weapon.description
       textGroup.append(title, description)
 
+      const left = document.createElement('div')
+      left.className = 'hud-modal__left'
+      const icon = this.createHudIcon(weapon.hudIconKey, weapon.name)
+      if (icon) {
+        left.append(icon)
+      }
+      left.append(textGroup)
+
       const meta = document.createElement('span')
       meta.className = 'hud-modal__weapon-meta'
       meta.textContent = `${weapon.isEquipped ? 'Equipped' : 'Equip'} · ${weapon.damage} dmg`
+      if (weapon.accentColor != null) {
+        meta.style.color = `#${weapon.accentColor.toString(16).padStart(6, '0')}`
+      }
 
-      button.append(textGroup, meta)
+      button.append(left, meta)
       return button
     })
   }
@@ -386,5 +429,20 @@ export class HudController {
     paragraph.className = 'hud-empty'
     paragraph.textContent = message
     return paragraph
+  }
+
+  private createHudIcon(iconKey: string | undefined, label: string): HTMLImageElement | null {
+    const src = getHudIconSrc(iconKey)
+    if (!src) {
+      return null
+    }
+
+    const image = document.createElement('img')
+    image.className = 'hud-icon'
+    image.src = src
+    image.alt = `${label} icon`
+    image.width = 32
+    image.height = 32
+    return image
   }
 }

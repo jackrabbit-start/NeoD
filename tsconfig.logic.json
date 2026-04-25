@@ -9,6 +9,7 @@
   "include": [
     "src/domain/**/*.ts",
     "src/data/**/*.ts",
+    "src/game/**/*.ts",
     "src/systems/**/*.ts"
   ]
 }

@@ -9,6 +9,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     fireRateMs: 280,
     projectileSpeed: 460,
     projectileTint: 0xf8fafc,
+    projectileTextureKey: 'starter-projectile',
+    visual: {
+      hudIconKey: 'weapon-starter-blaster',
+      accentColor: 0xf8fafc,
+    },
   },
   'acid-sprayer': {
     id: 'acid-sprayer',
@@ -18,6 +23,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     fireRateMs: 230,
     projectileSpeed: 500,
     projectileTint: 0xc1ff72,
+    projectileTextureKey: 'acid-projectile',
+    visual: {
+      hudIconKey: 'weapon-acid-sprayer',
+      accentColor: 0xc1ff72,
+    },
   },
   'frost-lance': {
     id: 'frost-lance',
@@ -27,6 +37,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     fireRateMs: 190,
     projectileSpeed: 620,
     projectileTint: 0x9ce7ff,
+    projectileTextureKey: 'frost-projectile',
+    visual: {
+      hudIconKey: 'weapon-frost-lance',
+      accentColor: 0x9ce7ff,
+    },
   },
   'storm-cannon': {
     id: 'storm-cannon',
@@ -36,6 +51,11 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     fireRateMs: 210,
     projectileSpeed: 560,
     projectileTint: 0xd4b5ff,
+    projectileTextureKey: 'storm-projectile',
+    visual: {
+      hudIconKey: 'weapon-storm-cannon',
+      accentColor: 0xd4b5ff,
+    },
   },
   'arc-loom': {
     id: 'arc-loom',
@@ -45,5 +65,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     fireRateMs: 175,
     projectileSpeed: 590,
     projectileTint: 0xffd866,
+    projectileTextureKey: 'arc-projectile',
+    visual: {
+      hudIconKey: 'weapon-arc-loom',
+      accentColor: 0xffd866,
+    },
   },
 }

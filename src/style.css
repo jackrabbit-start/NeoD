@@ -7,8 +7,19 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  background: #050816;
+  background: #06111f;
   color: #f3f6ff;
+  --ui-bg: rgba(5, 13, 27, 0.86);
+  --ui-surface: rgba(10, 20, 39, 0.88);
+  --ui-surface-strong: rgba(12, 24, 47, 0.96);
+  --ui-border: rgba(151, 191, 255, 0.26);
+  --ui-border-strong: rgba(151, 191, 255, 0.4);
+  --ui-accent: #8fe4ff;
+  --ui-accent-soft: rgba(143, 228, 255, 0.18);
+  --ui-accent-lime: #a6ffd0;
+  --ui-text-soft: #b9c7ff;
+  --ui-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+  --ui-line: linear-gradient(90deg, rgba(143, 228, 255, 0), rgba(143, 228, 255, 0.72), rgba(166, 255, 208, 0));
 }
 
 * {
@@ -19,8 +30,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, #10203a 0%, #050816 56%),
-    #050816;
+    radial-gradient(circle at top, rgba(39, 78, 132, 0.45) 0%, rgba(6, 17, 31, 0) 42%),
+    radial-gradient(circle at 18% 18%, rgba(143, 228, 255, 0.12) 0%, rgba(143, 228, 255, 0) 24%),
+    linear-gradient(180deg, #0c1c32 0%, #06111f 54%, #050b14 100%);
 }
 
 button {
@@ -36,26 +48,106 @@ button {
 
 .game-shell {
   display: grid;
-  gap: 12px;
+  gap: 18px;
 }
 
 .game-header {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  align-items: baseline;
-  color: #b9c7ff;
+  gap: 20px;
+  align-items: center;
+  padding: 14px 18px;
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.08), rgba(166, 255, 208, 0.03)),
+    rgba(5, 13, 27, 0.74);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+  color: var(--ui-text-soft);
   font-size: 14px;
+}
+
+.game-header__brand {
+  display: grid;
+  gap: 6px;
+}
+
+.game-header__brand strong {
+  color: #f8fbff;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.game-header__brand span {
+  color: var(--ui-text-soft);
+}
+
+.game-header__rails {
+  display: flex;
+  flex: 1;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.game-header__rails span {
+  display: block;
+  height: 1px;
+  border-radius: 999px;
+  background: var(--ui-line);
+}
+
+.game-header__rails span:first-child {
+  width: min(160px, 28vw);
+  opacity: 0.72;
+}
+
+.game-header__rails span:last-child {
+  width: min(92px, 18vw);
+  opacity: 0.48;
 }
 
 .game-frame {
   position: relative;
   width: min(960px, calc(100vw - 32px));
   aspect-ratio: 16 / 9;
-  border: 1px solid rgba(156, 181, 255, 0.35);
-  border-radius: 14px;
+  border: 1px solid rgba(151, 191, 255, 0.32);
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.45);
+  background:
+    radial-gradient(circle at top, rgba(143, 228, 255, 0.1), rgba(143, 228, 255, 0) 32%),
+    linear-gradient(180deg, rgba(9, 20, 39, 0.96), rgba(5, 12, 22, 0.98));
+  box-shadow:
+    var(--ui-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.game-frame::before,
+.game-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.game-frame::before {
+  inset: 12px;
+  border: 1px solid rgba(151, 191, 255, 0.12);
+  border-radius: 18px;
+}
+
+.game-frame::after {
+  background:
+    radial-gradient(circle at 14% 14%, rgba(143, 228, 255, 0.18), rgba(143, 228, 255, 0) 18%),
+    radial-gradient(circle at 88% 18%, rgba(166, 255, 208, 0.12), rgba(166, 255, 208, 0) 16%);
+  mix-blend-mode: screen;
+  opacity: 0.78;
+}
+
+#game-root {
+  width: 100%;
+  height: 100%;
 }
 
 .hud-panel {
@@ -85,18 +177,32 @@ button {
 
 .hud-summary {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  max-width: 320px;
-  padding: 12px 14px;
-  border: 1px solid rgba(156, 181, 255, 0.2);
-  border-radius: 12px;
-  background: rgba(5, 8, 22, 0.72);
-  backdrop-filter: blur(10px);
+  top: 18px;
+  left: 18px;
+  width: min(360px, calc(100% - 36px));
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(143, 228, 255, 0.08), rgba(143, 228, 255, 0) 28%),
+    rgba(5, 13, 27, 0.78);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
   color: #ecf2ff;
   font-size: 13px;
   line-height: 1.45;
   pointer-events: auto;
+}
+
+.hud-summary::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(151, 191, 255, 0.12);
+  border-radius: 18px;
+  pointer-events: none;
 }
 
 .hud-summary h1,
@@ -109,11 +215,51 @@ button {
   margin: 0;
 }
 
-.hud-summary h1 {
-  font-size: 16px;
+.hud-summary__shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
 }
 
-.hud-summary h2,
+.hud-summary__hero {
+  display: grid;
+  gap: 10px;
+}
+
+.hud-summary__title-block {
+  display: grid;
+  gap: 4px;
+}
+
+.hud-summary h1 {
+  font-size: 20px;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+
+.hud-summary__title-block > p {
+  color: var(--ui-text-soft);
+}
+
+.hud-summary__status {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(151, 191, 255, 0.14);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.14), rgba(143, 228, 255, 0) 68%),
+    rgba(9, 19, 37, 0.92);
+}
+
+.hud-summary h2 {
+  color: #9bb5ff;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .codex-section > h3 {
   margin-top: 10px;
   margin-bottom: 4px;
@@ -123,21 +269,77 @@ button {
   text-transform: uppercase;
 }
 
-.hud-summary ul {
-  margin: 4px 0 0;
-  padding-left: 18px;
+.hud-summary__status p {
+  color: #f7fbff;
+  font-size: 14px;
 }
 
-.hud-summary li + li {
-  margin-top: 2px;
+.hud-summary__grid {
+  display: grid;
+  gap: 10px;
+}
+
+.hud-summary__section {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(151, 191, 255, 0.12);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(143, 228, 255, 0.06), rgba(143, 228, 255, 0) 80%),
+    rgba(8, 18, 35, 0.88);
+}
+
+.hud-summary__section--controls {
+  background:
+    linear-gradient(135deg, rgba(166, 255, 208, 0.08), rgba(166, 255, 208, 0) 72%),
+    rgba(8, 18, 35, 0.9);
+}
+
+.hud-summary__section--inventory {
+  gap: 10px;
+}
+
+.hud-summary__body,
+.hud-summary__section > p {
+  color: #f3f7ff;
+}
+
+.hud-summary__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hud-summary__list li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 10px;
+  border: 1px solid rgba(151, 191, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  color: #e9f0ff;
+}
+
+.hud-summary__list li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-lime));
+  box-shadow: 0 0 0 4px rgba(143, 228, 255, 0.08);
 }
 
 .hud-summary__inventory-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 12px;
 }
 
 .hud-summary__inventory-header h2 {
@@ -145,26 +347,37 @@ button {
 }
 
 .hud-tip {
-  color: #a6ffd0;
+  color: var(--ui-accent-lime);
 }
 
 .hud-button {
-  border: 1px solid rgba(156, 181, 255, 0.4);
+  border: 1px solid var(--ui-border-strong);
   border-radius: 999px;
-  background: rgba(34, 52, 92, 0.9);
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.2), rgba(143, 228, 255, 0) 58%),
+    rgba(18, 36, 70, 0.94);
   color: #f8fbff;
-  padding: 6px 10px;
+  padding: 8px 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   cursor: pointer;
   transition:
-    transform 120ms ease,
-    background 120ms ease,
-    border-color 120ms ease;
+    transform 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
-.hud-button:hover {
+.hud-button:hover,
+.hud-button:focus-visible {
   transform: translateY(-1px);
-  background: rgba(49, 72, 126, 0.95);
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.26), rgba(143, 228, 255, 0.04) 62%),
+    rgba(27, 52, 100, 0.96);
   border-color: rgba(166, 255, 208, 0.55);
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  outline: none;
 }
 
 .hud-button:disabled {
@@ -174,7 +387,9 @@ button {
 }
 
 .hud-button--secondary {
-  background: rgba(11, 18, 38, 0.92);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 56%),
+    rgba(8, 16, 31, 0.94);
 }
 
 .hud-modal-layer {
@@ -191,8 +406,10 @@ button {
 .hud-modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(2, 6, 18, 0.72);
-  backdrop-filter: blur(3px);
+  background:
+    radial-gradient(circle at top, rgba(143, 228, 255, 0.12), rgba(143, 228, 255, 0) 34%),
+    rgba(2, 6, 18, 0.74);
+  backdrop-filter: blur(5px);
 }
 
 .hud-modal {
@@ -203,19 +420,25 @@ button {
   max-height: calc(100% - 48px);
   overflow: auto;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(156, 181, 255, 0.3);
-  border-radius: 20px;
-  background: rgba(7, 14, 31, 0.96);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
-  padding: 20px;
+  border: 1px solid rgba(151, 191, 255, 0.26);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(143, 228, 255, 0.08), rgba(143, 228, 255, 0) 26%),
+    rgba(7, 14, 31, 0.97);
+  box-shadow:
+    0 40px 90px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 24px;
 }
 
 .hud-modal__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(151, 191, 255, 0.1);
 }
 
 .hud-modal__header h2,
@@ -236,16 +459,19 @@ button {
 .hud-modal__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 18px;
 }
 
 .hud-modal__section {
   display: grid;
   gap: 10px;
-  padding: 14px;
-  border: 1px solid rgba(156, 181, 255, 0.16);
-  border-radius: 14px;
-  background: rgba(10, 18, 38, 0.72);
+  padding: 16px;
+  border: 1px solid rgba(151, 191, 255, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(143, 228, 255, 0.06), rgba(143, 228, 255, 0) 85%),
+    rgba(10, 18, 38, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .hud-modal__detail {
@@ -258,34 +484,80 @@ button {
 }
 
 .hud-modal__item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid rgba(156, 181, 255, 0.18);
-  border-radius: 12px;
-  background: rgba(14, 26, 54, 0.92);
+  padding: 12px 14px 12px 16px;
+  border: 1px solid rgba(151, 191, 255, 0.16);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.08), rgba(143, 228, 255, 0) 70%),
+    rgba(14, 26, 54, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   color: #f4f7ff;
   text-align: left;
   cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
 }
 
-.hud-modal__item span {
+.hud-modal__item::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--ui-accent), var(--ui-accent-lime));
+  opacity: 0.52;
+}
+
+.hud-modal__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud-modal__content {
   display: grid;
   gap: 3px;
 }
 
-.hud-modal__item small {
+.hud-modal__content small {
   color: #adc0ff;
 }
 
+.hud-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(151, 191, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  object-fit: contain;
+  padding: 4px;
+}
+
 .hud-modal__item:hover,
+.hud-modal__item:focus-visible,
 .hud-modal__item.is-hovered,
 .hud-modal__item.is-equipped {
   border-color: rgba(166, 255, 208, 0.58);
-  background: rgba(21, 40, 78, 0.96);
+  background:
+    linear-gradient(135deg, rgba(143, 228, 255, 0.14), rgba(143, 228, 255, 0.03) 72%),
+    rgba(21, 40, 78, 0.98);
+  box-shadow:
+    0 14px 24px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .hud-modal__item--weapon.is-equipped .hud-modal__weapon-meta {
@@ -302,10 +574,21 @@ button {
 .hud-modal__detail-card {
   display: grid;
   gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(151, 191, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .hud-empty {
   color: #b9c7ff;
+}
+
+.hud-summary .hud-empty {
+  padding: 9px 10px;
+  border: 1px dashed rgba(151, 191, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .codex-shell {
@@ -389,6 +672,12 @@ button {
   .game-header {
     flex-direction: column;
     align-items: flex-start;
+    padding: 14px;
+  }
+
+  .game-header__rails {
+    width: 100%;
+    min-width: 0;
   }
 
   .hud-modal__grid {
@@ -402,7 +691,10 @@ button {
   }
 
   .hud-summary {
-    max-width: min(320px, calc(100% - 28px));
+    top: 12px;
+    left: 12px;
+    width: min(360px, calc(100% - 24px));
+    padding: 14px;
   }
 
   .codex-panel {

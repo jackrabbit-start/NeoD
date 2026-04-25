@@ -12,6 +12,7 @@ import type {
   RecipeId,
   WeaponId,
 } from '../domain/types.js'
+import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RADIUS, PROJECTILE_HIT_PADDING } from '../game/combatGeometry.js'
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { CodexController } from '../ui/Codex.js'
 import type { HudController } from '../ui/Hud.js'
@@ -28,6 +29,7 @@ import {
 import { getWaveByIndex, shouldAdvanceWave } from '../systems/waves.js'
 
 type PhysicsImage = Phaser.Physics.Arcade.Image
+type PhysicsSprite = Phaser.Physics.Arcade.Sprite
 
 interface EnemyHealthBar {
   background: Phaser.GameObjects.Rectangle
@@ -38,7 +40,7 @@ interface EnemyHealthBar {
 }
 
 interface EnemyEntity {
-  sprite: PhysicsImage
+  sprite: PhysicsSprite
   config: EnemyDefinition
   currentHealth: number
   healthBar: EnemyHealthBar
@@ -53,6 +55,7 @@ interface LootEntity {
 interface ProjectileEntity {
   sprite: PhysicsImage
   damage: number
+  spinTween?: Phaser.Tweens.Tween
 }
 
 export class ArenaScene extends Phaser.Scene {
@@ -60,7 +63,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private codex!: CodexController
 
-  private player!: PhysicsImage
+  private player!: PhysicsSprite
 
   private enemySprites!: Phaser.Physics.Arcade.Group
 
@@ -118,18 +121,10 @@ export class ArenaScene extends Phaser.Scene {
     this.hud = this.game.registry.get('hud') as HudController
     this.codex = this.game.registry.get('codex') as CodexController
     this.hud.setHandlers({
-      onInventoryToggle: () => {
-        this.toggleInventory()
-      },
-      onInventoryClose: () => {
-        this.closeInventory()
-      },
-      onRecipeSelect: (recipeId) => {
-        this.handleRecipeSelection(recipeId)
-      },
-      onWeaponEquip: (weaponId) => {
-        this.handleWeaponEquip(weaponId)
-      },
+      onInventoryToggle: () => this.toggleInventory(),
+      onInventoryClose: () => this.closeInventory(),
+      onRecipeSelect: (recipeId) => this.handleRecipeSelection(recipeId),
+      onWeaponEquip: (weaponId) => this.handleWeaponEquip(weaponId),
     })
 
     this.cameras.main.setBackgroundColor('#07111f')
@@ -145,16 +140,14 @@ export class ArenaScene extends Phaser.Scene {
     )
     arena.setStrokeStyle(2, 0x214266, 0.9)
 
-    this.add
-      .text(40, GAME_HEIGHT - 36, 'Prototype goal: survive the slime waves and beat the boss', {
-        fontSize: '16px',
-        color: '#9bb5ff',
-      })
-      .setDepth(1)
-
-    this.player = this.physics.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'player')
-    this.player.setCircle(14)
+    this.player = this.physics.add.sprite(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      'player',
+    )
+    this.player.setCircle(PLAYER_COLLISION_RADIUS)
     this.player.setCollideWorldBounds(true)
+    this.player.play('player-idle')
 
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
@@ -214,6 +207,7 @@ export class ArenaScene extends Phaser.Scene {
   private handlePlayerMovement(): void {
     if (this.isInteractionBlocked()) {
       this.player.setVelocity(0, 0)
+      this.setPlayerAnimation(false)
       return
     }
 
@@ -222,11 +216,13 @@ export class ArenaScene extends Phaser.Scene {
       Number(this.cursors.down.isDown) - Number(this.cursors.up.isDown),
     )
 
-    if (velocity.lengthSq() > 0) {
+    const isMoving = velocity.lengthSq() > 0
+    if (isMoving) {
       velocity.normalize().scale(this.playerSpeed)
     }
 
     this.player.setVelocity(velocity.x, velocity.y)
+    this.setPlayerAnimation(isMoving)
   }
 
   private handleFiring(time: number): void {
@@ -246,20 +242,39 @@ export class ArenaScene extends Phaser.Scene {
 
     direction.normalize()
 
-    const projectile = this.physics.add.image(this.player.x, this.player.y, 'projectile')
-    projectile.setTint(weapon.projectileTint)
-    projectile.setCircle(5)
+    const projectile = this.physics.add.image(
+      this.player.x,
+      this.player.y,
+      weapon.projectileTextureKey,
+    )
+    projectile.setCircle(PROJECTILE_COLLISION_RADIUS)
+    projectile.setRotation(direction.angle())
     projectile.setVelocity(
       direction.x * weapon.projectileSpeed,
       direction.y * weapon.projectileSpeed,
     )
 
+    const spinTween = this.tweens.add({
+      targets: projectile,
+      angle: projectile.angle + 360,
+      duration: 1100,
+      repeat: -1,
+    })
+
     this.projectiles.push({
       sprite: projectile,
       damage: weapon.damage,
+      spinTween,
     })
 
     this.nextFireAt = time + weapon.fireRateMs
+    this.tweens.add({
+      targets: this.player,
+      scaleX: 0.94,
+      scaleY: 1.06,
+      duration: 70,
+      yoyo: true,
+    })
   }
 
   private updateEnemies(): void {
@@ -287,6 +302,7 @@ export class ArenaScene extends Phaser.Scene {
 
       direction.normalize().scale(enemy.config.speed)
       enemy.sprite.setVelocity(direction.x, direction.y)
+      enemy.sprite.play(enemy.config.animationKey, true)
 
       const touchingPlayer =
         Phaser.Math.Distance.Between(
@@ -295,7 +311,7 @@ export class ArenaScene extends Phaser.Scene {
           this.player.x,
           this.player.y,
         ) <
-        enemy.config.size / 2 + 16
+        enemy.config.size / 2 + ENEMY_CONTACT_PADDING
 
       if (touchingPlayer) {
         this.damagePlayer(enemy.config.contactDamage)
@@ -322,6 +338,7 @@ export class ArenaScene extends Phaser.Scene {
         projectile.sprite.y > GAME_HEIGHT
 
       if (outOfBounds) {
+        projectile.spinTween?.remove()
         projectile.sprite.destroy()
         continue
       }
@@ -331,7 +348,7 @@ export class ArenaScene extends Phaser.Scene {
           continue
         }
 
-        const hitDistance = enemy.config.size / 2 + 7
+        const hitDistance = enemy.config.size / 2 + PROJECTILE_HIT_PADDING
         if (
           Phaser.Math.Distance.Between(
             projectile.sprite.x,
@@ -341,6 +358,7 @@ export class ArenaScene extends Phaser.Scene {
           ) <= hitDistance
         ) {
           this.damageEnemy(enemy, projectile.damage)
+          projectile.spinTween?.remove()
           projectile.sprite.destroy()
           break
         }
@@ -443,11 +461,11 @@ export class ArenaScene extends Phaser.Scene {
           ? 48
           : GAME_HEIGHT - 48
 
-    const sprite = this.physics.add.image(x, y, config.textureKey)
-    sprite.setTint(config.tint)
+    const sprite = this.physics.add.sprite(x, y, config.textureKey)
     sprite.setCircle(config.size / 2)
     sprite.setCollideWorldBounds(true)
     sprite.setBounce(0)
+    sprite.play(config.animationKey)
     this.enemySprites.add(sprite)
 
     const enemy: EnemyEntity = {
@@ -477,7 +495,7 @@ export class ArenaScene extends Phaser.Scene {
       this.tweens.add({
         targets: enemy.sprite,
         scale: 1,
-        duration: 80,
+        duration: 100,
       })
       return
     }
@@ -485,7 +503,12 @@ export class ArenaScene extends Phaser.Scene {
     if (enemy.config.drops) {
       const droppedItem = resolveWeightedDrop(enemy.config.drops)
       if (droppedItem) {
-        const loot = this.physics.add.image(enemy.sprite.x, enemy.sprite.y, droppedItem)
+        const itemDefinition = ITEM_DEFINITIONS[droppedItem]
+        const loot = this.physics.add.image(
+          enemy.sprite.x,
+          enemy.sprite.y,
+          itemDefinition.textureKey,
+        )
         loot.setCircle(7)
         this.lootDrops.push({
           sprite: loot,
@@ -515,10 +538,12 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayerHitAt = now
     this.playerHealth = Math.max(0, this.playerHealth - damage)
     this.statusMessage = `Player hit for ${damage}. Stay mobile.`
-    this.player.setTint(0xffa8a8)
-
-    this.time.delayedCall(120, () => {
-      this.player.clearTint()
+    this.player.setAlpha(0.55)
+    this.tweens.add({
+      targets: this.player,
+      alpha: 1,
+      duration: 130,
+      ease: 'Quad.Out',
     })
 
     if (this.playerHealth <= 0) {
@@ -561,8 +586,22 @@ export class ArenaScene extends Phaser.Scene {
     if (shouldPause) {
       this.player.setVelocity(0, 0)
       this.physics.world.pause()
+      this.player.anims.pause()
+      for (const enemy of this.enemies) {
+        enemy.sprite.anims.pause()
+      }
+      for (const projectile of this.projectiles) {
+        projectile.spinTween?.pause()
+      }
     } else {
       this.physics.world.resume()
+      this.player.anims.resume()
+      for (const enemy of this.enemies) {
+        enemy.sprite.anims.resume()
+      }
+      for (const projectile of this.projectiles) {
+        projectile.spinTween?.resume()
+      }
     }
 
     if (this.spawnTimer) {
@@ -577,10 +616,13 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    const result = applyRecipeSelection({
-      inventory: this.inventory,
-      ownedWeaponIds: this.ownedWeaponIds,
-    }, recipeId)
+    const result = applyRecipeSelection(
+      {
+        inventory: this.inventory,
+        ownedWeaponIds: this.ownedWeaponIds,
+      },
+      recipeId,
+    )
 
     if (!result) {
       this.statusMessage = 'That combine is no longer actionable. Choose another option.'
@@ -627,10 +669,14 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private createEnemyHealthBar(
-    sprite: PhysicsImage,
-    config: EnemyDefinition,
-  ): EnemyHealthBar {
+  private setPlayerAnimation(isMoving: boolean): void {
+    const targetKey = isMoving ? 'player-move' : 'player-idle'
+    if (this.player.anims.currentAnim?.key !== targetKey) {
+      this.player.play(targetKey)
+    }
+  }
+
+  private createEnemyHealthBar(sprite: PhysicsSprite, config: EnemyDefinition): EnemyHealthBar {
     const { width, height, offsetY } = getEnemyHealthBarMetrics(config.size)
 
     const background = this.add
@@ -660,11 +706,7 @@ export class ArenaScene extends Phaser.Scene {
     const { background, fill, width, height, offsetY } = enemy.healthBar
     const left = enemy.sprite.x - width / 2
     const y = enemy.sprite.y - offsetY
-    const fillWidth = getEnemyHealthFillWidth(
-      enemy.currentHealth,
-      enemy.config.maxHealth,
-      width,
-    )
+    const fillWidth = getEnemyHealthFillWidth(enemy.currentHealth, enemy.config.maxHealth, width)
 
     background.setPosition(left, y)
     fill.setPosition(left, y)
@@ -771,6 +813,8 @@ export class ArenaScene extends Phaser.Scene {
       outputWeaponName: weapon.name,
       damage: weapon.damage,
       inputs: recipe.inputs.map((itemId) => ITEM_DEFINITIONS[itemId].name),
+      outputWeaponHudIconKey: weapon.visual.hudIconKey,
+      outputWeaponAccentColor: weapon.visual.accentColor,
     }))
   }
 
@@ -784,6 +828,8 @@ export class ArenaScene extends Phaser.Scene {
         description: ownedWeapon.description,
         damage: ownedWeapon.damage,
         isEquipped: weaponId === this.activeWeaponId,
+        hudIconKey: ownedWeapon.visual.hudIconKey,
+        accentColor: ownedWeapon.visual.accentColor,
       }
     })
   }

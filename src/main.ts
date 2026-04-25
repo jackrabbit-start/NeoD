@@ -13,8 +13,14 @@ if (!app) {
 app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
-      <strong>NeoD · browser-first V1 prototype</strong>
-      <span>Safe fictional slime run · drop + combine loop</span>
+      <div class="game-header__brand">
+        <strong>NeoD · browser-first V1 prototype</strong>
+        <span>Safe fictional slime run · drop + combine loop</span>
+      </div>
+      <div class="game-header__rails" aria-hidden="true">
+        <span></span>
+        <span></span>
+      </div>
     </header>
     <section class="game-frame">
       <div class="hud-panel" id="hud"></div>
