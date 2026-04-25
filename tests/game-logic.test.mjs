@@ -1333,7 +1333,7 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
     {
       enemyId: 'slime',
       enemyName: '출석 체크 알림',
-      count: 6,
+      count: 11,
       ratio: 1,
       percentLabel: '100%',
     },
@@ -1355,7 +1355,7 @@ test('run progression spawn sequence interleaves weighted enemies early', () => 
   const firstBackPhase = getRunPhaseByElapsedMs(30_000)
   const sequence = flattenRunPhaseEntries(firstBackPhase)
 
-  assert.equal(sequence.length, 9)
+  assert.equal(sequence.length, 17)
   assert.deepEqual(sequence.slice(0, 4), ['slime', 'dash-slime', 'slime', 'dash-slime'])
 })
 
@@ -1366,11 +1366,11 @@ test('run progression gives enemy roles clear scheduled ambush moments', () => {
   const finaleAmbush = getRunPhaseByElapsedMs(FINAL_STAGE_START_MS)
   const lastStage = getRunPhaseByElapsedMs(RUN_DURATION_MS)
 
-  assert.equal(dashAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'dash-slime').length, 5)
-  assert.equal(splitterAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'splitter-slime').length, 6)
-  assert.equal(supportAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'mender-slime').length, 3)
+  assert.equal(dashAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'dash-slime').length, 14)
+  assert.equal(splitterAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'splitter-slime').length, 16)
+  assert.equal(supportAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'mender-slime').length, 7)
   assert.ok(finaleAmbush.oneTimeSpawns?.includes('slime-boss'))
-  assert.equal(finaleAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'siege-toad').length, 3)
+  assert.equal(finaleAmbush.oneTimeSpawns?.filter((enemyId) => enemyId === 'siege-toad').length, 9)
   assert.equal(lastStage.stageLabel, 'Stage 20')
 })
 

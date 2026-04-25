@@ -19,8 +19,8 @@ test('run progression runtime starts with immediate recurring pressure', () => {
 
   assert.equal(step.state.elapsedMs, 0)
   assert.equal(step.activePhase.id, 'minute-01-a')
-  assert.equal(step.spawnedEnemyIds.length, 2)
-  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime'])
+  assert.equal(step.spawnedEnemyIds.length, 4)
+  assert.deepEqual(step.spawnedEnemyIds, ['slime', 'slime', 'slime', 'slime'])
   assert.equal(step.timedOut, false)
 })
 
@@ -63,6 +63,7 @@ test('run progression table covers 20 minutes with half-minute probability phase
   assert.equal(RUN_PROGRESS_PHASES.length, 40)
   assert.equal(RUN_PROGRESS_PHASES[0]?.startMs, 0)
   assert.equal(RUN_PROGRESS_PHASES.at(-1)?.startMs, 19 * 60_000 + 30_000)
+  assert.ok((RUN_PROGRESS_PHASES.at(-1)?.softEnemyCap ?? 0) >= 100)
   assert.ok((RUN_PROGRESS_PHASES.at(-1)?.softEnemyCap ?? 0) > (RUN_PROGRESS_PHASES[0]?.softEnemyCap ?? 0))
   assert.ok((RUN_PROGRESS_PHASES.at(-1)?.healthMultiplier ?? 0) > (RUN_PROGRESS_PHASES[0]?.healthMultiplier ?? 0))
 })

@@ -28,6 +28,27 @@ const pressureNames = [
   '최후의 1분',
 ]
 
+function scaleEntriesForHackSlash(
+  entries: RunSpawnEntryDefinition[],
+  minuteIndex: number,
+): RunSpawnEntryDefinition[] {
+  const multiplier =
+    minuteIndex >= 18
+      ? 3.8
+      : minuteIndex >= 15
+        ? 3.25
+        : minuteIndex >= 10
+          ? 2.75
+          : minuteIndex >= 5
+            ? 2.2
+            : 1.8
+
+  return entries.map((entry) => ({
+    ...entry,
+    count: Math.max(1, Math.round(entry.count * multiplier)),
+  }))
+}
+
 function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
   const clampedMinute = Math.max(0, Math.min(19, minuteIndex))
   const lateRamp = Math.max(0, clampedMinute - 10)
@@ -79,7 +100,10 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
     weights.push({ enemyId: 'siege-toad', count: 1 + Math.floor((clampedMinute - 16) / 3) + Math.floor(finaleRamp / 2) })
   }
 
-  return weights.filter((entry) => entry.count > 0)
+  return scaleEntriesForHackSlash(
+    weights.filter((entry) => entry.count > 0),
+    clampedMinute,
+  )
 }
 
 function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
@@ -93,7 +117,7 @@ function entriesForPhase(phaseIndex: number): RunSpawnEntryDefinition[] {
   }
 
   const surgeIndex = (phaseIndex + minuteIndex) % entries.length
-  const surgeAmount = Math.max(2, Math.ceil((minuteIndex + 2) / 2))
+  const surgeAmount = Math.max(5, Math.ceil((minuteIndex + 4) * 1.25))
   entries[surgeIndex] = {
     ...entries[surgeIndex],
     count: entries[surgeIndex].count + surgeAmount,
@@ -107,16 +131,16 @@ function repeatedEnemy(enemyId: EnemyId, count: number): EnemyId[] {
 
 function oneTimeSpawnsForPhase(phaseIndex: number, startMs: number): EnemyId[] {
   const ambushes: Record<number, EnemyId[]> = {
-    3: repeatedEnemy('dash-slime', 5),
-    7: repeatedEnemy('splitter-slime', 6),
-    12: repeatedEnemy('orbit-slime', 4),
-    16: repeatedEnemy('needle-wasp', 6),
-    19: [...repeatedEnemy('mender-slime', 3), ...repeatedEnemy('dash-slime', 3)],
-    24: repeatedEnemy('prism-slime', 4),
-    28: [...repeatedEnemy('void-orb', 3), ...repeatedEnemy('lantern-moth', 3)],
-    30: [...repeatedEnemy('crusher-slime', 3), ...repeatedEnemy('mirror-wisp', 3)],
-    32: [...repeatedEnemy('siege-toad', 3), ...repeatedEnemy('shard-sentinel', 4)],
-    38: [...repeatedEnemy('siege-toad', 4), ...repeatedEnemy('crusher-slime', 4)],
+    3: repeatedEnemy('dash-slime', 14),
+    7: repeatedEnemy('splitter-slime', 16),
+    12: repeatedEnemy('orbit-slime', 12),
+    16: repeatedEnemy('needle-wasp', 16),
+    19: [...repeatedEnemy('mender-slime', 7), ...repeatedEnemy('dash-slime', 14)],
+    24: repeatedEnemy('prism-slime', 12),
+    28: [...repeatedEnemy('void-orb', 10), ...repeatedEnemy('lantern-moth', 10)],
+    30: [...repeatedEnemy('crusher-slime', 9), ...repeatedEnemy('mirror-wisp', 10)],
+    32: [...repeatedEnemy('siege-toad', 9), ...repeatedEnemy('shard-sentinel', 14)],
+    38: [...repeatedEnemy('siege-toad', 12), ...repeatedEnemy('crusher-slime', 12)],
   }
 
   return [
@@ -143,9 +167,9 @@ function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
     startMs,
     durationMs: RUN_PHASE_DURATION_MS,
     entries: entriesForPhase(phaseIndex),
-    spawnIntervalMs: Math.max(300, 1300 - minuteIndex * 50),
-    burstSize: Math.min(14, 2 + Math.floor(minuteIndex / 2)),
-    softEnemyCap: Math.min(150, 8 + minuteIndex * 6),
+    spawnIntervalMs: Math.max(160, 850 - minuteIndex * 35),
+    burstSize: Math.min(36, 3 + Math.floor((minuteIndex + 1) * 1.4)),
+    softEnemyCap: Math.min(340, 28 + minuteIndex * 16),
     healthMultiplier: Number((1 + minuteIndex * 0.11 + Math.max(0, minuteIndex - 10) * 0.04).toFixed(2)),
     ...(oneTimeSpawns.length > 0 ? { oneTimeSpawns } : {}),
     ...(isFinale ? { isFinale } : {}),
