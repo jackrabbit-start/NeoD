@@ -37,3 +37,15 @@
 - Added `docs/wiki/dropped-loot-pickup-ux.md` to preserve the current-loot-only interpretation, pickup radii, magnet feedback, and true-weapon-drop non-goal.
 - Updated `docs/index.md` so future agents can find the dropped loot pickup guidance.
 - Source artifacts: `.omx/specs/deep-interview-dropped-loot-pickup-design.md`, `.omx/interviews/dropped-loot-pickup-design-20260425T100726Z.md`, `.omx/context/post-interview-dropped-loot-pickup-design-20260425T111351Z.md`, and PR #30.
+
+## [2026-04-25] gameplay | Added run result flow rule
+
+- Added `docs/wiki/run-result-flow.md` to preserve the boss-clear result-screen fix and shared presentation boundary.
+- Updated `docs/index.md` so future agents can find the run-ending flow rules.
+- Source artifacts: `.omx/specs/deep-interview-boss-patterns-end-screen.md`, `.omx/context/post-interview-boss-result-screen-20260425T110444Z.md`, and PR #27.
+
+## [2026-04-25] gameplay | Captured enemy boss pressure experiment
+
+- Added `docs/wiki/enemy-boss-pressure.md` to preserve the 3x density extreme-experiment target, boss anti-sponge rule, and follow-up tuning boundaries.
+- Updated `docs/index.md` so future agents can find the enemy/boss pressure guidance.
+- Source artifacts: `.omx/specs/deep-interview-enemy-boss-pressure.md`, `.omx/interviews/enemy-boss-pressure-20260425T111248Z.md`, `.omx/context/post-interview-enemy-boss-pressure-20260425T112833Z.md`, and PR #31.

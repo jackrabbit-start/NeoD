@@ -1,0 +1,45 @@
+# Post-Interview Context — Enemy Boss Pressure
+
+- Source spec: `.omx/specs/deep-interview-enemy-boss-pressure.md`
+- Source transcript/context:
+  - `.omx/interviews/enemy-boss-pressure-20260425T111248Z.md`
+  - `.omx/context/enemy-boss-pressure-20260425T110714Z.md`
+- Branch/worktree:
+  - Interview and implementation occurred from `ai-dev` into `ai-task/enemy-boss-pressure`.
+  - PR: https://github.com/jackrabbit-start/NeoD/pull/31
+  - Merge commit: `7c21407ee6a1b2423e79e62f4dba5f2410705f24`
+- Summary:
+  - The interview clarified that the desired fun is many-enemy survival pressure: “살아남기 벅참,” not a boss-only HP sponge.
+  - The implementation made a first-pass extreme experiment: regular wave counts moved from 6/8/9 to 18/24/27 and spawn intervals tightened to 650/520/420ms.
+  - Boss pressure was raised with stronger stats plus faster, larger, player-anchored AOE so the longer fight has active dodge pressure.
+- Lessons:
+  - For challenge-first experiments, preserve readability boundaries even when the user asks for “extreme” difficulty.
+  - If boss HP increases substantially, pair it with pattern/timing pressure; do not create an HP sponge.
+  - Data-first tuning can satisfy this pass without introducing new attack schemas or dependencies.
+  - Rebase against active `ai-dev` before merge; concurrent UI/gameplay work can change test copy and wave expectations.
+- New files:
+  - None in production code for PR #31.
+  - This context note and `docs/wiki/enemy-boss-pressure.md` preserve the lesson after merge.
+- Modified files:
+  - `src/data/waves.ts`: raised regular-wave counts to 18/24/27 and tightened cadence.
+  - `src/data/enemies.ts`: raised `slime-boss` HP/stat pressure and changed AOE to faster player-anchored pressure.
+  - `tests/enemy-behaviors.test.mjs`: locks boss constants and AOE anchor behavior.
+  - `tests/game-logic.test.mjs`: locks deterministic high-density mixed-wave spawn order and count.
+  - `tests/knockback.test.mjs`: updates boss knockback force expectation for higher resistance/weight.
+  - `tests/wave-runtime.test.mjs`: locks new spawn cadence, counts, and localized wave-start copy after rebase.
+- Decisions / constraints:
+  - Preserve boss-win flow and boss-wave singularity.
+  - Do not add new dependencies or new attack schema unless a later pass needs it.
+  - Prioritize readable pressure over literal maximum density if future playtesting finds the pass unfair.
+  - Future tuning should reduce wave density/spawn cadence or boss AOE values before undoing the clarified pressure target.
+- Verification:
+  - Before initial PR: `pnpm typecheck`, `pnpm test` (90/90), `pnpm build`, `git diff --check`.
+  - After rebase on updated `ai-dev`: `pnpm typecheck`, `pnpm test` (94/94), `pnpm build`, `git diff --check`.
+  - Build still emitted the known Vite chunk-size warning.
+  - Commands ran under Node `v25.5.0`; `package.json` requests Node `22.x`.
+- Residual risks:
+  - No manual browser play-feel pass was recorded after the extreme density merge.
+  - The 3x density pass may overshoot on lower-end devices or small-screen readability; tune down if manual play shows visual clutter or unavoidable deaths.
+- Next recommended use:
+  - Consult `docs/wiki/enemy-boss-pressure.md` before future density, boss HP, or boss AOE tuning.
+  - Pair future balance changes with deterministic tests and at least one manual browser feel check when possible.
