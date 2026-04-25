@@ -62,11 +62,11 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   const toad = ENEMY_DEFINITIONS['siege-toad']
   const boss = ENEMY_DEFINITIONS['slime-boss']
 
-  assert.equal(slime.maxHealth, 30)
+  assert.equal(slime.maxHealth, 14)
   assert.equal(slime.speed, 84)
   assert.equal(slime.contactDamage, 18)
 
-  assert.equal(spark.maxHealth, 40)
+  assert.equal(spark.maxHealth, 18)
   assert.equal(spark.speed, 92)
   assert.equal(spark.contactDamage, 20)
   assert.equal(spark.movementBehavior.kind, 'orbit')
@@ -80,11 +80,11 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   assert.equal(spark.attackBehavior.range, 290)
   assert.equal(spark.attackBehavior.targetJitterRadius, 86)
 
-  assert.equal(prism.maxHealth, 110)
+  assert.equal(prism.maxHealth, 52)
   assert.equal(prism.speed, 82)
   assert.equal(prism.contactDamage, 28)
 
-  assert.equal(dash.maxHealth, 46)
+  assert.equal(dash.maxHealth, 20)
   assert.equal(dash.speed, 76)
   assert.equal(dash.contactDamage, 22)
   assert.equal(dash.movementBehavior.kind, 'dash')
@@ -93,7 +93,7 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   assert.equal(dash.movementBehavior.chargeDurationMs, 520)
   assert.equal(dash.movementBehavior.cooldownMs, 850)
 
-  assert.equal(orbit.maxHealth, 38)
+  assert.equal(orbit.maxHealth, 18)
   assert.equal(orbit.speed, 82)
   assert.equal(orbit.contactDamage, 19)
   assert.equal(orbit.movementBehavior.kind, 'orbit')
@@ -116,7 +116,7 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   assert.equal(toad.attackBehavior.kind, 'radial-burst')
   assert.ok(toad.maxHealth > crusher.maxHealth)
 
-  assert.equal(boss.maxHealth, 720)
+  assert.equal(boss.maxHealth, 360)
   assert.equal(boss.speed, 64)
   assert.equal(boss.contactDamage, 34)
   assert.equal(boss.attackBehavior.kind, 'telegraphed-aoe')

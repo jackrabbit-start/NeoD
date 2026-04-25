@@ -44,6 +44,7 @@ export interface HazardSpawnSpec {
   mode?: 'damage-zone' | 'trigger-trap'
   armingDelayMs?: number
   visualPowerTier?: number
+  attribute?: WeaponAttributeDefinition
 }
 
 export interface ChainSpec {
@@ -65,6 +66,7 @@ export interface TurretDeploySpec extends WeaponTurretDefinition {
   tint: number
   attribute?: WeaponAttributeDefinition
   visualPowerTier?: number
+  attribute?: WeaponAttributeDefinition
 }
 
 export interface ProjectileSpawnSpec {
@@ -93,6 +95,7 @@ export interface ProjectileSpawnSpec {
   summonOnKill?: WeaponSummonOnKillDefinition
   deployTurret?: TurretDeploySpec
   visualPowerTier?: number
+  attribute?: WeaponAttributeDefinition
 }
 
 export interface MeleeSwingSpec {
@@ -112,6 +115,7 @@ export interface MeleeSwingSpec {
   execute?: WeaponExecuteDefinition
   healOnHit?: number
   visualPowerTier?: number
+  attribute?: WeaponAttributeDefinition
 }
 
 export interface AttackPlan {
@@ -860,6 +864,9 @@ export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponS
 
 export function getWeaponSummary(weapon: WeaponDefinition): string {
   const range = getWeaponAttackRange(weapon)
+  const attributeSummary = weapon.attribute
+    ? ` · ${weapon.attribute.elementLabel}/${weapon.attribute.traitLabel}`
+    : ''
 
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
     return `피해 ${weapon.damage} · 공 ${weapon.attackBehavior.ricochet.projectileCount ?? 1}개 · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${getWeaponAttributeSummary(weapon)}`

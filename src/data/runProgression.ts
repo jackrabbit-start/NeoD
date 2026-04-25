@@ -170,7 +170,7 @@ function createPhase(phaseIndex: number): RunProgressionPhaseDefinition {
     spawnIntervalMs: Math.max(160, 850 - minuteIndex * 35),
     burstSize: Math.min(36, 3 + Math.floor((minuteIndex + 1) * 1.4)),
     softEnemyCap: Math.min(340, 28 + minuteIndex * 16),
-    healthMultiplier: Number((1 + minuteIndex * 0.11 + Math.max(0, minuteIndex - 10) * 0.04).toFixed(2)),
+    healthMultiplier: Number((1 + minuteIndex * 0.03 + Math.max(0, minuteIndex - 12) * 0.035).toFixed(2)),
     ...(oneTimeSpawns.length > 0 ? { oneTimeSpawns } : {}),
     ...(isFinale ? { isFinale } : {}),
   }
