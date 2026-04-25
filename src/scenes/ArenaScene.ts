@@ -49,6 +49,7 @@ import { getEnemyAttackMotionProfile, getEnemyHitMotionProfile } from '../system
 import {
   getLootAttractionStep,
   getLootPickupPhase,
+  LOOT_ATTRACTION_RADIUS,
   LOOT_COLLECT_RADIUS,
 } from '../systems/lootPickup.js'
 import {
@@ -85,6 +86,8 @@ import {
   getPassiveIncomingDamageMultiplier,
   getPassiveCardChoices,
   getPassivePachinkoActiveWeaponWeightMultiplier,
+  getPassiveHeartHealMultiplier,
+  getPassiveLootPickupTuning,
   getPassiveSummaryLines,
   getPassiveTokenXpMultiplier,
   resolveCriticalHit,
@@ -1462,7 +1465,11 @@ export class ArenaScene extends Phaser.Scene {
         this.player.x,
         this.player.y,
       )
-      const pickupPhase = getLootPickupPhase(distance)
+      const pickupTuning = getPassiveLootPickupTuning(this.passiveState)
+      const pickupPhase = getLootPickupPhase(distance, {
+        attractionRadius: LOOT_ATTRACTION_RADIUS * pickupTuning.attractionRadiusMultiplier,
+        collectRadius: LOOT_COLLECT_RADIUS * pickupTuning.collectRadiusMultiplier,
+      })
 
       if (pickupPhase === 'collect') {
         this.collectHeartPickup(pickup)
@@ -1483,8 +1490,14 @@ export class ArenaScene extends Phaser.Scene {
   private applyHealthPickupAttraction(pickup: HealthPickupEntity, distance: number, delta: number): void {
     this.setHealthPickupAttractionStyle(pickup, true)
 
-    const attractionStep = getLootAttractionStep(distance, delta)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    const pickupTuning = getPassiveLootPickupTuning(this.passiveState)
+    const effectiveCollectRadius = LOOT_COLLECT_RADIUS * pickupTuning.collectRadiusMultiplier
+    const attractionStep = getLootAttractionStep(distance, delta, {
+      attractionRadius: LOOT_ATTRACTION_RADIUS * pickupTuning.attractionRadiusMultiplier,
+      collectRadius: effectiveCollectRadius,
+      attractionSpeedMultiplier: pickupTuning.attractionSpeedMultiplier,
+    })
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
     if (distance <= 0 || travelDistance <= 0) {
       this.syncHealthPickupAura(pickup)
       return
@@ -1530,7 +1543,7 @@ export class ArenaScene extends Phaser.Scene {
     this.playerHealth = getHealedPlayerHealth(
       this.playerHealth,
       this.playerMaxHealth,
-      HEART_PICKUP_HEAL_AMOUNT,
+      Math.round(HEART_PICKUP_HEAL_AMOUNT * getPassiveHeartHealMultiplier(this.passiveState)),
     )
     this.syncPlayerHealthBar()
     const healedAmount = this.playerHealth - previousHealth
@@ -1569,7 +1582,11 @@ export class ArenaScene extends Phaser.Scene {
         this.player.x,
         this.player.y,
       )
-      const pickupPhase = getLootPickupPhase(distance)
+      const pickupTuning = getPassiveLootPickupTuning(this.passiveState)
+      const pickupPhase = getLootPickupPhase(distance, {
+        attractionRadius: LOOT_ATTRACTION_RADIUS * pickupTuning.attractionRadiusMultiplier,
+        collectRadius: LOOT_COLLECT_RADIUS * pickupTuning.collectRadiusMultiplier,
+      })
 
       if (pickupPhase === 'collect') {
         this.collectPachinkoTokenPickup(pickup)
@@ -1593,8 +1610,14 @@ export class ArenaScene extends Phaser.Scene {
   ): void {
     this.setPachinkoTokenAttractionStyle(pickup, true)
 
-    const attractionStep = getLootAttractionStep(distance, delta)
-    const travelDistance = Math.min(attractionStep, Math.max(0, distance - LOOT_COLLECT_RADIUS))
+    const pickupTuning = getPassiveLootPickupTuning(this.passiveState)
+    const effectiveCollectRadius = LOOT_COLLECT_RADIUS * pickupTuning.collectRadiusMultiplier
+    const attractionStep = getLootAttractionStep(distance, delta, {
+      attractionRadius: LOOT_ATTRACTION_RADIUS * pickupTuning.attractionRadiusMultiplier,
+      collectRadius: effectiveCollectRadius,
+      attractionSpeedMultiplier: pickupTuning.attractionSpeedMultiplier,
+    })
+    const travelDistance = Math.min(attractionStep, Math.max(0, distance - effectiveCollectRadius))
     if (distance <= 0 || travelDistance <= 0) {
       this.syncPachinkoTokenAura(pickup)
       return

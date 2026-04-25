@@ -18,6 +18,10 @@ interface PassiveEffects {
   bossDamageMultiplier?: number
   normalEnemyDamageMultiplier?: number
   pachinkoActiveWeaponWeightMultiplier?: number
+  lootAttractionRadiusMultiplier?: number
+  lootCollectRadiusMultiplier?: number
+  lootAttractionSpeedMultiplier?: number
+  heartHealMultiplier?: number
 }
 
 export type PassiveCardGrade = 'common' | 'rare' | 'epic' | 'legendary'
@@ -236,6 +240,81 @@ const PASSIVE_CARD_TEMPLATES = [
       const [min, max] = createLevelScaledPercentRange(0.03, 0.07, level, 0.003, 0.12)
       const result = rollNumber(random, min, max, 2)
       return { effects: { playerSpeedMultiplier: 1 + result.value }, quality: result.quality }
+    },
+  },
+  {
+    id: 'magnet-array',
+    name: '마그넷 어레이',
+    description: '토큰과 하트가 더 먼 거리에서도 빨려 들어옵니다.',
+    preferredFamilies: ['starter', 'zone', 'rapid'],
+    weight: { base: 0.96, levelScale: 0.02, repeatPenalty: 0.36, familyBonus: 0.42 },
+    roll(level, random) {
+      const [min, max] = createLevelScaledPercentRange(0.18, 0.34, level, 0.01, 0.5)
+      const result = rollNumber(random, min, max, 2)
+      return {
+        effects: { lootAttractionRadiusMultiplier: 1 + result.value },
+        quality: result.quality,
+      }
+    },
+  },
+  {
+    id: 'vacuum-pocket',
+    name: '진공 포켓',
+    description: '가까워진 보상을 더 빨리 빨아들이고 획득 판정도 넉넉해집니다.',
+    preferredFamilies: ['spray', 'zone', 'melee'],
+    weight: { base: 0.9, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.46 },
+    roll(level, random) {
+      const [collectMin, collectMax] = createLevelScaledPercentRange(0.12, 0.24, level, 0.008, 0.36)
+      const [speedMin, speedMax] = createLevelScaledPercentRange(0.12, 0.26, level, 0.01, 0.42)
+      const collect = rollNumber(random, collectMin, collectMax, 2)
+      const speed = rollNumber(random, speedMin, speedMax, 2)
+      return {
+        effects: {
+          lootCollectRadiusMultiplier: 1 + collect.value,
+          lootAttractionSpeedMultiplier: 1 + speed.value,
+        },
+        quality: averageQuality(collect.quality, speed.quality),
+      }
+    },
+  },
+  {
+    id: 'recovery-loop',
+    name: '리커버리 루프',
+    description: '하트 회복량이 늘고 안전하게 회수할 범위도 소폭 넓어집니다.',
+    preferredFamilies: ['heavy', 'melee', 'starter'],
+    weight: { base: 0.84, levelScale: 0.018, repeatPenalty: 0.4, familyBonus: 0.38 },
+    roll(level, random) {
+      const [healMin, healMax] = createLevelScaledPercentRange(0.1, 0.2, level, 0.008, 0.32)
+      const [collectMin, collectMax] = createLevelScaledPercentRange(0.06, 0.12, level, 0.006, 0.2)
+      const heal = rollNumber(random, healMin, healMax, 2)
+      const collect = rollNumber(random, collectMin, collectMax, 2)
+      return {
+        effects: {
+          heartHealMultiplier: 1 + heal.value,
+          lootCollectRadiusMultiplier: 1 + collect.value,
+        },
+        quality: averageQuality(heal.quality, collect.quality),
+      }
+    },
+  },
+  {
+    id: 'scavenger-route',
+    name: '스캐빈저 루트',
+    description: '회수 경로를 최적화해 토큰 경험치와 흡입 속도를 함께 높입니다.',
+    preferredFamilies: ['rapid', 'starter', 'chain'],
+    weight: { base: 0.82, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.44 },
+    roll(level, random) {
+      const [tokenMin, tokenMax] = createLevelScaledPercentRange(0.04, 0.1, level, 0.004, 0.18)
+      const [speedMin, speedMax] = createLevelScaledPercentRange(0.08, 0.18, level, 0.008, 0.3)
+      const token = rollNumber(random, tokenMin, tokenMax, 2)
+      const speed = rollNumber(random, speedMin, speedMax, 2)
+      return {
+        effects: {
+          tokenXpMultiplier: 1 + token.value,
+          lootAttractionSpeedMultiplier: 1 + speed.value,
+        },
+        quality: averageQuality(token.quality, speed.quality),
+      }
     },
   },
   {
@@ -515,6 +594,10 @@ export interface PassiveTotals {
   bossDamageMultiplier: number
   normalEnemyDamageMultiplier: number
   pachinkoActiveWeaponWeightMultiplier: number
+  lootAttractionRadiusMultiplier: number
+  lootCollectRadiusMultiplier: number
+  lootAttractionSpeedMultiplier: number
+  heartHealMultiplier: number
 }
 
 export interface CriticalHitResult {
@@ -590,6 +673,18 @@ function formatEffectSummary(effects: PassiveEffects): string {
   if (effects.pachinkoActiveWeaponWeightMultiplier !== undefined && effects.pachinkoActiveWeaponWeightMultiplier > 1) {
     lines.push(`활성 무기 확률 +${roundPercent(effects.pachinkoActiveWeaponWeightMultiplier - 1)}%`)
   }
+  if (effects.lootAttractionRadiusMultiplier !== undefined && effects.lootAttractionRadiusMultiplier > 1) {
+    lines.push(`흡입 범위 +${roundPercent(effects.lootAttractionRadiusMultiplier - 1)}%`)
+  }
+  if (effects.lootCollectRadiusMultiplier !== undefined && effects.lootCollectRadiusMultiplier > 1) {
+    lines.push(`획득 범위 +${roundPercent(effects.lootCollectRadiusMultiplier - 1)}%`)
+  }
+  if (effects.lootAttractionSpeedMultiplier !== undefined && effects.lootAttractionSpeedMultiplier > 1) {
+    lines.push(`흡입 속도 +${roundPercent(effects.lootAttractionSpeedMultiplier - 1)}%`)
+  }
+  if (effects.heartHealMultiplier !== undefined && effects.heartHealMultiplier > 1) {
+    lines.push(`하트 회복량 +${roundPercent(effects.heartHealMultiplier - 1)}%`)
+  }
 
   return lines.join(' · ')
 }
@@ -612,6 +707,14 @@ function mergeEffects(existing: PassiveEffects = {}, next: PassiveEffects): Pass
     normalEnemyDamageMultiplier: (existing.normalEnemyDamageMultiplier ?? 1) * (next.normalEnemyDamageMultiplier ?? 1),
     pachinkoActiveWeaponWeightMultiplier:
       (existing.pachinkoActiveWeaponWeightMultiplier ?? 1) * (next.pachinkoActiveWeaponWeightMultiplier ?? 1),
+    lootAttractionRadiusMultiplier:
+      (existing.lootAttractionRadiusMultiplier ?? 1) * (next.lootAttractionRadiusMultiplier ?? 1),
+    lootCollectRadiusMultiplier:
+      (existing.lootCollectRadiusMultiplier ?? 1) * (next.lootCollectRadiusMultiplier ?? 1),
+    lootAttractionSpeedMultiplier:
+      (existing.lootAttractionSpeedMultiplier ?? 1) * (next.lootAttractionSpeedMultiplier ?? 1),
+    heartHealMultiplier:
+      (existing.heartHealMultiplier ?? 1) * (next.heartHealMultiplier ?? 1),
   }
 }
 
@@ -733,6 +836,10 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     bossDamageMultiplier: 1,
     normalEnemyDamageMultiplier: 1,
     pachinkoActiveWeaponWeightMultiplier: 1,
+    lootAttractionRadiusMultiplier: 1,
+    lootCollectRadiusMultiplier: 1,
+    lootAttractionSpeedMultiplier: 1,
+    heartHealMultiplier: 1,
   }
 
   for (const entry of Object.values(state)) {
@@ -756,6 +863,10 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     totals.bossDamageMultiplier *= effects.bossDamageMultiplier ?? 1
     totals.normalEnemyDamageMultiplier *= effects.normalEnemyDamageMultiplier ?? 1
     totals.pachinkoActiveWeaponWeightMultiplier *= effects.pachinkoActiveWeaponWeightMultiplier ?? 1
+    totals.lootAttractionRadiusMultiplier *= effects.lootAttractionRadiusMultiplier ?? 1
+    totals.lootCollectRadiusMultiplier *= effects.lootCollectRadiusMultiplier ?? 1
+    totals.lootAttractionSpeedMultiplier *= effects.lootAttractionSpeedMultiplier ?? 1
+    totals.heartHealMultiplier *= effects.heartHealMultiplier ?? 1
   }
 
   totals.critChance = Math.min(0.55, totals.critChance)
@@ -841,6 +952,19 @@ export function getPassiveEnemyDamageMultiplier(isBossEnemy: boolean, state: Pas
 
 export function getPassivePachinkoActiveWeaponWeightMultiplier(state: PassiveState = {}): number {
   return getPassiveTotals(state).pachinkoActiveWeaponWeightMultiplier
+}
+
+export function getPassiveLootPickupTuning(state: PassiveState = {}) {
+  const totals = getPassiveTotals(state)
+  return {
+    attractionRadiusMultiplier: totals.lootAttractionRadiusMultiplier,
+    collectRadiusMultiplier: totals.lootCollectRadiusMultiplier,
+    attractionSpeedMultiplier: totals.lootAttractionSpeedMultiplier,
+  }
+}
+
+export function getPassiveHeartHealMultiplier(state: PassiveState = {}): number {
+  return getPassiveTotals(state).heartHealMultiplier
 }
 
 export function getPassiveSummaryLines(state: PassiveState = {}): string[] {

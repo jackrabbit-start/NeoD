@@ -98,6 +98,27 @@ test('passive summaries and player speed reflect rolled and stacked run-local ch
   assert.match(lines[1], /치명타 확률 \+/)
 })
 
+
+
+test('pickup utility cards expose attraction, collect, speed, and heal scaling', () => {
+  const magnet = createPassiveCardChoice('magnet-array', 12, createSequenceRandom([0.9]))
+  const vacuum = createPassiveCardChoice('vacuum-pocket', 10, createSequenceRandom([0.8, 0.7]))
+  const recovery = createPassiveCardChoice('recovery-loop', 9, createSequenceRandom([0.6, 0.5]))
+  const scavenger = createPassiveCardChoice('scavenger-route', 11, createSequenceRandom([0.7, 0.8]))
+
+  let state = {}
+  state = addPassiveCard(state, magnet)
+  state = addPassiveCard(state, vacuum)
+  state = addPassiveCard(state, recovery)
+  state = addPassiveCard(state, scavenger)
+
+  const lines = getPassiveSummaryLines(state)
+  assert.ok(lines.some((line) => /흡입 범위/.test(line)))
+  assert.ok(lines.some((line) => /획득 범위/.test(line)))
+  assert.ok(lines.some((line) => /흡입 속도/.test(line)))
+  assert.ok(lines.some((line) => /하트 회복량/.test(line)))
+})
+
 test('new pachinko and enemy cards expose varied utility modifiers', () => {
   const jackpot = createPassiveCardChoice('jackpot-fever', 12, createSequenceRandom([0.9]))
   const shield = createPassiveCardChoice('panic-shield', 9, createSequenceRandom([0.75]))
