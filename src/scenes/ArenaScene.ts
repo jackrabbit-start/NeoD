@@ -2801,7 +2801,7 @@ export class ArenaScene extends Phaser.Scene {
       const tokenDropCount = getEnemyPachinkoTokenDropCount(enemy.config.id, this.runElapsedMs)
       let rareTokenCount = 0
       for (let tokenIndex = 0; tokenIndex < tokenDropCount; tokenIndex += 1) {
-        const tokenXpMultiplier = resolveEnemyPachinkoTokenXpMultiplier(Math.random)
+        const tokenXpMultiplier = resolveEnemyPachinkoTokenXpMultiplier(Math.random, this.runElapsedMs)
         if (tokenXpMultiplier >= 10) {
           rareTokenCount += 1
         }

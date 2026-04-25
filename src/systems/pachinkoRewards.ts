@@ -14,8 +14,8 @@ export const PACHINKO_FEVER_DURATION_TOKENS = 3 as const
 export const PACHINKO_PITY_THRESHOLD = 4 as const
 export const DOUBLE_TOKEN_DROP_START_MS = 13 * 60_000
 export const RARE_TOKEN_XP_MULTIPLIER = 10 as const
-export const RARE_TOKEN_DROP_CHANCE = 0.08
-export const PACHINKO_STAR_20_TARGET_TOKEN_XP = 120_000
+export const RARE_TOKEN_DROP_CHANCE = 0.03
+export const PACHINKO_STAR_20_TARGET_TOKEN_XP = 220_000
 
 export const PACHINKO_XP_DISPLAY_SCALE = 100 as const
 
@@ -326,13 +326,26 @@ export function getEnemyPachinkoTokenDropCount(enemyId: EnemyId, elapsedMs: numb
   if (safeElapsedMs < DOUBLE_TOKEN_DROP_START_MS) {
     return 1
   }
-
-  const minutesAfterRamp = Math.floor((safeElapsedMs - DOUBLE_TOKEN_DROP_START_MS) / 60_000)
-  return Math.min(20, 2 + minutesAfterRamp * 3)
+  if (safeElapsedMs >= 18 * 60_000) {
+    return 4
+  }
+  if (safeElapsedMs >= 16 * 60_000) {
+    return 3
+  }
+  return 2
 }
 
-export function resolveEnemyPachinkoTokenXpMultiplier(random: RandomSource = Math.random): number {
-  return random() < RARE_TOKEN_DROP_CHANCE ? RARE_TOKEN_XP_MULTIPLIER : 1
+export function resolveEnemyPachinkoTokenXpMultiplier(
+  random: RandomSource = Math.random,
+  elapsedMs = 0,
+): number {
+  const safeElapsedMs = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs)) : 0
+  const rareChance = safeElapsedMs >= 18 * 60_000
+    ? 0.08
+    : safeElapsedMs >= DOUBLE_TOKEN_DROP_START_MS
+      ? 0.05
+      : RARE_TOKEN_DROP_CHANCE
+  return random() < rareChance ? RARE_TOKEN_XP_MULTIPLIER : 1
 }
 
 export function getPachinkoRewardLevel(totalTokenXp: number): number {
