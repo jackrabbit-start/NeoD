@@ -20,6 +20,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/config.js'
 import type { CodexController } from '../ui/Codex.js'
 import type { HudController } from '../ui/Hud.js'
+import { GAMEPLAY_CONTROL_TIP } from '../ui/controlCopy.js'
 import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
 import {
@@ -2109,7 +2110,7 @@ export class ArenaScene extends Phaser.Scene {
       objective: this.isBossActive
         ? '크라운 슬라임을 격파하고 네온 아레나를 장악하세요.'
         : '웨이브를 돌파하며 드롭을 모아 새로운 무기를 완성하세요.',
-      tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합/무기 교체 · Q 코덱스 · 스테이지 선택 버튼',
+      tip: GAMEPLAY_CONTROL_TIP,
       status: this.statusMessage,
       inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen || this.isStageSelectOpen,

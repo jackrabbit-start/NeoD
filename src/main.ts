@@ -3,8 +3,11 @@ import { createGameConfig } from './game/config.js'
 import './style.css'
 import { CodexController } from './ui/Codex.js'
 import { HudController } from './ui/Hud.js'
+import { GAME_HEADER_CONTROL_HINTS, GAMEPLAY_CONTROL_TIP } from './ui/controlCopy.js'
 
 const app = document.querySelector<HTMLDivElement>('#app')
+
+const headerControlMarkup = GAME_HEADER_CONTROL_HINTS.map((hint) => `<span>${hint}</span>`).join('')
 
 if (!app) {
   throw new Error('#app 루트 요소가 필요합니다.')
@@ -14,7 +17,12 @@ app.innerHTML = `
   <main class="game-shell">
     <header class="game-header">
       <div class="game-header__brand">
-        <strong>NeoD</strong>
+        <div class="game-header__title-row">
+          <strong>NeoD</strong>
+          <div class="game-header__controls" aria-label="조작 방법">
+            ${headerControlMarkup}
+          </div>
+        </div>
         <span>슬라임 아레나 · 드롭과 조합으로 완성하는 생존 런</span>
       </div>
       <div class="game-header__rails" aria-hidden="true">
@@ -52,7 +60,7 @@ hud.update({
   inventory: ['드롭 대기 중'],
   recipes: ['조합 상태 대기 중'],
   objective: '드롭을 모아 무기를 완성하고 크라운 슬라임에게 도전하세요.',
-  tip: 'WASD 이동 · J 대시/짧은 무적 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리 조합 · Q 코덱스 · 스테이지 선택 버튼',
+  tip: GAMEPLAY_CONTROL_TIP,
   status: '아레나 연결 중',
   inventoryButtonLabel: '인벤토리 열기',
   inventoryButtonDisabled: false,
