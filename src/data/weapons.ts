@@ -142,6 +142,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectileSpeed: 720,
     projectileTint: 0xfff06a,
     projectileTextureKey: 'spark-projectile',
+    knockback: {
+      force: 60,
+      durationMs: 75,
+    },
     attackBehavior: {
       kind: 'single',
       projectileLifetimeMs: 820,
@@ -162,6 +166,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectileSpeed: 430,
     projectileTint: 0xc4f1ff,
     projectileTextureKey: 'mist-projectile',
+    knockback: {
+      force: 45,
+      durationMs: 90,
+    },
     attackBehavior: {
       kind: 'spray-hazard',
       projectileCount: 5,
