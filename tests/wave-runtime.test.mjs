@@ -31,7 +31,7 @@ test('wave runtime starts a regular wave with an immediate spawn and scheduled f
   assert.equal(started, true)
   assert.equal(clearedLoops, 1)
   assert.equal(scheduledLoops.length, 1)
-  assert.equal(scheduledLoops[0]?.delayMs, 900)
+  assert.equal(scheduledLoops[0]?.delayMs, 850)
   assert.equal(scheduledLoops[0]?.repeat, 5)
   assert.deepEqual(appliedState[0], {
     currentWaveIndex: 0,
@@ -51,6 +51,46 @@ test('wave runtime starts a regular wave with an immediate spawn and scheduled f
   assert.deepEqual(appliedState[2], {
     remainingSpawns: 4,
   })
+})
+
+test('wave runtime keeps existing wave shape while tightening regular-wave cadence', () => {
+  const starts = [0, 1, 2].map((index) => {
+    const appliedState = []
+    const scheduledLoops = []
+    const spawnedEnemies = []
+
+    startWaveRuntime(index, {
+      applyState: (patch) => {
+        appliedState.push(patch)
+      },
+      clearSpawnLoop: () => {},
+      scheduleSpawnLoop: (config) => {
+        scheduledLoops.push(config)
+      },
+      spawnEnemy: (enemyId) => {
+        spawnedEnemies.push(enemyId)
+      },
+    })
+
+    return { appliedState, scheduledLoops, spawnedEnemies }
+  })
+
+  assert.deepEqual(
+    starts.map(({ appliedState }) => appliedState[0]?.remainingSpawns),
+    [6, 8, 9],
+  )
+  assert.deepEqual(
+    starts.map(({ scheduledLoops }) => scheduledLoops[0]?.delayMs),
+    [850, 650, 520],
+  )
+  assert.deepEqual(
+    starts.map(({ scheduledLoops }) => scheduledLoops[0]?.repeat),
+    [5, 7, 8],
+  )
+  assert.deepEqual(
+    starts.map(({ spawnedEnemies }) => spawnedEnemies[0]),
+    ['slime', 'slime', 'spark-slime'],
+  )
 })
 
 test('wave runtime starts a boss wave without scheduling follow-up spawns', () => {

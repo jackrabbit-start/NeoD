@@ -5,7 +5,7 @@ export const WAVE_DEFINITIONS: WaveDefinition[] = [
     id: 'wave-1',
     label: '1 웨이브',
     entries: [{ enemyId: 'slime', count: 6 }],
-    spawnIntervalMs: 900,
+    spawnIntervalMs: 850,
   },
   {
     id: 'wave-2',
@@ -14,7 +14,7 @@ export const WAVE_DEFINITIONS: WaveDefinition[] = [
       { enemyId: 'slime', count: 5 },
       { enemyId: 'dash-slime', count: 3 },
     ],
-    spawnIntervalMs: 720,
+    spawnIntervalMs: 650,
   },
   {
     id: 'wave-3',
@@ -24,7 +24,7 @@ export const WAVE_DEFINITIONS: WaveDefinition[] = [
       { enemyId: 'orbit-slime', count: 3 },
       { enemyId: 'dash-slime', count: 2 },
     ],
-    spawnIntervalMs: 560,
+    spawnIntervalMs: 520,
   },
   {
     id: 'elite-wave',
