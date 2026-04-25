@@ -151,6 +151,11 @@ interface MiniMapDisplay {
   bounds: MiniMapBounds
 }
 
+interface ViewportSize {
+  width: number
+  height: number
+}
+
 interface EnemyTelegraph {
   visual: Phaser.GameObjects.Arc
   x: number
@@ -376,6 +381,10 @@ export class ArenaScene extends Phaser.Scene {
     this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I)
     this.codexKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J)
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.RESIZE, this.handleScaleResize, this)
+    })
 
     this.startWave(0)
     this.syncMiniMap()
@@ -429,6 +438,27 @@ export class ArenaScene extends Phaser.Scene {
     return this.isInventoryOpen || this.isCodexOpen
   }
 
+  private getViewportSize(): ViewportSize {
+    return {
+      width: Math.max(1, Math.round(this.scale.gameSize.width || GAME_WIDTH)),
+      height: Math.max(1, Math.round(this.scale.gameSize.height || GAME_HEIGHT)),
+    }
+  }
+
+  private handleScaleResize(): void {
+    if (!this.playerHealthBar || !this.miniMap) {
+      return
+    }
+
+    this.destroyPlayerHealthBar()
+    this.playerHealthBar = this.createPlayerHealthBar()
+    this.syncPlayerHealthBar()
+
+    this.destroyMiniMap()
+    this.createMiniMap()
+    this.syncMiniMap()
+  }
+
   private createMapVisuals(): void {
     const { worldBounds } = this.mapLayout
     const arena = this.add.rectangle(
@@ -462,7 +492,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private createMiniMap(): void {
-    const bounds = getTopRightMiniMapBounds(GAME_WIDTH)
+    const { width } = this.getViewportSize()
+    const bounds = getTopRightMiniMapBounds(width)
     const graphics = this.add
       .graphics()
       .setDepth(48)
@@ -1713,7 +1744,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private createPlayerHealthBar(): PlayerHealthBar {
-    const { x, y, width, height } = getPlayerHealthBarMetrics(GAME_WIDTH, GAME_HEIGHT)
+    const viewport = this.getViewportSize()
+    const { x, y, width, height } = getPlayerHealthBarMetrics(viewport.width, viewport.height)
     const depth = 30
 
     const background = this.add
@@ -1730,7 +1762,7 @@ export class ArenaScene extends Phaser.Scene {
       .setScrollFactor(0)
 
     const label = this.add
-      .text(GAME_WIDTH / 2, y - 1, '', {
+      .text(viewport.width / 2, y - 1, '', {
         color: '#f7fbff',
         fontFamily: 'Inter, system-ui, sans-serif',
         fontSize: '10px',

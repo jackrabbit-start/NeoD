@@ -14,6 +14,11 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create(payload: RunResultPayload): void {
+    const width = Math.max(1, Math.round(this.scale.gameSize.width || GAME_WIDTH))
+    const height = Math.max(1, Math.round(this.scale.gameSize.height || GAME_HEIGHT))
+    const panelWidth = Math.max(240, width - 96)
+    const panelHeight = Math.max(240, height - 96)
+    const textWidth = Math.max(160, Math.min(720, width - 96))
     const presentation = createRunResultPresentation(payload)
     const hud = this.game.registry.get('hud') as HudController | undefined
     hud?.update(createRunResultHudState(payload))
@@ -21,11 +26,11 @@ export class ResultScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(presentation.backgroundColor)
 
     this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH - 96, GAME_HEIGHT - 96, 0x081426, 0.84)
+      .rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x081426, 0.84)
       .setStrokeStyle(3, Number.parseInt(presentation.accentColor.slice(1), 16), 0.85)
 
     this.add
-      .text(GAME_WIDTH / 2, 128, presentation.title, {
+      .text(width / 2, Math.max(84, height * 0.24), presentation.title, {
         fontSize: '40px',
         color: '#f8fafc',
         fontStyle: 'bold',
@@ -33,18 +38,18 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     this.add
-      .text(GAME_WIDTH / 2, 198, presentation.subtitle, {
+      .text(width / 2, Math.max(144, height * 0.37), presentation.subtitle, {
         fontSize: '20px',
         color: '#d8e2ff',
-        wordWrap: { width: 720 },
+        wordWrap: { width: textWidth },
         align: 'center',
       })
       .setOrigin(0.5)
 
     this.add
       .text(
-        GAME_WIDTH / 2,
-        292,
+        width / 2,
+        Math.max(224, height * 0.54),
         presentation.statLines.join('\n'),
         {
           fontSize: '22px',
@@ -56,22 +61,22 @@ export class ResultScene extends Phaser.Scene {
 
     this.add
       .text(
-        GAME_WIDTH / 2,
-        390,
+        width / 2,
+        Math.max(312, height * 0.72),
         presentation.objective,
         {
           fontSize: '20px',
           color: presentation.accentColor,
           align: 'center',
-          wordWrap: { width: 720 },
+          wordWrap: { width: textWidth },
         },
       )
       .setOrigin(0.5)
 
     this.add
       .text(
-        GAME_WIDTH / 2,
-        GAME_HEIGHT - 120,
+        width / 2,
+        height - 96,
         presentation.restartPrompt,
         {
           fontSize: '20px',

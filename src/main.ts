@@ -26,8 +26,8 @@ app.innerHTML = `
       <section class="game-frame">
         <div class="codex-panel" id="codex" hidden></div>
         <div id="game-root"></div>
+        <section class="hud-panel" id="hud"></section>
       </section>
-      <section class="hud-panel" id="hud"></section>
     </section>
   </main>
 `
