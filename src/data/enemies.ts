@@ -13,6 +13,10 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     size: 20,
     textureKey: 'slime',
     animationKey: 'slime-idle',
+    knockback: {
+      resistance: 0.05,
+      weight: 1,
+    },
     movementBehavior: {
       kind: 'direct-chase',
     },
@@ -41,6 +45,10 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     size: 22,
     textureKey: 'spark-slime',
     animationKey: 'spark-slime-idle',
+    knockback: {
+      resistance: 0.15,
+      weight: 1.1,
+    },
     movementBehavior: {
       kind: 'orbit',
       preferredDistance: 152,
@@ -79,6 +87,10 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     size: 30,
     textureKey: 'spark-slime',
     animationKey: 'spark-slime-idle',
+    knockback: {
+      resistance: 0.35,
+      weight: 1.45,
+    },
     movementBehavior: {
       kind: 'direct-chase',
     },
@@ -103,6 +115,10 @@ export const ENEMY_DEFINITIONS: Record<EnemyDefinition['id'], EnemyDefinition> =
     size: 44,
     textureKey: 'slime-boss',
     animationKey: 'slime-boss-idle',
+    knockback: {
+      resistance: 0.65,
+      weight: 2.1,
+    },
     movementBehavior: {
       kind: 'direct-chase',
     },

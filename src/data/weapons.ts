@@ -10,6 +10,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectileSpeed: 460,
     projectileTint: 0xf8fafc,
     projectileTextureKey: 'starter-projectile',
+    knockback: {
+      force: 90,
+      durationMs: 110,
+    },
     attackBehavior: {
       kind: 'single',
       projectileLifetimeMs: 1000,
@@ -28,6 +32,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectileSpeed: 500,
     projectileTint: 0xc1ff72,
     projectileTextureKey: 'acid-projectile',
+    knockback: {
+      force: 70,
+      durationMs: 95,
+    },
     attackBehavior: {
       kind: 'spray-hazard',
       projectileCount: 3,
@@ -52,6 +60,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectileSpeed: 620,
     projectileTint: 0x9ce7ff,
     projectileTextureKey: 'frost-projectile',
+    knockback: {
+      force: 55,
+      durationMs: 80,
+    },
     attackBehavior: {
       kind: 'pierce',
       projectileLifetimeMs: 900,
@@ -71,6 +83,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectileSpeed: 560,
     projectileTint: 0xd4b5ff,
     projectileTextureKey: 'storm-projectile',
+    knockback: {
+      force: 125,
+      durationMs: 130,
+    },
     attackBehavior: {
       kind: 'single',
       projectileLifetimeMs: 1050,
@@ -89,6 +105,10 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
     projectileSpeed: 590,
     projectileTint: 0xffd866,
     projectileTextureKey: 'arc-projectile',
+    knockback: {
+      force: 85,
+      durationMs: 100,
+    },
     attackBehavior: {
       kind: 'chain',
       projectileLifetimeMs: 900,

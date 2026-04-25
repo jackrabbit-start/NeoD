@@ -1,6 +1,7 @@
 import type {
   WeaponChainBehavior,
   WeaponDefinition,
+  WeaponKnockbackDefinition,
   WeaponPierceBehavior,
   WeaponSprayHazardBehavior,
 } from '../domain/types.js'
@@ -32,6 +33,7 @@ export interface ProjectileSpawnSpec {
   radius: number
   lifetimeMs: number
   maxHits: number
+  knockback: WeaponKnockbackDefinition
   chain?: ChainSpec
   hazardOnHit?: HazardSpawnSpec
   hazardOnExpire?: HazardSpawnSpec
@@ -122,6 +124,7 @@ const createBaseProjectile = (
   radius: BASE_PROJECTILE_RADIUS,
   lifetimeMs: weapon.attackBehavior.projectileLifetimeMs,
   maxHits: 1,
+  knockback: weapon.knockback,
   ...overrides,
 })
 
