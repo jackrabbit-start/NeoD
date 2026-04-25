@@ -1,5 +1,6 @@
 import { ITEM_DEFINITIONS } from '../../data/items.js'
 import type { AvailableRecipe, InventoryState, LootId } from '../../domain/types.js'
+import { getWeaponSummary } from '../../systems/weaponBehaviors.js'
 
 export function describeInventoryEntries(inventory: InventoryState): string[] {
   const inventoryEntries = Object.entries(inventory) as [LootId, number][]
@@ -19,6 +20,6 @@ export function describeAvailableRecipes(recipes: AvailableRecipe[]): string[] {
   }
 
   return recipes.map(
-    ({ recipe, weapon }) => `${recipe.name} → ${weapon.damage} dmg (${recipe.note})`,
+    ({ recipe, weapon }) => `${recipe.name} → ${getWeaponSummary(weapon)} (${recipe.note})`,
   )
 }

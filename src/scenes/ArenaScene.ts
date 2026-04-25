@@ -19,6 +19,19 @@ import { getCodexState } from '../systems/codex.js'
 import { resolveWeightedDrop } from '../systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
 import {
+  advanceHazardState,
+  applyProjectileHitState,
+  buildAttackPlan,
+  collectTargetsInRadius,
+  getChainDamage,
+  getWeaponIdentityLabel,
+  getWeaponSummary,
+  isProjectileOutOfBounds,
+  shouldWeaponFire,
+  selectChainTargets,
+} from '../systems/weaponBehaviors.js'
+import type { ChainSpec, HazardSpawnSpec, ProjectileSpawnSpec } from '../systems/weaponBehaviors.js'
+import {
   equipOwnedWeapon,
   getActionableRecipes,
   seedOwnedWeapons,
@@ -41,6 +54,7 @@ interface EnemyHealthBar {
 }
 
 interface EnemyEntity {
+  runtimeId: number
   sprite: PhysicsImage
   config: EnemyDefinition
   currentHealth: number
@@ -55,7 +69,27 @@ interface LootEntity {
 
 interface ProjectileEntity {
   sprite: PhysicsImage
+  tint: number
   damage: number
+  radius: number
+  remainingLifetimeMs: number
+  remainingHits: number
+  hitEnemyIds: Set<number>
+  chain?: ChainSpec
+  hazardOnHit?: HazardSpawnSpec
+  hazardOnExpire?: HazardSpawnSpec
+}
+
+interface HazardZoneEntity {
+  visual: Phaser.GameObjects.Arc
+  x: number
+  y: number
+  radius: number
+  damage: number
+  remainingLifetimeMs: number
+  totalLifetimeMs: number
+  tickEveryMs: number
+  tickCountdownMs: number
 }
 
 export class ArenaScene extends Phaser.Scene {
@@ -80,6 +114,8 @@ export class ArenaScene extends Phaser.Scene {
   private lootDrops: LootEntity[] = []
 
   private projectiles: ProjectileEntity[] = []
+
+  private hazardZones: HazardZoneEntity[] = []
 
   private ownedWeaponIds: WeaponId[] = seedOwnedWeapons()
 
@@ -114,6 +150,8 @@ export class ArenaScene extends Phaser.Scene {
   private statusMessage = 'Move with WASD, aim with the mouse, and click to fire.'
 
   private lastPlayerHitAt = 0
+
+  private nextEnemyRuntimeId = 1
 
   constructor() {
     super('arena')
@@ -183,13 +221,14 @@ export class ArenaScene extends Phaser.Scene {
     this.updateCodex()
   }
 
-  update(time: number): void {
+  update(time: number, delta: number): void {
     this.handleInventoryToggle()
     this.handleCodexToggle()
     this.handlePlayerMovement()
     this.handleFiring(time)
     this.updateEnemies()
-    this.updateProjectiles()
+    this.updateProjectiles(delta)
+    this.updateHazards(delta)
     this.cleanupDestroyedEntities()
 
     if (!this.isInteractionBlocked() && shouldAdvanceWave(this.remainingSpawns, this.enemies.length)) {
@@ -245,7 +284,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleFiring(time: number): void {
-    if (this.isInteractionBlocked() || !this.input.activePointer.isDown || time < this.nextFireAt) {
+    if (!shouldWeaponFire(this.isInteractionBlocked(), this.input.activePointer.isDown, time, this.nextFireAt)) {
       return
     }
 
@@ -253,28 +292,16 @@ export class ArenaScene extends Phaser.Scene {
     const pointer = this.input.activePointer
     const target = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY)
     const origin = new Phaser.Math.Vector2(this.player.x, this.player.y)
-    const direction = target.subtract(origin)
-
-    if (direction.lengthSq() === 0) {
+    const attackPlan = buildAttackPlan(weapon, origin, target)
+    if (attackPlan.projectiles.length === 0) {
       return
     }
 
-    direction.normalize()
+    for (const projectileSpec of attackPlan.projectiles) {
+      this.spawnProjectile(projectileSpec)
+    }
 
-    const projectile = this.physics.add.image(this.player.x, this.player.y, 'projectile')
-    projectile.setTint(weapon.projectileTint)
-    projectile.setCircle(5)
-    projectile.setVelocity(
-      direction.x * weapon.projectileSpeed,
-      direction.y * weapon.projectileSpeed,
-    )
-
-    this.projectiles.push({
-      sprite: projectile,
-      damage: weapon.damage,
-    })
-
-    this.nextFireAt = time + weapon.fireRateMs
+    this.nextFireAt = time + attackPlan.cooldownMs
   }
 
   private updateEnemies(): void {
@@ -320,7 +347,7 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private updateProjectiles(): void {
+  private updateProjectiles(delta: number): void {
     if (this.isInteractionBlocked()) {
       return
     }
@@ -330,14 +357,23 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
-      const outOfBounds =
-        projectile.sprite.x < 0 ||
-        projectile.sprite.x > GAME_WIDTH ||
-        projectile.sprite.y < 0 ||
-        projectile.sprite.y > GAME_HEIGHT
+      projectile.remainingLifetimeMs -= delta
+      if (projectile.remainingLifetimeMs <= 0) {
+        this.destroyProjectile(projectile, projectile.hazardOnExpire)
+        continue
+      }
 
-      if (outOfBounds) {
-        projectile.sprite.destroy()
+      if (
+        isProjectileOutOfBounds(
+          {
+            x: projectile.sprite.x,
+            y: projectile.sprite.y,
+          },
+          GAME_WIDTH,
+          GAME_HEIGHT,
+        )
+      ) {
+        this.destroyProjectile(projectile, projectile.hazardOnExpire)
         continue
       }
 
@@ -346,7 +382,7 @@ export class ArenaScene extends Phaser.Scene {
           continue
         }
 
-        const hitDistance = enemy.config.size / 2 + 7
+        const hitDistance = enemy.config.size / 2 + projectile.radius
         if (
           Phaser.Math.Distance.Between(
             projectile.sprite.x,
@@ -355,9 +391,31 @@ export class ArenaScene extends Phaser.Scene {
             enemy.sprite.y,
           ) <= hitDistance
         ) {
+          const hitStep = applyProjectileHitState(
+            projectile.hitEnemyIds,
+            enemy.runtimeId,
+            projectile.remainingHits,
+          )
+          if (!hitStep.applied) {
+            continue
+          }
+
+          projectile.hitEnemyIds = hitStep.hitEnemyIds
+          projectile.remainingHits = hitStep.remainingHits
           this.damageEnemy(enemy, projectile.damage)
-          projectile.sprite.destroy()
-          break
+
+          if (projectile.chain) {
+            this.applyChainDamage(enemy, projectile.chain, projectile.damage, projectile.tint)
+          }
+
+          if (projectile.hazardOnHit) {
+            this.spawnHazardZone(projectile.sprite.x, projectile.sprite.y, projectile.hazardOnHit)
+          }
+
+          if (hitStep.destroyed) {
+            this.destroyProjectile(projectile)
+            break
+          }
         }
       }
     }
@@ -384,6 +442,67 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private updateHazards(delta: number): void {
+    if (this.isInteractionBlocked()) {
+      return
+    }
+
+    for (const hazard of this.hazardZones) {
+      if (!hazard.visual.active) {
+        continue
+      }
+
+      const hazardStep = advanceHazardState(
+        hazard.remainingLifetimeMs,
+        hazard.tickCountdownMs,
+        delta,
+        hazard.tickEveryMs,
+      )
+      hazard.remainingLifetimeMs = hazardStep.remainingLifetimeMs
+      hazard.tickCountdownMs = hazardStep.tickCountdownMs
+
+      for (let tickIndex = 0; tickIndex < hazardStep.ticks; tickIndex += 1) {
+        const affectedEnemyIds = new Set(
+          collectTargetsInRadius(
+            {
+              x: hazard.x,
+              y: hazard.y,
+            },
+            hazard.radius,
+            this.enemies
+              .filter((enemy) => enemy.sprite.active)
+              .map((enemy) => ({
+                id: enemy.runtimeId,
+                x: enemy.sprite.x,
+                y: enemy.sprite.y,
+                radius: enemy.config.size / 2,
+              })),
+          ),
+        )
+
+        for (const enemy of this.enemies) {
+          if (!enemy.sprite.active || !affectedEnemyIds.has(enemy.runtimeId)) {
+            continue
+          }
+
+          this.damageEnemy(enemy, hazard.damage, {
+            ignoreRecentHit: true,
+          })
+        }
+      }
+
+      if (hazardStep.expired) {
+        hazard.visual.destroy()
+        continue
+      }
+
+      hazard.visual.setFillStyle(
+        hazard.visual.fillColor,
+        Math.max(0.12, 0.3 * (hazard.remainingLifetimeMs / hazard.totalLifetimeMs)),
+      )
+    }
+  }
+
   private cleanupDestroyedEntities(): void {
     for (const enemy of this.enemies) {
       if (!enemy.sprite.active) {
@@ -394,6 +513,7 @@ export class ArenaScene extends Phaser.Scene {
     this.enemies = this.enemies.filter((enemy) => enemy.sprite.active)
     this.lootDrops = this.lootDrops.filter((loot) => loot.sprite.active)
     this.projectiles = this.projectiles.filter((projectile) => projectile.sprite.active)
+    this.hazardZones = this.hazardZones.filter((hazard) => hazard.visual.active)
   }
 
   private startWave(index: number): void {
@@ -467,6 +587,7 @@ export class ArenaScene extends Phaser.Scene {
     this.enemySprites.add(sprite)
 
     const enemy: EnemyEntity = {
+      runtimeId: this.nextEnemyRuntimeId,
       sprite,
       config,
       currentHealth: config.maxHealth,
@@ -474,13 +595,20 @@ export class ArenaScene extends Phaser.Scene {
       lastHitAt: 0,
     }
 
+    this.nextEnemyRuntimeId += 1
     this.syncEnemyHealthBar(enemy)
     this.enemies.push(enemy)
   }
 
-  private damageEnemy(enemy: EnemyEntity, damage: number): void {
+  private damageEnemy(
+    enemy: EnemyEntity,
+    damage: number,
+    options?: {
+      ignoreRecentHit?: boolean
+    },
+  ): void {
     const now = this.time.now
-    if (now - enemy.lastHitAt < 50) {
+    if (!options?.ignoreRecentHit && now - enemy.lastHitAt < 50) {
       return
     }
 
@@ -642,10 +770,7 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private createEnemyHealthBar(
-    sprite: PhysicsImage,
-    config: EnemyDefinition,
-  ): EnemyHealthBar {
+  private createEnemyHealthBar(sprite: PhysicsImage, config: EnemyDefinition): EnemyHealthBar {
     const { width, height, offsetY } = getEnemyHealthBarMetrics(config.size)
 
     const background = this.add
@@ -743,7 +868,7 @@ export class ArenaScene extends Phaser.Scene {
       subtitle: this.activeWaveLabel || 'Preparing arena',
       stats: [
         `Health: ${this.playerHealth}/${this.playerMaxHealth}`,
-        `Weapon: ${weapon.name} (${weapon.damage} dmg / ${Math.round(1000 / weapon.fireRateMs)} shots/s)`,
+        `Weapon: ${weapon.name} · ${getWeaponSummary(weapon)}`,
         `Enemies alive: ${this.enemies.length}`,
         `Remaining spawns: ${this.remainingSpawns}`,
       ],
@@ -785,6 +910,7 @@ export class ArenaScene extends Phaser.Scene {
       outputWeaponId: recipe.outputWeaponId,
       outputWeaponName: weapon.name,
       damage: weapon.damage,
+      identity: getWeaponIdentityLabel(weapon),
       inputs: recipe.inputs.map((itemId) => ITEM_DEFINITIONS[itemId].name),
     }))
   }
@@ -798,8 +924,135 @@ export class ArenaScene extends Phaser.Scene {
         name: ownedWeapon.name,
         description: ownedWeapon.description,
         damage: ownedWeapon.damage,
+        identity: getWeaponIdentityLabel(ownedWeapon),
         isEquipped: weaponId === this.activeWeaponId,
       }
+    })
+  }
+
+  private spawnProjectile(projectileSpec: ProjectileSpawnSpec): void {
+    const projectile = this.physics.add.image(this.player.x, this.player.y, 'projectile')
+    projectile.setTint(projectileSpec.tint)
+    projectile.setCircle(projectileSpec.radius)
+    projectile.setVelocity(
+      projectileSpec.direction.x * projectileSpec.speed,
+      projectileSpec.direction.y * projectileSpec.speed,
+    )
+
+    this.projectiles.push({
+      sprite: projectile,
+      tint: projectileSpec.tint,
+      damage: projectileSpec.damage,
+      radius: projectileSpec.radius,
+      remainingLifetimeMs: projectileSpec.lifetimeMs,
+      remainingHits: projectileSpec.maxHits,
+      hitEnemyIds: new Set<number>(),
+      chain: projectileSpec.chain,
+      hazardOnHit: projectileSpec.hazardOnHit,
+      hazardOnExpire: projectileSpec.hazardOnExpire,
+    })
+  }
+
+  private destroyProjectile(projectile: ProjectileEntity, hazard?: HazardSpawnSpec): void {
+    if (!projectile.sprite.active) {
+      return
+    }
+
+    if (hazard) {
+      this.spawnHazardZone(projectile.sprite.x, projectile.sprite.y, hazard)
+    }
+
+    projectile.sprite.destroy()
+  }
+
+  private spawnHazardZone(x: number, y: number, hazard: HazardSpawnSpec): void {
+    const visual = this.add
+      .circle(x, y, hazard.radius, hazard.tint, 0.3)
+      .setStrokeStyle(2, hazard.tint, 0.85)
+      .setDepth(0.5)
+
+    this.hazardZones.push({
+      visual,
+      x,
+      y,
+      radius: hazard.radius,
+      damage: hazard.damage,
+      remainingLifetimeMs: hazard.durationMs,
+      totalLifetimeMs: hazard.durationMs,
+      tickEveryMs: hazard.tickEveryMs,
+      tickCountdownMs: hazard.tickEveryMs,
+    })
+  }
+
+  private applyChainDamage(
+    primaryEnemy: EnemyEntity,
+    chain: ChainSpec,
+    baseDamage: number,
+    tint: number,
+  ): void {
+    const start = {
+      x: primaryEnemy.sprite.x,
+      y: primaryEnemy.sprite.y,
+    }
+    const nearbyTargetIds = new Set(
+      collectTargetsInRadius(
+        start,
+        chain.range,
+        this.enemies
+          .filter((enemy) => enemy.sprite.active && enemy.runtimeId !== primaryEnemy.runtimeId)
+          .map((enemy) => ({
+            id: enemy.runtimeId,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            radius: enemy.config.size / 2,
+          })),
+      ),
+    )
+    const targetIds = selectChainTargets(
+      start,
+      this.enemies
+        .filter(
+          (enemy) =>
+            enemy.sprite.active &&
+            enemy.runtimeId !== primaryEnemy.runtimeId &&
+            nearbyTargetIds.has(enemy.runtimeId),
+        )
+        .map((enemy) => ({
+          id: enemy.runtimeId,
+          x: enemy.sprite.x,
+          y: enemy.sprite.y,
+        })),
+      chain.range,
+      chain.maxChains,
+    )
+
+    let previous = start
+    targetIds.forEach((runtimeId, chainIndex) => {
+      const target = this.enemies.find((enemy) => enemy.runtimeId === runtimeId && enemy.sprite.active)
+      if (!target) {
+        return
+      }
+
+      this.damageEnemy(target, getChainDamage(baseDamage, chainIndex + 1, chain.falloff))
+      this.drawChainArc(previous.x, previous.y, target.sprite.x, target.sprite.y, tint)
+      previous = {
+        x: target.sprite.x,
+        y: target.sprite.y,
+      }
+    })
+  }
+
+  private drawChainArc(startX: number, startY: number, endX: number, endY: number, tint: number): void {
+    const bolt = this.add.line(0, 0, startX, startY, endX, endY, tint, 0.9).setOrigin(0, 0)
+    bolt.setLineWidth(2, 2)
+    bolt.setDepth(1.5)
+    this.tweens.add({
+      targets: bolt,
+      alpha: 0,
+      duration: 90,
+      onComplete: () => {
+        bolt.destroy()
+      },
     })
   }
 }

@@ -3,9 +3,7 @@ import { ITEM_DEFINITIONS } from '../data/items.js'
 import { RECIPE_DEFINITIONS } from '../data/recipes.js'
 import { WEAPON_DEFINITIONS } from '../data/weapons.js'
 import type { CodexState } from '../domain/types.js'
-
-const formatWeaponSummary = (damage: number, fireRateMs: number) =>
-  `${damage} dmg · ${Math.round(1000 / fireRateMs)} shots/s`
+import { getWeaponSummary } from './weaponBehaviors.js'
 
 export function getCodexState(isOpen: boolean): CodexState {
   return {
@@ -32,7 +30,7 @@ export function getCodexState(isOpen: boolean): CodexState {
           id: weapon.id,
           name: weapon.name,
           description: weapon.description,
-          summary: formatWeaponSummary(weapon.damage, weapon.fireRateMs),
+          summary: getWeaponSummary(weapon),
         },
       }
     }),

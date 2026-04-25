@@ -132,7 +132,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   assert.deepEqual(describeAvailableRecipes(recipes), [
-    'Acid Sprayer → 20 dmg (Turns stable slime matter into corrosive firepower.)',
+    'Acid Sprayer → 20 dmg · 4 shots/s · Acid spray (Turns stable slime matter into corrosive firepower.)',
   ])
 })
 
