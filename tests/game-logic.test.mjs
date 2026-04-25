@@ -29,15 +29,34 @@ import {
   AMBIENT_ITEM_RADIUS,
   ARENA_WORLD_BOUNDS,
   ENEMY_SPAWN_MIN_DISTANCE,
+  HEART_ITEM_RADIUS,
   PLAYER_SAFE_RADIUS,
   createMapLayout,
   getAmbientItemSpawnPoints,
+  getHeartItemSpawnPoints,
   getWorldCenter,
   isCircleClearOfObstacles,
   isPointWithinWorld,
   selectAmbientItemSpawnPoint,
+  selectHeartItemSpawnPoint,
   selectEnemySpawnPoint,
 } from '../.tmp-test/src/systems/mapLayout.js'
+import {
+  HEART_PICKUP_HEAL_AMOUNT,
+  HEART_PICKUP_INITIAL_DELAY_MS,
+  HEART_PICKUP_INTERVAL_MS,
+  HEART_PICKUP_MAX_ACTIVE,
+  HEART_PICKUP_TEXTURE_KEY,
+  getHealedPlayerHealth,
+  getInitialHeartPickupSpawnAt,
+  getNextHeartPickupSpawnAt,
+  shouldSpawnHeartPickup,
+} from '../.tmp-test/src/systems/healthPickups.js'
+import {
+  getTopRightMiniMapBounds,
+  projectWorldPointToMiniMap,
+  projectWorldRectToMiniMap,
+} from '../.tmp-test/src/systems/minimap.js'
 import { createInitialArenaRunState } from '../.tmp-test/src/systems/runState.js'
 import {
   describeAvailableRecipes,
@@ -287,18 +306,7 @@ test('map layout defines a larger scrolling world with a safe starting area', ()
   assert.equal(layout.worldBounds.width > 960, true)
   assert.equal(layout.worldBounds.height > 540, true)
   assert.deepEqual(layout.playerStart, start)
-  assert.ok(layout.obstacles.length > 0)
-
-  for (const obstacle of layout.obstacles) {
-    assert.equal(isPointWithinWorld({ x: obstacle.x, y: obstacle.y }, layout.worldBounds), true)
-    assert.equal(
-      isPointWithinWorld(
-        { x: obstacle.x + obstacle.width, y: obstacle.y + obstacle.height },
-        layout.worldBounds,
-      ),
-      true,
-    )
-  }
+  assert.deepEqual(layout.obstacles, [])
 
   assert.equal(isCircleClearOfObstacles(start, PLAYER_SAFE_RADIUS, layout.obstacles), true)
 })
@@ -319,6 +327,22 @@ test('ambient map item points stay clear and reuse existing loot ids', () => {
   assert.deepEqual(selectAmbientItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
 })
 
+test('heart item spawn points are sparse map pickups outside inventory loot', () => {
+  const layout = createMapLayout(ARENA_WORLD_BOUNDS)
+  const spawnPoints = getHeartItemSpawnPoints(layout.worldBounds, layout.obstacles)
+
+  assert.equal(spawnPoints.length >= 4, true)
+  assert.equal(LOOT_IDS.includes('heart-pickup'), false)
+  for (const spawn of spawnPoints) {
+    assert.equal(isPointWithinWorld(spawn, layout.worldBounds, 56), true)
+    assert.equal(isCircleClearOfObstacles(spawn, HEART_ITEM_RADIUS, layout.obstacles), true)
+  }
+
+  assert.deepEqual(layout.heartItemSpawns, spawnPoints)
+  assert.deepEqual(selectHeartItemSpawnPoint(spawnPoints, () => 0), spawnPoints[0])
+  assert.deepEqual(selectHeartItemSpawnPoint(spawnPoints, () => 0.999), spawnPoints.at(-1))
+})
+
 test('enemy map spawn selection respects player distance, world bounds, and obstacle clearance', () => {
   const layout = createMapLayout(ARENA_WORLD_BOUNDS)
   const spawn = selectEnemySpawnPoint(
@@ -335,6 +359,58 @@ test('enemy map spawn selection respects player distance, world bounds, and obst
     Math.hypot(spawn.x - layout.playerStart.x, spawn.y - layout.playerStart.y) >= ENEMY_SPAWN_MIN_DISTANCE,
     true,
   )
+})
+
+test('heart pickup healing and intermittent spawn gates stay deterministic', () => {
+  assert.equal(HEART_PICKUP_HEAL_AMOUNT, 24)
+  assert.equal(HEART_PICKUP_MAX_ACTIVE, 3)
+  assert.equal(getHealedPlayerHealth(40, 100), 64)
+  assert.equal(getHealedPlayerHealth(90, 100), 100)
+  assert.equal(getHealedPlayerHealth(-5, 100), 24)
+  assert.equal(getInitialHeartPickupSpawnAt(1_000), 1_000 + HEART_PICKUP_INITIAL_DELAY_MS)
+  assert.equal(getNextHeartPickupSpawnAt(1_000, () => 0), 1_000 + HEART_PICKUP_INTERVAL_MS)
+  assert.equal(
+    getNextHeartPickupSpawnAt(1_000, () => 0.999),
+    1_000 + HEART_PICKUP_INTERVAL_MS + 3_996,
+  )
+  assert.equal(shouldSpawnHeartPickup(6_999, 7_000, 0), false)
+  assert.equal(shouldSpawnHeartPickup(7_000, 7_000, HEART_PICKUP_MAX_ACTIVE), false)
+  assert.equal(shouldSpawnHeartPickup(7_000, 7_000, HEART_PICKUP_MAX_ACTIVE - 1), true)
+})
+
+test('minimap projects world points and viewport into the top-right overlay', () => {
+  const miniMap = getTopRightMiniMapBounds(960)
+  assert.equal(miniMap.x > 960 / 2, true)
+  assert.equal(miniMap.y, 16)
+
+  const topLeft = projectWorldPointToMiniMap(
+    { x: ARENA_WORLD_BOUNDS.x, y: ARENA_WORLD_BOUNDS.y },
+    ARENA_WORLD_BOUNDS,
+    miniMap,
+  )
+  const bottomRight = projectWorldPointToMiniMap(
+    {
+      x: ARENA_WORLD_BOUNDS.x + ARENA_WORLD_BOUNDS.width,
+      y: ARENA_WORLD_BOUNDS.y + ARENA_WORLD_BOUNDS.height,
+    },
+    ARENA_WORLD_BOUNDS,
+    miniMap,
+  )
+
+  assert.deepEqual(topLeft, { x: miniMap.x + miniMap.padding, y: miniMap.y + miniMap.padding })
+  assert.deepEqual(bottomRight, {
+    x: miniMap.x + miniMap.width - miniMap.padding,
+    y: miniMap.y + miniMap.height - miniMap.padding,
+  })
+
+  const viewport = projectWorldRectToMiniMap(
+    { x: 0, y: 0, width: 960, height: 540 },
+    ARENA_WORLD_BOUNDS,
+    miniMap,
+  )
+
+  assert.equal(viewport.width < miniMap.width, true)
+  assert.equal(viewport.height < miniMap.height, true)
 })
 
 test('recipe presenter mirrors the actionable combine summary strings', () => {
@@ -1202,6 +1278,13 @@ test('item and weapon visual metadata stays aligned with the external asset pass
       'mist-bead': { width: 22, height: 22, radius: 10 },
       'tuning-capsule': { width: 22, height: 22, radius: 10 },
     },
+  )
+
+  assert.deepEqual(
+    VECTOR_ASSETS
+      .filter((asset) => asset.key === HEART_PICKUP_TEXTURE_KEY)
+      .map((asset) => ({ key: asset.key, width: asset.width, height: asset.height, radius: asset.fallback?.radius })),
+    [{ key: 'heart-pickup', width: 24, height: 24, radius: 11 }],
   )
 
   assert.deepEqual(
