@@ -210,6 +210,24 @@ const PASSIVE_CARD_TEMPLATES = [
     },
   },
   {
+    id: 'rangefinder',
+    name: '사거리 계산',
+    description: '투사체와 타격 범위가 더 멀리 뻗어 안정적으로 선공을 잡습니다.',
+    kind: 'passive',
+    preferredFamilies: ['precision', 'rapid', 'heavy', 'zone'],
+    weight: { base: 0.94, levelScale: 0.018, repeatPenalty: 0.4, familyBonus: 0.46 },
+    roll(level, random) {
+      const tier = getLevelTier(level)
+      const range = rollNumber(random, 18 + tier * 4, 34 + tier * 6)
+      return {
+        effects: {
+          rangeDelta: range.value,
+        },
+        quality: range.quality,
+      }
+    },
+  },
+  {
     id: 'heavy-push',
     name: '묵직한 밀어내기',
     description: '무기 충격이 강해져 적을 더 잘 밀어냅니다.',
@@ -458,7 +476,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'panic-shield',
     name: '패닉 실드',
     description: '위험한 순간 받는 피해를 덜어 생존 여유를 벌어줍니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['melee', 'heavy', 'starter'],
     weight: { base: 0.92, levelScale: 0.022, repeatPenalty: 0.36, familyBonus: 0.42 },
     roll(level, random) {
@@ -535,6 +553,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'thick-armor',
     name: '두꺼운 장갑',
     description: '받는 피해를 줄이는 대신 일반 적 상대 압박도 조금 더 안정됩니다.',
+    kind: 'passive',
     preferredFamilies: ['heavy', 'melee', 'starter'],
     weight: { base: 0.82, levelScale: 0.02, repeatPenalty: 0.42, familyBonus: 0.46 },
     roll(level, random) {
@@ -555,7 +574,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'critical-mass',
     name: '크리티컬 매스',
     description: '치명타 확률과 피해를 함께 밀어주는 하이리스크 카드입니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['precision', 'rapid', 'heavy'],
     weight: { base: 0.68, levelScale: 0.02, repeatPenalty: 0.56, familyBonus: 0.54 },
     roll(level, random) {
@@ -576,6 +595,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'acid-bloom',
     name: '산성 만개',
     description: '분사와 장판 계열 무기가 더 넓고 끈질기게 압박합니다.',
+    kind: 'passive',
     preferredFamilies: ['spray', 'zone'],
     weight: { base: 0.8, levelScale: 0.024, repeatPenalty: 0.45, familyBonus: 0.72 },
     roll(level, random) {
@@ -638,6 +658,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'crusher-stance',
     name: '크러셔 스탠스',
     description: '중화력/근접 계열이 짧은 순간 더 묵직하게 밀어붙입니다.',
+    kind: 'passive',
     preferredFamilies: ['heavy', 'melee'],
     weight: { base: 0.76, levelScale: 0.024, repeatPenalty: 0.48, familyBonus: 0.78 },
     roll(level, random) {
@@ -698,7 +719,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'linger-protocol',
     name: '지속 프로토콜',
     description: '탄이 남는 시간과 장판/함정 유지 시간이 함께 늘어납니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['zone', 'spray', 'precision'],
     weight: { base: 0.88, levelScale: 0.02, repeatPenalty: 0.34, familyBonus: 0.44 },
     roll(level, random) {
@@ -719,7 +740,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'siege-framework',
     name: '공성 프레임',
     description: '설치물과 소환체가 더 오래 버티며 전장을 유지합니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['zone', 'rapid', 'heavy'],
     weight: { base: 0.76, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.4 },
     roll(level, random) {
@@ -740,7 +761,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'arc-playbook',
     name: '반사 설계도',
     description: '튕김 횟수와 반사 거리처럼 경로형 무기의 판을 넓혀 줍니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['chain', 'rapid', 'precision'],
     weight: { base: 0.7, levelScale: 0.022, repeatPenalty: 0.42, familyBonus: 0.36 },
     roll(level, random) {
@@ -760,7 +781,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'hitbox-bloom',
     name: '히트박스 팽창',
     description: '투사체 크기가 커져 맞히기 쉬워지고 범위형 무기도 존재감이 커집니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['starter', 'zone', 'heavy'],
     weight: { base: 0.74, levelScale: 0.02, repeatPenalty: 0.36, familyBonus: 0.34 },
     roll(level, random) {
@@ -781,7 +802,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'status-overclock',
     name: '상태 오버클럭',
     description: '화상·중독·출혈 같은 속성 상태가 더 오래 남고 틱 피해도 강해집니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['zone', 'heavy', 'melee'],
     weight: { base: 0.74, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.34 },
     roll(level, random) {
@@ -802,7 +823,7 @@ const PASSIVE_CARD_TEMPLATES = [
     id: 'cold-logic',
     name: '냉각 로직',
     description: '빙결·감전 계열 둔화가 더 오래, 더 강하게 붙습니다.',
-    kind: 'general',
+    kind: 'passive',
     preferredFamilies: ['precision', 'rapid', 'zone'],
     weight: { base: 0.68, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.32 },
     roll(level, random) {
@@ -1153,7 +1174,7 @@ function formatEffectSummary(effects: PassiveEffects): string {
     lines.push(`투사체 크기 +${roundPercent(effects.projectileSizeMultiplier - 1)}%`)
   }
   if (effects.rangeDelta) {
-    lines.push(`범위 +${Math.round(effects.rangeDelta)}`)
+    lines.push(`사거리/범위 +${Math.round(effects.rangeDelta)}`)
   }
   if (effects.damageMultiplier !== undefined && effects.damageMultiplier > 1) {
     lines.push(`피해 +${roundPercent(effects.damageMultiplier - 1)}%`)

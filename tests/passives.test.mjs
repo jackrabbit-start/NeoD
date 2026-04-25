@@ -102,6 +102,12 @@ test('passives modify hazard, burst, impact, and melee behavior safely with roll
   assert.equal(modifiedTurret.attackBehavior.kind, 'deploy-turret')
   assert.ok(modifiedTurret.attackBehavior.deploy.maxTurrets > baseTurret.attackBehavior.deploy.maxTurrets)
   assert.ok(modifiedTurret.attackBehavior.deploy.range > baseTurret.attackBehavior.deploy.range)
+  const baseBurst = WEAPON_DEFINITIONS['starter-blaster']
+  const modifiedBurst = applyPassiveWeaponEffects(baseBurst, state)
+  assert.equal(modifiedBurst.attackBehavior.kind, 'burst-fire')
+  assert.ok(modifiedBurst.attackBehavior.shotsPerBurst > baseBurst.attackBehavior.shotsPerBurst)
+  assert.ok(modifiedBurst.fireRateMs < baseBurst.fireRateMs)
+  assert.ok((modifiedBurst.range ?? 0) > (baseBurst.range ?? 0))
 
   const glaiveState = addPassiveCard({}, createPassiveCardChoice('wide-zone', 6, createSequenceRandom([0.4, 0.9])))
   const baseGlaive = WEAPON_DEFINITIONS['slime-glaive']
@@ -174,14 +180,16 @@ test('passive summaries and player speed reflect rolled and stacked run-local ch
   state = addPassiveCard(state, createPassiveCardChoice('runner-instinct', 11, createSequenceRandom([0.8])))
   state = addPassiveCard(state, createPassiveCardChoice('keen-sense', 7, createSequenceRandom([0.5])))
   state = addPassiveCard(state, createPassiveCardChoice('split-focus', 9, createSequenceRandom([0.2])))
+  state = addPassiveCard(state, createPassiveCardChoice('rangefinder', 9, createSequenceRandom([0.6])))
 
   assert.ok(applyPassivePlayerSpeed(220, state) > 220)
   const lines = getPassiveSummaryLines(state)
-  assert.equal(lines.length, 3)
+  assert.equal(lines.length, 4)
   assert.match(lines[0], /런각 본능 × 2/)
   assert.match(lines[0], /이동속도 \+/)
   assert.ok(lines.some((line) => /예리한 감각/.test(line)))
   assert.ok(lines.some((line) => /투사체 \+/.test(line)))
+  assert.ok(lines.some((line) => /사거리\/범위 \+/.test(line)))
 })
 
 
@@ -203,6 +211,24 @@ test('pickup utility cards expose attraction, collect, speed, and heal scaling',
   assert.ok(lines.some((line) => /획득 범위/.test(line)))
   assert.ok(lines.some((line) => /흡입 속도/.test(line)))
   assert.ok(lines.some((line) => /하트 회복량/.test(line)))
+})
+
+test('card categories keep loot utility in general and combat scaling in passive buckets', () => {
+  const magnet = createPassiveCardChoice('magnet-array', 8, createSequenceRandom([0.8]))
+  const vacuum = createPassiveCardChoice('vacuum-pocket', 8, createSequenceRandom([0.7, 0.6]))
+  const scavenger = createPassiveCardChoice('scavenger-route', 8, createSequenceRandom([0.7, 0.5]))
+  const shield = createPassiveCardChoice('panic-shield', 8, createSequenceRandom([0.7]))
+  const critMass = createPassiveCardChoice('critical-mass', 8, createSequenceRandom([0.8, 0.7]))
+  const linger = createPassiveCardChoice('linger-protocol', 8, createSequenceRandom([0.8, 0.7]))
+  const status = createPassiveCardChoice('status-overclock', 8, createSequenceRandom([0.8, 0.7]))
+
+  assert.equal(magnet.kind, 'general')
+  assert.equal(vacuum.kind, 'general')
+  assert.equal(scavenger.kind, 'general')
+  assert.equal(shield.kind, 'passive')
+  assert.equal(critMass.kind, 'passive')
+  assert.equal(linger.kind, 'passive')
+  assert.equal(status.kind, 'passive')
 })
 
 test('new pachinko and enemy cards expose varied utility modifiers', () => {
