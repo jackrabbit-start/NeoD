@@ -2504,7 +2504,7 @@ test('effective weapon stats scale by star grade for combat-visible fusion payof
 
 test('player level combat stats raise health and weapon damage globally', () => {
   assert.equal(BASE_PLAYER_MAX_HEALTH, 100)
-  assert.equal(PLAYER_HEALTH_PER_LEVEL, 8)
+  assert.equal(PLAYER_HEALTH_PER_LEVEL, 10)
   assert.equal(PLAYER_DAMAGE_MULTIPLIER_PER_LEVEL, 0.05)
 
   assert.deepEqual(getPlayerLevelCombatStats(1), {
@@ -2517,7 +2517,7 @@ test('player level combat stats raise health and weapon damage globally', () => 
 
   assert.deepEqual(getPlayerLevelCombatStats(10), {
     level: 10,
-    maxHealth: 172,
+    maxHealth: 190,
     damageMultiplier: 1.45,
     weaponRangeMultiplier: 1.16,
     weaponSpecialTier: 1,
