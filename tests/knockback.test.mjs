@@ -197,5 +197,5 @@ test('enemy data keeps boss knockback restrained with resistance and weight', ()
     ENEMY_DEFINITIONS['slime-boss'].knockback,
   )
 
-  approx(force, 14.46666666666667)
+  approx(force, 12.600000000000001)
 })

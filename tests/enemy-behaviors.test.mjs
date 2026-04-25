@@ -62,49 +62,49 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   const toad = ENEMY_DEFINITIONS['siege-toad']
   const boss = ENEMY_DEFINITIONS['slime-boss']
 
-  assert.equal(slime.maxHealth, 16)
-  assert.equal(slime.speed, 69)
-  assert.equal(slime.contactDamage, 14)
+  assert.equal(slime.maxHealth, 30)
+  assert.equal(slime.speed, 84)
+  assert.equal(slime.contactDamage, 18)
 
-  assert.equal(spark.maxHealth, 21)
-  assert.equal(spark.speed, 75)
-  assert.equal(spark.contactDamage, 16)
+  assert.equal(spark.maxHealth, 40)
+  assert.equal(spark.speed, 92)
+  assert.equal(spark.contactDamage, 20)
   assert.equal(spark.movementBehavior.kind, 'orbit')
   assert.equal(spark.movementBehavior.preferredDistance, 132)
   assert.equal(spark.movementBehavior.distanceTolerance, 22)
   assert.equal(spark.attackBehavior.kind, 'telegraphed-aoe')
-  assert.equal(spark.attackBehavior.damage, 19)
-  assert.equal(spark.attackBehavior.cooldownMs, 968)
-  assert.equal(spark.attackBehavior.telegraphMs, 550)
-  assert.equal(spark.attackBehavior.radius, 56)
-  assert.equal(spark.attackBehavior.range, 232)
-  assert.equal(spark.attackBehavior.targetJitterRadius, 69)
+  assert.equal(spark.attackBehavior.damage, 24)
+  assert.equal(spark.attackBehavior.cooldownMs, 820)
+  assert.equal(spark.attackBehavior.telegraphMs, 500)
+  assert.equal(spark.attackBehavior.radius, 72)
+  assert.equal(spark.attackBehavior.range, 290)
+  assert.equal(spark.attackBehavior.targetJitterRadius, 86)
 
-  assert.equal(prism.maxHealth, 57)
-  assert.equal(prism.speed, 67)
-  assert.equal(prism.contactDamage, 22)
+  assert.equal(prism.maxHealth, 110)
+  assert.equal(prism.speed, 82)
+  assert.equal(prism.contactDamage, 28)
 
-  assert.equal(dash.maxHealth, 24)
-  assert.equal(dash.speed, 62)
-  assert.equal(dash.contactDamage, 17)
+  assert.equal(dash.maxHealth, 46)
+  assert.equal(dash.speed, 76)
+  assert.equal(dash.contactDamage, 22)
   assert.equal(dash.movementBehavior.kind, 'dash')
-  assert.equal(dash.movementBehavior.triggerRange, 216)
-  assert.equal(dash.movementBehavior.chargeSpeed, 221)
+  assert.equal(dash.movementBehavior.triggerRange, 270)
+  assert.equal(dash.movementBehavior.chargeSpeed, 270)
   assert.equal(dash.movementBehavior.chargeDurationMs, 520)
-  assert.equal(dash.movementBehavior.cooldownMs, 1003)
+  assert.equal(dash.movementBehavior.cooldownMs, 850)
 
-  assert.equal(orbit.maxHealth, 20)
-  assert.equal(orbit.speed, 67)
-  assert.equal(orbit.contactDamage, 15)
+  assert.equal(orbit.maxHealth, 38)
+  assert.equal(orbit.speed, 82)
+  assert.equal(orbit.contactDamage, 19)
   assert.equal(orbit.movementBehavior.kind, 'orbit')
-  assert.equal(orbit.movementBehavior.preferredDistance, 69)
-  assert.equal(orbit.movementBehavior.distanceTolerance, 22)
+  assert.equal(orbit.movementBehavior.preferredDistance, 86)
+  assert.equal(orbit.movementBehavior.distanceTolerance, 28)
 
   assert.equal(splitter.attackBehavior.kind, 'radial-burst')
-  assert.equal(splitter.attackBehavior.projectileCount, 3)
-  assert.equal(splitter.attackBehavior.damage, 8)
+  assert.equal(splitter.attackBehavior.projectileCount, 8)
+  assert.equal(splitter.attackBehavior.damage, 10)
   assert.equal(sentinel.attackBehavior.kind, 'line-beam')
-  assert.equal(sentinel.attackBehavior.width, 27)
+  assert.equal(sentinel.attackBehavior.width, 34)
   assert.equal(mender.attackBehavior.kind, 'telegraphed-aoe')
   assert.equal(mender.attackBehavior.anchor, 'self')
   assert.equal(voidOrb.attackBehavior.kind, 'line-beam')
@@ -116,17 +116,17 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   assert.equal(toad.attackBehavior.kind, 'radial-burst')
   assert.ok(toad.maxHealth > crusher.maxHealth)
 
-  assert.equal(boss.maxHealth, 374)
-  assert.equal(boss.speed, 52)
-  assert.equal(boss.contactDamage, 27)
+  assert.equal(boss.maxHealth, 720)
+  assert.equal(boss.speed, 64)
+  assert.equal(boss.contactDamage, 34)
   assert.equal(boss.attackBehavior.kind, 'telegraphed-aoe')
-  assert.equal(boss.attackBehavior.damage, 33)
-  assert.equal(boss.attackBehavior.cooldownMs, 968)
-  assert.equal(boss.attackBehavior.telegraphMs, 495)
-  assert.equal(boss.attackBehavior.radius, 113)
-  assert.equal(boss.attackBehavior.range, 264)
+  assert.equal(boss.attackBehavior.damage, 42)
+  assert.equal(boss.attackBehavior.cooldownMs, 820)
+  assert.equal(boss.attackBehavior.telegraphMs, 450)
+  assert.equal(boss.attackBehavior.radius, 145)
+  assert.equal(boss.attackBehavior.range, 330)
   assert.equal(boss.attackBehavior.anchor, 'player')
-  assert.equal(boss.attackBehavior.targetJitterRadius, 96)
+  assert.equal(boss.attackBehavior.targetJitterRadius, 120)
 })
 
 test('telegraphed aoe uses configured anchors for readable pressure zones', () => {
@@ -157,11 +157,11 @@ test('telegraphed aoe uses configured anchors for readable pressure zones', () =
 
   assert.deepEqual(
     sparkTelegraph && { x: sparkTelegraph.x, y: sparkTelegraph.y, radius: sparkTelegraph.radius },
-    { x: 90, y: 120, radius: 56 },
+    { x: 90, y: 120, radius: 72 },
   )
   assert.deepEqual(
     bossTelegraph && { x: bossTelegraph.x, y: bossTelegraph.y, radius: bossTelegraph.radius },
-    { x: 90, y: 120, radius: 113 },
+    { x: 90, y: 120, radius: 145 },
   )
   assert.deepEqual(
     selfAnchoredTelegraph && {

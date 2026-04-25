@@ -48,7 +48,7 @@ export function createInitialArenaRunState(): ArenaRunState {
     isRunEnding: false,
     playerHealth: 100,
     playerMaxHealth: 100,
-    playerSpeed: 180,
+    playerSpeed: 220,
     nextFireAt: 0,
     runElapsedMs: 0,
     currentStageIndex: 0,
