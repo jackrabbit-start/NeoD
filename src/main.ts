@@ -8,6 +8,16 @@ import { GAMEPLAY_CONTROL_TIP, GAME_TITLE, KIM_COMMUNITY_NARRATIONS } from './ui
 const app = document.querySelector<HTMLDivElement>('#app')
 
 const getHeaderNarration = (index: number): string => KIM_COMMUNITY_NARRATIONS[index % KIM_COMMUNITY_NARRATIONS.length]
+const HEADER_CHARACTER_ICONS = [
+  'assets/units/player-kim-idle-0.png',
+  'assets/units/player-kim-walk-0.png',
+  'assets/units/player-bunny-idle-0.svg',
+  'assets/units/slime-idle-0.svg',
+  'assets/units/needle-wasp-idle-0.svg',
+  'assets/units/lantern-moth-idle-0.svg',
+] as const
+const getHeaderCharacterIcon = (index: number, offset: number): string =>
+  HEADER_CHARACTER_ICONS[(index + offset) % HEADER_CHARACTER_ICONS.length]
 let headerNarrationIndex = new Date().getSeconds() % KIM_COMMUNITY_NARRATIONS.length
 
 if (!app) {
@@ -19,9 +29,9 @@ app.innerHTML = `
     <header class="game-header">
       <div class="game-header__narration-strip" data-region="kim-narration-strip">
         <div class="game-header__mood-icons" aria-hidden="true">
-          <span>😤</span>
-          <span>🎰</span>
-          <span>🏃</span>
+          <span><img src="${getHeaderCharacterIcon(headerNarrationIndex, 0)}" alt="" /></span>
+          <span><img src="${getHeaderCharacterIcon(headerNarrationIndex, 2)}" alt="" /></span>
+          <span><img src="${getHeaderCharacterIcon(headerNarrationIndex, 4)}" alt="" /></span>
         </div>
         <p class="game-header__narration" data-region="kim-narration" aria-live="polite" aria-label="김동성 커뮤니티 드립">
           “${getHeaderNarration(headerNarrationIndex)}”
@@ -107,6 +117,9 @@ const narrationTimer = window.setInterval(() => {
   narrationStripElement.classList.remove('is-rolling')
   void narrationStripElement.offsetWidth
   narrationElement.textContent = `“${getHeaderNarration(headerNarrationIndex)}”`
+  document.querySelectorAll<HTMLImageElement>('.game-header__mood-icons img').forEach((icon, iconIndex) => {
+    icon.src = getHeaderCharacterIcon(headerNarrationIndex, iconIndex * 2)
+  })
   narrationStripElement.classList.add('is-rolling')
   window.setTimeout(() => narrationStripElement.classList.remove('is-rolling'), 520)
 }, 5000)

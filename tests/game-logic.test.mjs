@@ -1548,7 +1548,9 @@ test('game title, narration, and control hints stay aligned with playable keyboa
   assert.equal(GAME_TITLE, '달려라 김동성!')
   assert.deepEqual([...GAME_HEADER_CONTROL_HINTS], ['WASD 이동', 'J 대시', 'I 인벤토리', 'Q 코덱스'])
   assert.ok(KIM_COMMUNITY_NARRATIONS.length >= 5)
-  assert.ok(KIM_COMMUNITY_NARRATIONS.every((line) => line.includes('김동성') || line.includes('토큰') || line.includes('빚쟁이') || line.includes('파친코')))
+  assert.ok(KIM_COMMUNITY_NARRATIONS.some((line) => line.startsWith('익명1:')))
+  assert.ok(KIM_COMMUNITY_NARRATIONS.some((line) => line.startsWith('베댓:')))
+  assert.ok(KIM_COMMUNITY_NARRATIONS.some((line) => line.includes('ㅋㅋ')))
   assert.match(GAMEPLAY_CONTROL_TIP, /I 인벤토리/)
   assert.match(GAMEPLAY_CONTROL_TIP, /Q 코덱스/)
   assert.match(GAMEPLAY_CONTROL_TIP, /끝까지 버티기/)
@@ -1561,6 +1563,8 @@ test('game title, narration, and control hints stay aligned with playable keyboa
   assert.ok(mainSource.includes('}, 5000)'))
   assert.ok(mainSource.includes('data-region="kim-narration"'))
   assert.ok(mainSource.includes('game-header__mood-icons'))
+  assert.ok(mainSource.includes('HEADER_CHARACTER_ICONS'))
+  assert.ok(mainSource.includes('assets/units/player-kim-idle-0.png'))
   assert.ok(!mainSource.includes('<strong>${GAME_TITLE}</strong>'))
   assert.ok(!mainSource.includes('game-header__controls'))
   assert.ok(!mainSource.includes('game-header__rails'))
@@ -1569,7 +1573,17 @@ test('game title, narration, and control hints stay aligned with playable keyboa
   assert.ok(styleSource.includes('word-break: keep-all'))
   assert.ok(styleSource.includes('@keyframes narration-drop'))
   assert.ok(styleSource.includes('.game-header__mood-icons'))
+  assert.ok(styleSource.includes('.game-header__mood-icons img'))
   assert.ok(!styleSource.includes('COMMUNITY LOG'))
+})
+
+
+test('weapon descriptions carry Kim-flavored personal hooks', () => {
+  assert.match(WEAPON_DEFINITIONS['arc-loom'].description, /축구/)
+  assert.match(WEAPON_DEFINITIONS['slime-glaive'].description, /레넥톤/)
+  assert.match(WEAPON_DEFINITIONS['starter-blaster'].description, /파친코/)
+  assert.match(WEAPON_DEFINITIONS['mist-vortex'].description, /커뮤 댓글/)
+  assert.ok(Object.values(WEAPON_DEFINITIONS).every((weapon) => weapon.description.length >= 40))
 })
 
 test('stage selection views expose readable time-stage choices and current marker', () => {

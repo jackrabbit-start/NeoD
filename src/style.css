@@ -109,14 +109,22 @@ button {
 .game-header__mood-icons span {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 1px solid rgba(255, 216, 102, 0.24);
   border-radius: 999px;
   background: rgba(7, 18, 35, 0.66);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  font-size: 16px;
   line-height: 1;
+  overflow: hidden;
+}
+
+.game-header__mood-icons img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.42));
 }
 
 .game-header__narration {
@@ -1100,9 +1108,13 @@ button {
   }
 
   .game-header__mood-icons span {
-    width: 24px;
-    height: 24px;
-    font-size: 14px;
+    width: 26px;
+    height: 26px;
+  }
+
+  .game-header__mood-icons img {
+    width: 21px;
+    height: 21px;
   }
 
   .hud-summary__grid,
