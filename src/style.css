@@ -729,6 +729,12 @@ button {
   text-align: right;
 }
 
+.hud-modal__stat-bonus {
+  color: #79ffb2;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .hud-modal__list--stage {
   gap: 10px;
 }

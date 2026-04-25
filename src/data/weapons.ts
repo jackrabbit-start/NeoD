@@ -3,8 +3,8 @@ import type { WeaponDefinition, WeaponId } from '../domain/types.js'
 export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   'starter-blaster': {
     id: 'starter-blaster',
-    name: 'Bullet Hose',
-    description: '커뮤에서는 김동성이 파친코 대신 마우스 꾹 누르는 중이라고 놀립니다. 손가락만 고정하면 화면이 알아서 긁히는 도주용 버릇입니다.',
+    name: '마우스 꾹누르기',
+    description: '커뮤에서는 김동성이 파친코 대신 마우스를 꾹 누르는 중이라고 놀립니다. 손가락만 고정하면 화면이 알아서 긁히는 도주용 버릇입니다.',
     identityLabel: '꾹누름 본능',
     identityHint: '한 번 잡은 라인을 놓치지 않고 계속 긁어야 값이 나오는 기본 지속 화력 무기입니다.',
     range: 420,
@@ -33,9 +33,9 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'acid-sprayer': {
     id: 'acid-sprayer',
-    name: 'Spitter',
-    description: '토큰 잃은 날의 표정처럼 질척하게 남는다는 드립이 붙었습니다. 지나간 자리마다 후회가 묻어나는 김동성식 찝찝함입니다.',
-    identityLabel: '산성 토사',
+    name: '술먹고 난 토',
+    description: '술 마신 다음 날 길가에 남긴 토처럼 질척하게 퍼진다는 드립이 붙었습니다. 지나간 자리마다 후회가 묻어나는 김동성식 찝찝함입니다.',
+    identityLabel: '숙취 토사',
     identityHint: '직격보다 토해 놓은 오염 지대까지 묶어 적 무리를 태우는 광역 압박 무기입니다.',
     range: 240,
     damage: 11,
@@ -64,7 +64,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'frost-lance': {
     id: 'frost-lance',
-    name: 'Rocket Forge',
+    name: '대충 만든 로켓',
     description: '한 방에 판을 엎고 싶던 김동성의 파친코식 역전 욕망을 닮았습니다. 크게 꽂히는 순간만 믿고 뛰는 무모한 선택입니다.',
     identityLabel: '폭심 유도',
     identityHint: '정면 직사보다 적이 몰린 지점에 꽂아 한 번에 날리는 범위 청소 무기입니다.',
@@ -91,7 +91,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'storm-cannon': {
     id: 'storm-cannon',
-    name: 'Street Sweeper',
+    name: '골목 빗자루',
     description: '가까이 오면 말보다 먼저 터지는 커뮤식 손절 버튼입니다. 설명보다 반응이 빠른 김동성식 방어 본능입니다.',
     identityLabel: '근접 제압',
     identityHint: '붙어서 퍼뜨릴수록 여러 탄이 겹쳐 들어가며 잡몹 라인을 한 번에 비우는 산탄 무기입니다.',
@@ -121,7 +121,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'arc-loom': {
     id: 'arc-loom',
-    name: 'Kickoff',
+    name: '낡은 축구공',
     description: '어릴 때 축구는 꽤 했다는 김동성의 오래된 허세가 무기화됐습니다. 한 번 찬 공이 남의 얘기처럼 계속 튕겨 다닙니다.',
     identityLabel: '연쇄 킥',
     identityHint: '탄을 쏘는 게 아니라 튕김 경로를 태우는 무기라 적이 몰릴수록 공이 더 오래 살아남습니다.',
@@ -152,7 +152,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'spark-carbine': {
     id: 'spark-carbine',
-    name: 'Sentry Node',
+    name: '방범 카메라',
     description: '본인은 뛰고 감시는 기계에 맡기는 요즘식 생존 꼼수입니다. 김동성은 발만 바쁘고 책임은 작은 장치에게 넘깁니다.',
     identityLabel: '포탑 배치',
     identityHint: '직접 딜하는 시간이 아니라 포탑을 어디에 남기느냐가 전투 효율을 좌우하는 설치형 무기입니다.',
@@ -188,7 +188,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'mist-vortex': {
     id: 'mist-vortex',
-    name: 'Compiler',
+    name: '컴파일러',
     description: '커뮤 댓글처럼 밟는 순간 터지는 문장 폭탄입니다. 괜히 읽었다가 기분만 상하는 김동성식 함정글입니다.',
     identityLabel: '문법 폭발',
     identityHint: '적 위에 바로 꽂기보다 이동 경로에 문장을 심어 두고 밟게 만드는 설치 주문 무기입니다.',
@@ -218,8 +218,8 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'slime-glaive': {
     id: 'slime-glaive',
-    name: 'Blood Reaver',
-    description: '레넥톤은 애정 가는 롤 캐릭터라며 들고 온 김동성식 흡혈 난전입니다. 맞으면서도 버티는 게 멋있다고 우기는 픽입니다.',
+    name: '레넥톤 손맛',
+    description: '레넥톤은 김동성이 애정 가는 롤 캐릭터라며 끝까지 고집하는 손맛입니다. 맞으면서도 버티는 게 멋있다고 우기는 픽입니다.',
     identityLabel: '흡혈 난전',
     identityHint: '멀리서 깎기보다 적 무리 중앙을 버티며 여러 대상을 동시에 맞춰 회복을 챙기는 난전 무기입니다.',
     damage: 17,
@@ -246,7 +246,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'prism-cutter': {
     id: 'prism-cutter',
-    name: 'Iron Fist',
+    name: '동네 주먹',
     description: '말로 해명하다 안 되면 몸이 먼저 나가는 짤 같은 연속기입니다. 짧게 치고 빠지는 척하다가 마지막에 괜히 크게 갑니다.',
     identityLabel: '근접 콤보',
     identityHint: '한 번 휘두르고 끝나는 무기가 아니라 짧은 연속기 전체가 한 사이클이라 붙어 있을수록 이득을 봅니다.',
@@ -302,7 +302,7 @@ export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
   },
   'needle-fan': {
     id: 'needle-fan',
-    name: 'Reanimator',
+    name: '다시 출근',
     description: '탈출길에 구경꾼까지 알바로 세우는 김동성식 인력 운용입니다. 방금 쓰러진 애도 다시 출근시키는 야박한 생존법입니다.',
     identityLabel: '시체 재가동',
     identityHint: '직접 지우는 데서 끝나지 않고 처치가 다음 병력으로 이어져 전투가 길수록 전장이 유리해집니다.',

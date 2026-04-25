@@ -33,7 +33,7 @@ export function createRunResultPresentation(payload: RunResultPayload): RunResul
   return {
     title: isWin ? '런 클리어' : isTimeout ? '시간 종료' : '런 실패',
     subtitle: isWin
-      ? '크라운 슬라임을 넘어 김동성의 추격 끝에서 살아남아 30분 생존 기록을 완성했습니다.'
+      ? '잭팟 망령을 넘어 김동성의 추격 끝에서 살아남아 30분 생존 기록을 완성했습니다.'
       : isTimeout
         ? '30:00까지 버텼지만 마지막 추격 결전을 끝내지 못했습니다.'
         : '추격에서 밀려 생존 런이 중단되었습니다. 무기 루트와 회피 타이밍을 다시 점검하세요.',

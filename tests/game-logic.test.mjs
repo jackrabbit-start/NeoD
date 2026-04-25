@@ -369,7 +369,7 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
     nextInventory: {},
     ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
     activeWeaponId: 'acid-sprayer',
-    statusMessage: 'Spitter 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
+    statusMessage: '술먹고 난 토 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
   })
 })
 
@@ -656,7 +656,7 @@ test('pachinko slot table makes displayed bottom rewards exact', () => {
 test('pachinko weapon-family synergy marks mostly-upside bonus slots', () => {
   assert.equal(getPachinkoWeaponFamily('slime-glaive'), 'melee')
   assert.equal(getPachinkoWeaponFamilyLabel('melee'), '근접')
-  assert.equal(getPachinkoWeaponSynergySummary('slime-glaive'), '근접 계열: Blood Reaver 보너스 슬롯 등장')
+  assert.equal(getPachinkoWeaponSynergySummary('slime-glaive'), '근접 계열: 레넥톤 손맛 보너스 슬롯 등장')
 
   const modifiers = buildPachinkoSlotModifiers('slime-glaive', 3)
   assert.equal(modifiers.get(7), 'family')
@@ -973,9 +973,9 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
   )
 
   const [acidSummary] = describeAvailableRecipes(acidRecipes)
-  assert.match(acidSummary ?? '', /Spitter \[산성 토사]/)
+  assert.match(acidSummary ?? '', /술먹고 난 토 \[숙취 토사]/)
   assert.match(acidSummary ?? '', /사거리 240/)
-  assert.match(acidSummary ?? '', /산성 토사/)
+  assert.match(acidSummary ?? '', /숙취 토사/)
   assert.doesNotMatch(acidSummary ?? '', /초당 \d+회/)
 
   const sparkRecipes = getActionableRecipes(
@@ -995,10 +995,10 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
 
   const [sparkSummary] = describeAvailableRecipes(sparkRecipes)
   const [mistSummary] = describeAvailableRecipes(mistRecipes)
-  assert.match(sparkSummary ?? '', /Sentry Node \[포탑 배치]/)
+  assert.match(sparkSummary ?? '', /방범 카메라 \[포탑 배치]/)
   assert.match(sparkSummary ?? '', /배치 2기/)
   assert.match(sparkSummary ?? '', /포탑당 9/)
-  assert.match(mistSummary ?? '', /Compiler \[문법 폭발]/)
+  assert.match(mistSummary ?? '', /컴파일러 \[문법 폭발]/)
   assert.match(mistSummary ?? '', /직격 8/)
   assert.match(mistSummary ?? '', /지대 44/)
 
@@ -1010,7 +1010,7 @@ test('recipe presenter mirrors the actionable combine summary strings', () => {
     ['starter-blaster'],
   )
   const [needleSummary] = describeAvailableRecipes(needleRecipes)
-  assert.match(needleSummary ?? '', /Reanimator \[시체 재가동]/)
+  assert.match(needleSummary ?? '', /다시 출근 \[시체 재가동]/)
   assert.match(needleSummary ?? '', /처치 시 아군화/)
 })
 
@@ -1213,7 +1213,7 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
   assert.deepEqual(firstRows, [
     {
       enemyId: 'slime',
-      enemyName: '진흙 슬라임',
+      enemyName: '소액 빚 독촉장',
       count: 9,
       ratio: 1,
       percentLabel: '100%',
@@ -1455,6 +1455,15 @@ test('third wave still includes the existing spark slime sample enemy', () => {
   assert.ok(getWaveSpawnSequence(thirdWave).includes('spark-slime'))
 })
 
+
+test('enemy names match Kim Dong-sung escape story beats', () => {
+  assert.equal(ENEMY_DEFINITIONS.slime.name, '소액 빚 독촉장')
+  assert.equal(ENEMY_DEFINITIONS['slime-boss'].name, '잭팟 망령')
+  assert.match(ENEMY_DEFINITIONS['needle-wasp'].description, /커뮤 댓글창/)
+  assert.match(ENEMY_DEFINITIONS['siege-toad'].description, /불어난 빚/)
+  assert.ok(Object.values(ENEMY_DEFINITIONS).every((enemy) => !enemy.name.includes('슬라임')))
+})
+
 test('content id catalogs include scoped enemy and reward branches', () => {
   assert.deepEqual(LOOT_IDS, [
     'gel-shard',
@@ -1581,6 +1590,9 @@ test('game title, narration, and control hints stay aligned with playable keyboa
 
 
 test('weapon descriptions carry Kim-flavored personal hooks', () => {
+  assert.equal(WEAPON_DEFINITIONS['arc-loom'].name, '낡은 축구공')
+  assert.equal(WEAPON_DEFINITIONS['acid-sprayer'].name, '술먹고 난 토')
+  assert.equal(WEAPON_DEFINITIONS['mist-vortex'].name, '컴파일러')
   assert.match(WEAPON_DEFINITIONS['arc-loom'].description, /축구/)
   assert.match(WEAPON_DEFINITIONS['slime-glaive'].description, /레넥톤/)
   assert.match(WEAPON_DEFINITIONS['starter-blaster'].description, /파친코/)
@@ -1624,7 +1636,7 @@ test('boss win result presentation is explicit and reward-neutral', () => {
   const hudState = createRunResultHudState(payload)
 
   assert.equal(presentation.title, '런 클리어')
-  assert.match(presentation.subtitle, /크라운 슬라임/)
+  assert.match(presentation.subtitle, /잭팟 망령/)
   assert.match(presentation.restartPrompt, /버튼/)
   assert.deepEqual(presentation.statLines, [
     '결과: 클리어',
@@ -1829,7 +1841,7 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
 
   const needleWasp = codex.enemies.find((enemy) => enemy.id === 'needle-wasp')
   assert.ok(needleWasp)
-  assert.ok(needleWasp?.description.includes('비-슬라임'))
+  assert.ok(needleWasp?.description.includes('악플'))
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('부채꼴')))
   assert.deepEqual(needleWasp?.drops, [])
   assert.ok(needleWasp?.stats.some((stat) => stat.includes('보상 경험치 +120')))
@@ -1861,6 +1873,10 @@ test('codex controller preserves scroll across repeated open renders', () => {
     scrollTop = 0
     assignments = 0
     #innerHTML = ''
+
+    get childElementCount() {
+      return this.children.length
+    }
 
     get innerHTML() {
       return this.#innerHTML
@@ -1919,6 +1935,10 @@ test('hud controller skips summary DOM rewrites for identical frame-loop updates
 
     constructor(tagName = 'div') {
       this.tagName = tagName.toUpperCase()
+    }
+
+    get childElementCount() {
+      return this.children.length
     }
 
     get innerHTML() {
@@ -2038,6 +2058,10 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
       this.tagName = tagName.toUpperCase()
     }
 
+    get childElementCount() {
+      return this.children.length
+    }
+
     get innerHTML() {
       return this.#innerHTML
     }
@@ -2118,7 +2142,10 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
             accentColor: 0xfff06a,
           },
         ],
-        characterStats: [],
+        characterStats: [
+          { label: '공격력', value: '24', bonus: '(+6)' },
+          { label: '최대 체력', value: '132', bonus: '(+32)' },
+        ],
       },
       pachinko: {
         level: 1,
@@ -2133,10 +2160,23 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
     const weaponList = controller.weaponList
     const firstWeaponEntry = weaponList.children[0]
     const firstWeaponRow = firstWeaponEntry.children[1] ? firstWeaponEntry : firstWeaponEntry.children[0]
-    const actions = firstWeaponRow.children[1]
-    const meta = actions.children[0]
+    const left = firstWeaponRow.children[0]
+    const textGroup = left.children[left.children.length - 1]
+    const meta = textGroup.children[2]
 
+    assert.equal(firstWeaponRow.children.length, 2)
+    assert.equal(firstWeaponRow.children[1].children.length, 1)
+    assert.equal(firstWeaponRow.children[1].children[0].textContent, '장착 중')
     assert.equal(meta.textContent, '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사')
+
+    const equippedRow = controller.equippedWeaponList.children[0]
+    assert.equal(equippedRow.children.length, 1)
+
+    const characterStats = controller.characterStatsList
+    assert.equal(characterStats.children[0].children[1].textContent, '24')
+    assert.equal(characterStats.children[0].children[1].children[1].textContent, '(+6)')
+    assert.equal(characterStats.children[1].children[1].textContent, '132')
+    assert.equal(characterStats.children[1].children[1].children[1].textContent, '(+32)')
   } finally {
     if (previousDocument === undefined) {
       delete globalThis.document

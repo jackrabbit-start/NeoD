@@ -3737,20 +3737,44 @@ export class ArenaScene extends Phaser.Scene {
       deriveEffectiveWeaponStats(weaponId, {}, activeStar, this.playerProgression.level),
       this.passiveState,
     )
+    const baseLevelWeapon = applyPassiveWeaponEffects(
+      deriveEffectiveWeaponStats(weaponId, {}, activeStar, 1),
+      this.passiveState,
+    )
     const playerStats = getPlayerLevelCombatStats(this.playerProgression.level)
+    const basePlayerStats = getPlayerLevelCombatStats(1)
     const attackRange = getWeaponAttackRange(weapon)
+    const baseAttackRange = getWeaponAttackRange(baseLevelWeapon)
+    const formatPositiveBonus = (amount: number, suffix = ''): string | undefined =>
+      amount > 0 ? `(+${amount}${suffix})` : undefined
 
     return [
       { label: '이동 속도', value: `${this.playerSpeed}` },
-      { label: '공격력', value: `${weapon.damage}` },
+      { label: '공격력', value: `${weapon.damage}`, bonus: formatPositiveBonus(weapon.damage - baseLevelWeapon.damage) },
       { label: '기본 공속', value: `${(1000 / weapon.fireRateMs).toFixed(2)}/초` },
       { label: '치명타 확률', value: `${ArenaScene.BASE_CRIT_CHANCE}%` },
       { label: '치명타 배수', value: `×${ArenaScene.BASE_CRIT_MULTIPLIER.toFixed(2)}` },
-      { label: '최대 체력', value: `${this.playerMaxHealth}` },
-      { label: '공격 사거리', value: `${attackRange}` },
-      { label: '피해 배율', value: `×${playerStats.damageMultiplier.toFixed(2)}` },
-      { label: '사거리 배율', value: `×${playerStats.weaponRangeMultiplier.toFixed(2)}` },
-      { label: '특수 강화 단계', value: `${playerStats.weaponSpecialTier}` },
+      {
+        label: '최대 체력',
+        value: `${this.playerMaxHealth}`,
+        bonus: formatPositiveBonus(this.playerMaxHealth - basePlayerStats.maxHealth),
+      },
+      { label: '공격 사거리', value: `${attackRange}`, bonus: formatPositiveBonus(attackRange - baseAttackRange) },
+      {
+        label: '피해 배율',
+        value: `×${playerStats.damageMultiplier.toFixed(2)}`,
+        bonus: formatPositiveBonus(Math.round((playerStats.damageMultiplier - basePlayerStats.damageMultiplier) * 100), '%'),
+      },
+      {
+        label: '사거리 배율',
+        value: `×${playerStats.weaponRangeMultiplier.toFixed(2)}`,
+        bonus: formatPositiveBonus(Math.round((playerStats.weaponRangeMultiplier - basePlayerStats.weaponRangeMultiplier) * 100), '%'),
+      },
+      {
+        label: '특수 강화 단계',
+        value: `${playerStats.weaponSpecialTier}`,
+        bonus: formatPositiveBonus(playerStats.weaponSpecialTier - basePlayerStats.weaponSpecialTier),
+      },
     ]
   }
 

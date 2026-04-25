@@ -3,16 +3,16 @@ import type { RecipeDefinition } from '../domain/types.js'
 export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   {
     id: 'acid-sprayer-recipe',
-    name: 'Spitter',
+    name: '술먹고 난 토',
     inputs: ['gel-shard', 'acid-core'],
     outputWeaponId: 'acid-sprayer',
-    identityLabel: '산성 토사',
-    identityHint: '전방에 독액을 넓게 뿌리고 오염 지대를 남기는 범위 분기입니다.',
+    identityLabel: '숙취 토사',
+    identityHint: '전방에 숙취 토사를 넓게 뿌리고 찝찝한 오염 지대를 남기는 분기입니다.',
     note: '젤 조각을 압축 사격에 쓰지 않고 산성 위액으로 바꿔 광역 청소 루트를 엽니다.',
   },
   {
     id: 'frost-lance-recipe',
-    name: 'Rocket Forge',
+    name: '대충 만든 로켓',
     inputs: ['gel-shard', 'frost-mote'],
     outputWeaponId: 'frost-lance',
     identityLabel: '폭심 유도',
@@ -21,7 +21,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'storm-cannon-recipe',
-    name: 'Street Sweeper',
+    name: '골목 빗자루',
     inputs: ['acid-core', 'frost-mote'],
     outputWeaponId: 'storm-cannon',
     identityLabel: '근접 제압',
@@ -30,7 +30,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'arc-loom-recipe',
-    name: 'Kickoff',
+    name: '낡은 축구공',
     inputs: ['spark-knot', 'mist-bead'],
     outputWeaponId: 'arc-loom',
     identityLabel: '연쇄 킥',
@@ -39,7 +39,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'spark-carbine-recipe',
-    name: 'Sentry Node',
+    name: '방범 카메라',
     inputs: ['gel-shard', 'spark-knot'],
     outputWeaponId: 'spark-carbine',
     identityLabel: '포탑 배치',
@@ -48,7 +48,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'mist-vortex-recipe',
-    name: 'Compiler',
+    name: '컴파일러',
     inputs: ['frost-mote', 'mist-bead'],
     outputWeaponId: 'mist-vortex',
     identityLabel: '문법 폭발',
@@ -57,7 +57,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'slime-glaive-recipe',
-    name: 'Blood Reaver',
+    name: '레넥톤 손맛',
     inputs: ['acid-core', 'spark-knot'],
     outputWeaponId: 'slime-glaive',
     identityLabel: '흡혈 난전',
@@ -66,7 +66,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'prism-cutter-recipe',
-    name: 'Iron Fist',
+    name: '동네 주먹',
     inputs: ['acid-core', 'mist-bead'],
     outputWeaponId: 'prism-cutter',
     identityLabel: '근접 콤보',
@@ -75,7 +75,7 @@ export const RECIPE_DEFINITIONS: RecipeDefinition[] = [
   },
   {
     id: 'needle-fan-recipe',
-    name: 'Reanimator',
+    name: '다시 출근',
     inputs: ['chitin-needle', 'spark-knot'],
     outputWeaponId: 'needle-fan',
     identityLabel: '시체 재가동',

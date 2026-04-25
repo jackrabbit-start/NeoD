@@ -501,6 +501,7 @@ export interface HudOwnedWeaponView {
 export interface HudCharacterStatView {
   label: string
   value: string
+  bonus?: string
 }
 
 export interface HudPassiveChoiceView {

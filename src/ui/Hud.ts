@@ -471,6 +471,12 @@ export class HudController {
       const value = document.createElement('strong')
       value.className = 'hud-modal__stat-value'
       value.textContent = stat.value
+      if (stat.bonus) {
+        const bonus = document.createElement('span')
+        bonus.className = 'hud-modal__stat-bonus'
+        bonus.textContent = stat.bonus
+        value.append(' ', bonus)
+      }
 
       row.append(label, value)
       return row
@@ -525,7 +531,7 @@ export class HudController {
 
     const summary = document.createElement('small')
     summary.className = 'hud-modal__weapon-meta'
-    summary.textContent = weapon.summary
+    summary.textContent = weapon.levelUpgradeLabel ? `${weapon.summary} · ${weapon.levelUpgradeLabel}` : weapon.summary
     textGroup.append(title, description, summary)
 
     const left = document.createElement('div')
@@ -538,9 +544,6 @@ export class HudController {
 
     const actions = document.createElement('span')
     actions.className = 'hud-modal__weapon-actions'
-
-    const stats = this.createWeaponStats(weapon, variant)
-    actions.append(stats)
 
     if (variant === 'owned') {
       const equipButton = document.createElement('button')
@@ -555,20 +558,13 @@ export class HudController {
       actions.append(equipButton)
     }
 
-    row.append(left, actions)
-    return row
-  }
-
-  private createWeaponStats(weapon: HudOwnedWeaponView, variant: 'equipped' | 'owned'): HTMLElement {
-    const stats = document.createElement('small')
-    stats.className = `hud-modal__weapon-meta hud-modal__weapon-stats hud-modal__weapon-stats--${variant}`
-    const upgradeText = weapon.levelUpgradeLabel ? ` · ${weapon.levelUpgradeLabel}` : ''
-    stats.textContent = `${weapon.summary}${upgradeText}`
-    stats.title = weapon.summary
-    if (weapon.accentColor != null) {
-      stats.style.color = `#${weapon.accentColor.toString(16).padStart(6, '0')}`
+    if (actions.childElementCount > 0) {
+      row.append(left, actions)
+      return row
     }
-    return stats
+
+    row.append(left)
+    return row
   }
 
   private createOwnedWeaponGroup(group: HudOwnedWeaponView[]): HTMLElement {
