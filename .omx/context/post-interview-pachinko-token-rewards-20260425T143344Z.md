@@ -1,0 +1,40 @@
+# Post-Interview Context — Pachinko Token Rewards
+
+- Source spec: `.omx/specs/deep-interview-pachinko-token-weapons.md`
+- Source transcript/context: `.omx/interviews/pachinko-token-weapons-20260425T122020Z.md`, `.omx/context/pachinko-token-weapons-20260425T122020Z.md`
+- Branch/worktree: `ai-dev` after PR #42 and pickup-flow fix PR #46; worktree subject is post-interview + post-implementation documentation.
+- Summary: The token/pachinko interview replaced the underwhelming material-icon reward loop with an arcade reward loop: enemy-specific token XP, visible right-side physics pachinko, random complete weapon + random star rewards, and manual same-weapon/same-star fusion. A post-merge fix then corrected the flow so enemies drop collectible tokens first; the player picks them up before auto-insertion into pachinko.
+- Lessons:
+  - Token rewards are not direct material pickups and should not auto-resolve on enemy death; the visible field pickup is part of the intended moment-to-moment reward loop.
+  - The pachinko board is Phaser-owned gameplay presentation, not a DOM-only summary panel, because the falling token uses Arcade physics and lane resolution.
+  - Board lifecycle must be separated from per-frame destroyed-entity cleanup; otherwise UI/gameplay machines can vanish immediately after creation.
+  - With the larger scrolling map and `Phaser.Scale.RESIZE`, right-side screen-space gameplay overlays need dynamic viewport/camera positioning rather than fixed 960x540 coordinates alone.
+  - Pachinko reward level is the only level affected in this pass; player combat-level or fusion-level effects are deferred.
+- New files:
+  - `docs/wiki/pachinko-token-rewards.md`: durable synthesis of the token pickup → pachinko → weapon-star reward loop.
+  - `.omx/context/post-interview-pachinko-token-rewards-20260425T143344Z.md`: this prompt-safe local context note.
+- Modified files:
+  - `src/systems/pachinkoRewards.ts`: token XP, reward-level thresholds, star odds, and landing reward resolution.
+  - `src/systems/weaponOwnership.ts`: weapon stack/fusion helpers for same weapon + same star progression.
+  - `src/domain/types.ts`: weapon-star stack/HUD state shape.
+  - `src/data/weapons.ts`: meme/parody-safe weapon names and weapon definitions used by random rewards.
+  - `src/scenes/ArenaScene.ts`: pachinko board, dropped token pickup, reward queue, weapon grant, and fusion integration.
+  - `src/ui/Hud.ts`, `src/main.ts`: HUD communication for pachinko level, dropped tokens, queued tokens, latest reward, and inventory fusion.
+  - `tests/game-logic.test.mjs`: deterministic coverage for pachinko thresholds, reward odds, weapon-star fusion, and later button-result changes.
+  - `docs/index.md`, `docs/log.md`: wiki catalog/log updates for this context capture.
+- Decisions / constraints:
+  - Preserve combine as manual weapon fusion; do not delete the combine/fusion concept.
+  - Avoid direct real YouTuber, creator, channel, or brand names in meme-inspired weapon naming.
+  - Keep pachinko as safe-fiction arcade reward presentation, not betting/monetization/gambling language.
+  - Do not perform broad combat rebalance as part of the reward-loop feature.
+  - Same weapon + same star stacks fuse into the next star of that same weapon; pachinko gives random weapon + random star.
+- Verification:
+  - PR #42 verification before merge: `pnpm typecheck`, `pnpm test` (137/137), `pnpm build`.
+  - PR #46 pickup-flow fix verification before and after merge: `pnpm typecheck`, `pnpm test` (137/137), `pnpm build`.
+  - Known warnings: local Node v25.5.0 vs repo engine 22.x; existing Vite chunk-size warning.
+- Residual risks:
+  - Browser/manual feel pass is still useful for confirming token readability, pickup magnet feel, and board visibility during heavy combat.
+  - Static tests cover pure reward/fusion rules, but scene-level Phaser physics behavior is not browser-automated.
+  - Future layout changes can regress pachinko visibility if they reintroduce fixed canvas assumptions or delete board visuals during cleanup.
+- Next recommended use:
+  - Future reward-loop work should start from `docs/wiki/pachinko-token-rewards.md`, then inspect the current `ArenaScene` implementation and `pachinkoRewards`/`weaponOwnership` tests before changing token pacing, odds, or fusion semantics.

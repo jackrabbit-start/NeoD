@@ -81,3 +81,9 @@
 
 - Updated `docs/wiki/map-traversal-obstacles.md` to record the follow-up direction: no blocking obstacles, top-right minimap, and intermittent health-only heart pickups.
 - Preserved larger-map traversal rules while marking blocking obstacles as reversed unless a later plan reopens terrain blockers.
+
+## [2026-04-25] gameplay | Captured pachinko token reward loop
+
+- Added `docs/wiki/pachinko-token-rewards.md` to preserve the token pickup → right-side physics pachinko → random weapon/star → manual same-star fusion loop.
+- Updated `docs/index.md` so future agents can find the pachinko reward guidance.
+- Source artifacts: `.omx/specs/deep-interview-pachinko-token-weapons.md`, `.omx/interviews/pachinko-token-weapons-20260425T122020Z.md`, `.omx/context/post-interview-pachinko-token-rewards-20260425T143344Z.md`, PR #42, and PR #46.
