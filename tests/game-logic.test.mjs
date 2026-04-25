@@ -14,6 +14,7 @@ import { VECTOR_ASSETS } from '../.tmp-test/src/game/visualManifest.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
+import { createInitialArenaRunState } from '../.tmp-test/src/systems/runState.js'
 import {
   describeAvailableRecipes,
   describeInventoryEntries,
@@ -136,6 +137,42 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
 test('inventory presenter mirrors the arena summary strings', () => {
   assert.deepEqual(describeInventoryEntries({}), ['아직 획득한 드롭이 없습니다.'])
   assert.deepEqual(describeInventoryEntries({ 'gel-shard': 2 }), ['젤 파편 × 2'])
+})
+
+test('new arena runs start from the clean baseline state', () => {
+  const state = createInitialArenaRunState()
+
+  assert.deepEqual(state.inventory, {})
+  assert.deepEqual(state.ownedWeaponIds, ['starter-blaster'])
+  assert.equal(state.activeWeaponId, 'starter-blaster')
+  assert.deepEqual(state.tuningState, {})
+  assert.equal(state.isInventoryOpen, false)
+  assert.equal(state.isCodexOpen, false)
+  assert.equal(state.isRunEnding, false)
+  assert.equal(state.playerHealth, 100)
+  assert.equal(state.playerMaxHealth, 100)
+  assert.equal(state.playerSpeed, 220)
+  assert.equal(state.nextFireAt, 0)
+  assert.equal(state.remainingSpawns, 0)
+  assert.equal(state.currentWaveIndex, 0)
+  assert.equal(state.activeWaveLabel, '')
+  assert.equal(state.wavesCleared, 0)
+  assert.equal(state.isBossActive, false)
+  assert.equal(state.lastPlayerHitAt, 0)
+  assert.equal(state.nextEnemyRuntimeId, 1)
+})
+
+test('new arena run state does not reuse mutable containers', () => {
+  const first = createInitialArenaRunState()
+  first.inventory['gel-shard'] = 2
+  first.ownedWeaponIds.push('acid-sprayer')
+  first.tuningState['acid-sprayer'] = 'sharpened-core'
+
+  const second = createInitialArenaRunState()
+
+  assert.deepEqual(second.inventory, {})
+  assert.deepEqual(second.ownedWeaponIds, ['starter-blaster'])
+  assert.deepEqual(second.tuningState, {})
 })
 
 test('recipe presenter mirrors the actionable combine summary strings', () => {
