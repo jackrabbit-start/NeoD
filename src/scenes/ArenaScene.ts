@@ -10,7 +10,6 @@ import type {
 } from '../domain/types.js'
 import {
   ENEMY_CONTACT_PADDING,
-  PACHINKO_RECT,
   PLAYER_COLLISION_RADIUS,
   PROJECTILE_HIT_PADDING,
   type RectBounds,
@@ -78,10 +77,14 @@ import {
 } from '../systems/playerDash.js'
 import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import {
+  PACHINKO_SLOT_COUNT,
   applyEnemyPachinkoTokenProgress,
+  buildPachinkoSlotRewards,
+  canLaunchPachinkoToken,
   getPachinkoRewardLevel,
   getTokenXpForEnemy,
-  resolvePachinkoLandingReward,
+  resolvePachinkoSlotIndex,
+  resolvePachinkoSlotReward,
   shouldEnemyGrantPachinkoToken,
 } from '../systems/pachinkoRewards.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
@@ -192,7 +195,10 @@ interface EnemyEntity {
 }
 
 interface PachinkoTokenEntity {
+  runtimeId: number
   sprite: PhysicsImage
+  collider?: Phaser.Physics.Arcade.Collider
+  isResolving: boolean
 }
 
 interface PachinkoTokenPickupEntity {
@@ -212,6 +218,19 @@ interface PachinkoPinEntity {
 interface PachinkoLaneDividerEntity {
   visual: Phaser.GameObjects.Rectangle
   xRatio: number
+}
+
+interface PachinkoSlotVisualEntity {
+  frame: Phaser.GameObjects.Rectangle
+  icon: Phaser.GameObjects.Image
+  weaponLabel: Phaser.GameObjects.Text
+  starLabel: Phaser.GameObjects.Text
+}
+
+interface PachinkoLightEntity {
+  visual: Phaser.GameObjects.Arc
+  xRatio: number
+  yRatio: number
 }
 
 interface HealthPickupEntity {
@@ -256,6 +275,10 @@ interface HazardZoneEntity {
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
 const PACHINKO_TOKEN_COLOR = 0xffd866
+const PACHINKO_SLOT_VISUAL_HEIGHT = 48
+const PACHINKO_QUEUE_BADGE_WIDTH = 54
+const PACHINKO_QUEUE_BADGE_HEIGHT = 38
+const PACHINKO_QUEUE_BADGE_Y_OFFSET = 56
 
 interface ArenaSceneStartData {
   startWaveIndex?: number
@@ -352,7 +375,11 @@ export class ArenaScene extends Phaser.Scene {
 
   private pachinkoTokenQueue: number[] = []
 
-  private pachinkoTokenInFlight: PachinkoTokenEntity | null = null
+  private activePachinkoTokens: PachinkoTokenEntity[] = []
+
+  private nextPachinkoTokenRuntimeId = 1
+
+  private lastPachinkoTokenLaunchAt = 0
 
   private latestPachinkoReward: string | null = null
 
@@ -369,6 +396,20 @@ export class ArenaScene extends Phaser.Scene {
   private pachinkoPinEntities: PachinkoPinEntity[] = []
 
   private pachinkoLaneDividers: PachinkoLaneDividerEntity[] = []
+
+  private pachinkoSlotVisuals: PachinkoSlotVisualEntity[] = []
+
+  private pachinkoLights: PachinkoLightEntity[] = []
+
+  private pachinkoQueueBadge?: Phaser.GameObjects.Rectangle
+
+  private pachinkoQueueLabel?: Phaser.GameObjects.Text
+
+  private pachinkoLevelBadge?: Phaser.GameObjects.Text
+
+  private pachinkoTopTrimVisual?: Phaser.GameObjects.Rectangle
+
+  private pachinkoBottomGlowVisual?: Phaser.GameObjects.Rectangle
 
   private pachinkoBoardRect: RectBounds | null = null
 
@@ -2097,7 +2138,9 @@ export class ArenaScene extends Phaser.Scene {
     this.healthPickups = []
     this.pachinkoTokenPickups = []
     this.pachinkoTokenQueue = []
-    this.pachinkoTokenInFlight = null
+    this.activePachinkoTokens = []
+    this.nextPachinkoTokenRuntimeId = 1
+    this.lastPachinkoTokenLaunchAt = 0
     this.projectiles = []
     this.enemyProjectiles = []
     this.hazardZones = []
@@ -2169,8 +2212,9 @@ export class ArenaScene extends Phaser.Scene {
         level: getPachinkoRewardLevel(this.pachinkoTokenXp),
         totalTokenXp: this.pachinkoTokenXp,
         droppedTokens: this.getActivePachinkoTokenPickupCount(),
+        activeTokens: this.activePachinkoTokens.length,
         queuedTokens: this.pachinkoTokenQueue.length,
-        isTokenInFlight: Boolean(this.pachinkoTokenInFlight),
+        isTokenInFlight: this.activePachinkoTokens.length > 0,
         latestReward: this.latestPachinkoReward,
       },
       modal: {
@@ -2276,7 +2320,8 @@ export class ArenaScene extends Phaser.Scene {
     this.pachinkoTokenXp = nextProgress.totalTokenXp
     this.pachinkoTokenQueue = nextProgress.queuedTokenXp
     this.statusMessage = `파친코 토큰 획득: +${nextProgress.grantedTokenXp} XP · 보상 Lv.${nextProgress.rewardLevel}`
-    this.launchNextPachinkoToken()
+    this.syncPachinkoBoard()
+    this.launchAvailablePachinkoTokens()
   }
 
   private updatePachinko(): void {
@@ -2285,35 +2330,57 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     const rect = this.syncPachinkoBoard()
-    this.launchNextPachinkoToken()
+    this.launchAvailablePachinkoTokens()
 
-    const token = this.pachinkoTokenInFlight
-    if (!token?.sprite.active) {
-      return
+    for (const token of [...this.activePachinkoTokens]) {
+      if (!token.sprite.active) {
+        this.destroyActivePachinkoToken(token)
+        continue
+      }
+
+      if (token.sprite.x < rect.x + 8) {
+        token.sprite.setX(rect.x + 8)
+        token.sprite.setVelocityX(Math.abs(token.sprite.body?.velocity.x ?? 80))
+      } else if (token.sprite.x > rect.x + rect.width - 8) {
+        token.sprite.setX(rect.x + rect.width - 8)
+        token.sprite.setVelocityX(-Math.abs(token.sprite.body?.velocity.x ?? 80))
+      }
+
+      if (token.sprite.y >= rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT - 8) {
+        this.resolvePachinkoToken(token)
+      }
     }
 
-    if (token.sprite.x < rect.x + 8) {
-      token.sprite.setX(rect.x + 8)
-      token.sprite.setVelocityX(Math.abs(token.sprite.body?.velocity.x ?? 80))
-    } else if (token.sprite.x > rect.x + rect.width - 8) {
-      token.sprite.setX(rect.x + rect.width - 8)
-      token.sprite.setVelocityX(-Math.abs(token.sprite.body?.velocity.x ?? 80))
-    }
+    this.launchAvailablePachinkoTokens()
+  }
 
-    if (token.sprite.y >= rect.y + rect.height - 18) {
-      this.resolvePachinkoToken(token)
+  private launchAvailablePachinkoTokens(): void {
+    while (canLaunchPachinkoToken({
+      activeTokenCount: this.activePachinkoTokens.length,
+      queuedTokenCount: this.pachinkoTokenQueue.length,
+      now: this.time.now,
+      lastLaunchAt: this.lastPachinkoTokenLaunchAt,
+    }) && this.launchNextPachinkoToken()) {
+      // Keep filling until the cap, queue, or launch cadence stops this frame.
     }
   }
 
-  private launchNextPachinkoToken(): void {
-    if (this.pachinkoTokenInFlight || this.pachinkoTokenQueue.length === 0 || this.isInteractionBlocked()) {
-      return
+  private launchNextPachinkoToken(): boolean {
+    if (this.isInteractionBlocked() || !canLaunchPachinkoToken({
+      activeTokenCount: this.activePachinkoTokens.length,
+      queuedTokenCount: this.pachinkoTokenQueue.length,
+      now: this.time.now,
+      lastLaunchAt: this.lastPachinkoTokenLaunchAt,
+    })) {
+      return false
     }
 
     this.pachinkoTokenQueue.shift()
     const rect = this.syncPachinkoBoard()
+    const spawnOffset = this.activePachinkoTokens.length % PACHINKO_SLOT_COUNT
+    const spawnRatio = (spawnOffset + 0.5) / PACHINKO_SLOT_COUNT
     const sprite = this.physics.add.image(
-      rect.x + rect.width / 2,
+      rect.x + rect.width * spawnRatio,
       rect.y + 12,
       'tuning-capsule',
     )
@@ -2324,29 +2391,49 @@ export class ArenaScene extends Phaser.Scene {
     sprite.setBounce(0.68, 0.52)
     sprite.setVelocity(Phaser.Math.Between(-80, 80), 0)
     sprite.setGravityY(360)
-    if (this.pachinkoPins) {
-      this.physics.add.collider(sprite, this.pachinkoPins)
+    const token: PachinkoTokenEntity = {
+      runtimeId: this.nextPachinkoTokenRuntimeId,
+      sprite,
+      isResolving: false,
     }
-    this.pachinkoTokenInFlight = { sprite }
+    this.nextPachinkoTokenRuntimeId += 1
+    if (this.pachinkoPins) {
+      token.collider = this.physics.add.collider(sprite, this.pachinkoPins)
+    }
+    this.activePachinkoTokens.push(token)
+    this.lastPachinkoTokenLaunchAt = this.time.now
+    return true
   }
 
   private resolvePachinkoToken(token: PachinkoTokenEntity): void {
+    if (token.isResolving) {
+      return
+    }
+    token.isResolving = true
     const rect = this.syncPachinkoBoard()
     const laneRatio = Phaser.Math.Clamp((token.sprite.x - rect.x) / rect.width, 0, 0.999)
-    const reward = resolvePachinkoLandingReward(this.pachinkoTokenXp, laneRatio)
+    const slotIndex = resolvePachinkoSlotIndex(laneRatio)
+    const reward = resolvePachinkoSlotReward(this.pachinkoTokenXp, laneRatio)
     this.weaponStacks = addWeaponStack(this.weaponStacks, reward.weaponId, reward.star, 1)
     const rewardLabel = `${WEAPON_DEFINITIONS[reward.weaponId].name} ${'★'.repeat(reward.star)}`
     this.latestPachinkoReward = rewardLabel
-    this.statusMessage = `파친코 보상 획득: ${rewardLabel}`
-    token.sprite.destroy()
-    this.pachinkoTokenInFlight = null
-    this.launchNextPachinkoToken()
+    this.statusMessage = `파친코 ${slotIndex + 1}번 칸 보상 획득: ${rewardLabel}`
+    this.destroyActivePachinkoToken(token)
+    this.launchAvailablePachinkoTokens()
+  }
+
+  private destroyActivePachinkoToken(token: PachinkoTokenEntity): void {
+    token.collider?.destroy()
+    if (token.sprite.active) {
+      token.sprite.destroy()
+    }
+    this.activePachinkoTokens = this.activePachinkoTokens.filter((candidate) => candidate.runtimeId !== token.runtimeId)
   }
 
   private getPachinkoWorldRect(): RectBounds {
     const viewport = this.getViewportSize()
     const camera = this.cameras.main
-    const width = Math.min(PACHINKO_RECT.width, Math.max(156, viewport.width - 32))
+    const width = Math.min(260, Math.max(156, viewport.width - 32))
     const rightMargin = 20
     const bottomMargin = 24
     const minimapClearanceY = 132
@@ -2362,11 +2449,22 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+
+  private getPachinkoQueueBadgeX(rect: RectBounds): number {
+    const leftmostVisibleCenter = this.cameras.main.worldView.x + PACHINKO_QUEUE_BADGE_WIDTH / 2 + 2
+    const preferredOutsideX = rect.x - PACHINKO_QUEUE_BADGE_WIDTH / 2 - 11
+    const fallbackInsideX = rect.x + PACHINKO_QUEUE_BADGE_WIDTH / 2 + 2
+    return Math.min(fallbackInsideX, Math.max(leftmostVisibleCenter, preferredOutsideX))
+  }
+
   private syncPachinkoBoard(): RectBounds {
     const rect = this.getPachinkoWorldRect()
     const previousRect = this.pachinkoBoardRect
-    const inFlightSprite = this.pachinkoTokenInFlight?.sprite
-    if (previousRect && inFlightSprite?.active) {
+    for (const token of this.activePachinkoTokens) {
+      const inFlightSprite = token.sprite
+      if (!previousRect || !inFlightSprite.active) {
+        continue
+      }
       const xRatio = previousRect.width > 0
         ? Phaser.Math.Clamp((inFlightSprite.x - previousRect.x) / previousRect.width, 0, 1)
         : 0.5
@@ -2385,6 +2483,29 @@ export class ArenaScene extends Phaser.Scene {
       .setDisplaySize(6, rect.height + 26)
 
     this.pachinkoTitleVisual?.setPosition(rect.x + 12, rect.y + 10)
+    this.pachinkoTopTrimVisual
+      ?.setPosition(rect.x + rect.width / 2, rect.y + 36)
+      .setDisplaySize(rect.width - 18, 5)
+    this.pachinkoBottomGlowVisual
+      ?.setPosition(rect.x + rect.width / 2, rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT - 4)
+      .setDisplaySize(rect.width - 16, 4)
+    this.pachinkoLevelBadge
+      ?.setPosition(rect.x + rect.width - 12, rect.y + 14)
+      .setText(`Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`)
+    const queueBadgeX = this.getPachinkoQueueBadgeX(rect)
+    this.pachinkoQueueBadge
+      ?.setPosition(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET)
+      .setDisplaySize(PACHINKO_QUEUE_BADGE_WIDTH, PACHINKO_QUEUE_BADGE_HEIGHT)
+    this.pachinkoQueueLabel
+      ?.setPosition(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET)
+      .setText(`대기\n${this.pachinkoTokenQueue.length}`)
+
+    for (const light of this.pachinkoLights) {
+      if (!light.visual.active) {
+        continue
+      }
+      light.visual.setPosition(rect.x + rect.width * light.xRatio, rect.y + rect.height * light.yRatio)
+    }
 
     for (const pin of this.pachinkoPinEntities) {
       if (!pin.sprite.active) {
@@ -2398,8 +2519,10 @@ export class ArenaScene extends Phaser.Scene {
       if (!divider.visual.active) {
         continue
       }
-      divider.visual.setPosition(rect.x + rect.width * divider.xRatio, rect.y + rect.height - 30)
+      divider.visual.setPosition(rect.x + rect.width * divider.xRatio, rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2)
     }
+
+    this.syncPachinkoSlotVisuals(rect)
 
     return rect
   }
@@ -2420,6 +2543,10 @@ export class ArenaScene extends Phaser.Scene {
     const divider = this.add.rectangle(rect.x - 12, rect.y + rect.height / 2, 6, rect.height + 26, 0x050b14, 0.95)
       .setStrokeStyle(1, 0x9bb5ff, 0.4)
       .setDepth(57)
+    const topTrim = this.add.rectangle(rect.x + rect.width / 2, rect.y + 36, rect.width - 18, 5, 0xffd866, 0.65)
+      .setDepth(61)
+    const bottomGlow = this.add.rectangle(rect.x + rect.width / 2, rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT - 4, rect.width - 16, 4, 0x8fe4ff, 0.44)
+      .setDepth(61)
     const title = this.add.text(rect.x + 12, rect.y + 10, 'TOKEN\nPACHINKO', {
       color: '#ffd866',
       fontFamily: 'Inter, system-ui, sans-serif',
@@ -2427,10 +2554,42 @@ export class ArenaScene extends Phaser.Scene {
       fontStyle: '700',
       align: 'left',
     }).setDepth(63)
+    const levelBadge = this.add.text(rect.x + rect.width - 12, rect.y + 14, `Lv.${getPachinkoRewardLevel(this.pachinkoTokenXp)}`, {
+      color: '#101a32',
+      backgroundColor: '#ffd866',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: '11px',
+      fontStyle: '900',
+      padding: { x: 5, y: 2 },
+    }).setOrigin(1, 0).setDepth(64)
+    const queueBadgeX = this.getPachinkoQueueBadgeX(rect)
+    const queueBadge = this.add.rectangle(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET, PACHINKO_QUEUE_BADGE_WIDTH, PACHINKO_QUEUE_BADGE_HEIGHT, 0x101a32, 0.95)
+      .setStrokeStyle(1, 0xffd866, 0.8)
+      .setDepth(64)
+    const queueLabel = this.add.text(queueBadgeX, rect.y + PACHINKO_QUEUE_BADGE_Y_OFFSET, `대기\n${this.pachinkoTokenQueue.length}`, {
+      color: '#ffd866',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: '10px',
+      fontStyle: '800',
+      align: 'center',
+    }).setOrigin(0.5).setDepth(65)
     this.pachinkoBoardVisual = board
     this.pachinkoDividerVisual = divider
     this.pachinkoTitleVisual = title
-    this.pachinkoVisuals.push(board, divider, title)
+    this.pachinkoTopTrimVisual = topTrim
+    this.pachinkoBottomGlowVisual = bottomGlow
+    this.pachinkoLevelBadge = levelBadge
+    this.pachinkoQueueBadge = queueBadge
+    this.pachinkoQueueLabel = queueLabel
+    this.pachinkoVisuals.push(board, divider, topTrim, bottomGlow, title, levelBadge, queueBadge, queueLabel)
+
+    for (let lightIndex = 0; lightIndex < 8; lightIndex += 1) {
+      const xRatio = (lightIndex + 0.5) / 8
+      const light = this.add.circle(rect.x + rect.width * xRatio, rect.y + 50, 3.4, lightIndex % 2 === 0 ? 0xffd866 : 0x8fe4ff, 0.82)
+        .setDepth(62)
+      this.pachinkoLights.push({ visual: light, xRatio, yRatio: 0.1 })
+      this.pachinkoVisuals.push(light)
+    }
 
     this.pachinkoPins = this.physics.add.staticGroup()
     for (let row = 0; row < 6; row += 1) {
@@ -2450,24 +2609,89 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
 
-    for (let lane = 1; lane < 5; lane += 1) {
-      const xRatio = lane / 5
-      const laneDivider = this.add.rectangle(rect.x + rect.width * xRatio, rect.y + rect.height - 30, 2, 42, 0x9bb5ff, 0.55)
+    for (let lane = 1; lane < PACHINKO_SLOT_COUNT; lane += 1) {
+      const xRatio = lane / PACHINKO_SLOT_COUNT
+      const laneDivider = this.add.rectangle(rect.x + rect.width * xRatio, rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2, 1, PACHINKO_SLOT_VISUAL_HEIGHT - 6, 0x9bb5ff, 0.55)
         .setDepth(59)
       this.pachinkoLaneDividers.push({ visual: laneDivider, xRatio })
       this.pachinkoVisuals.push(laneDivider)
     }
+    this.createPachinkoSlotVisuals(rect)
     this.syncPachinkoBoard()
   }
 
+  private createPachinkoSlotVisuals(rect: RectBounds): void {
+    for (const reward of buildPachinkoSlotRewards(this.pachinkoTokenXp)) {
+      const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
+      const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
+      const frame = this.add.rectangle(centerX, centerY, rect.width / reward.slotCount - 3, PACHINKO_SLOT_VISUAL_HEIGHT - 8, 0x07111f, 0.96)
+        .setStrokeStyle(1, WEAPON_DEFINITIONS[reward.weaponId].visual.accentColor, 0.82)
+        .setDepth(61)
+      const icon = this.add.image(centerX, centerY - 7, reward.iconKey)
+        .setDepth(62)
+        .setDisplaySize(15, 15)
+      const weaponLabel = this.add.text(centerX, centerY + 7, `${reward.slotIndex + 1}`, {
+        color: '#dbeafe',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '8px',
+        fontStyle: '800',
+      }).setOrigin(0.5).setDepth(63)
+      const starLabel = this.add.text(centerX, centerY + 18, '★'.repeat(reward.star), {
+        color: '#ffd866',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: reward.star >= 4 ? '7px' : '8px',
+        fontStyle: '900',
+      }).setOrigin(0.5).setDepth(63)
+      this.pachinkoSlotVisuals.push({
+        frame,
+        icon,
+        weaponLabel,
+        starLabel,
+      })
+      this.pachinkoVisuals.push(frame, icon, weaponLabel, starLabel)
+    }
+  }
+
+  private syncPachinkoSlotVisuals(rect: RectBounds): void {
+    const rewards = buildPachinkoSlotRewards(this.pachinkoTokenXp)
+    for (let index = 0; index < this.pachinkoSlotVisuals.length; index += 1) {
+      const visual = this.pachinkoSlotVisuals[index]
+      const reward = rewards[index]
+      if (!visual || !reward) {
+        continue
+      }
+
+      const centerX = rect.x + rect.width * ((reward.slotIndex + 0.5) / reward.slotCount)
+      const centerY = rect.y + rect.height - PACHINKO_SLOT_VISUAL_HEIGHT / 2
+      const slotWidth = rect.width / reward.slotCount - 3
+      visual.frame
+        .setPosition(centerX, centerY)
+        .setDisplaySize(slotWidth, PACHINKO_SLOT_VISUAL_HEIGHT - 8)
+        .setStrokeStyle(1, WEAPON_DEFINITIONS[reward.weaponId].visual.accentColor, 0.82)
+      visual.icon
+        .setTexture(reward.iconKey)
+        .setPosition(centerX, centerY - 7)
+        .setDisplaySize(Math.min(16, slotWidth - 2), Math.min(16, slotWidth - 2))
+      visual.weaponLabel
+        .setPosition(centerX, centerY + 7)
+        .setText(`${reward.slotIndex + 1}`)
+      visual.starLabel
+        .setPosition(centerX, centerY + 18)
+        .setText('★'.repeat(reward.star))
+        .setFontSize(reward.star >= 4 ? 7 : 8)
+    }
+  }
+
   private destroyPachinkoBoard(): void {
-    if (this.pachinkoTokenInFlight?.sprite.active) {
-      this.pachinkoTokenInFlight.sprite.destroy()
+    for (const token of [...this.activePachinkoTokens]) {
+      this.destroyActivePachinkoToken(token)
     }
     this.pachinkoPins?.clear(true, true)
     this.pachinkoPins = undefined
     this.pachinkoPinEntities = []
     this.pachinkoLaneDividers = []
+    this.pachinkoSlotVisuals = []
+    this.pachinkoLights = []
     for (const visual of this.pachinkoVisuals) {
       if (visual.active) {
         visual.destroy()
@@ -2477,8 +2701,13 @@ export class ArenaScene extends Phaser.Scene {
     this.pachinkoBoardVisual = undefined
     this.pachinkoDividerVisual = undefined
     this.pachinkoTitleVisual = undefined
+    this.pachinkoLevelBadge = undefined
+    this.pachinkoTopTrimVisual = undefined
+    this.pachinkoBottomGlowVisual = undefined
+    this.pachinkoQueueBadge = undefined
+    this.pachinkoQueueLabel = undefined
     this.pachinkoBoardRect = null
-    this.pachinkoTokenInFlight = null
+    this.activePachinkoTokens = []
   }
 
 

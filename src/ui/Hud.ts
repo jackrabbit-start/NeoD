@@ -337,8 +337,8 @@ export class HudController {
           ${renderSummarySection('능력치', renderList(state.stats), 'hud-summary__section--stats')}
           ${state.pachinko ? renderSummarySection('파친코', renderList([
             `보상 레벨: Lv.${state.pachinko.level} · 누적 토큰 XP ${state.pachinko.totalTokenXp}`,
-            `바닥 토큰: ${state.pachinko.droppedTokens}개 · 토큰 큐: ${state.pachinko.queuedTokens}개`,
-            `${state.pachinko.isTokenInFlight ? '파친코 토큰 낙하 중' : '파친코 투입 대기 중'}`,
+            `바닥 토큰: ${state.pachinko.droppedTokens}개 · 투입 중: ${state.pachinko.activeTokens}개 · 대기: ${state.pachinko.queuedTokens}개`,
+            `${state.pachinko.isTokenInFlight ? '파친코 토큰 다중 낙하 중' : '파친코 투입 대기 중'}`,
             `최근 보상: ${state.pachinko.latestReward ?? '아직 없음'}`,
           ]), 'hud-summary__section--pachinko') : ''}
           <section class="hud-summary__section hud-summary__section--inventory">

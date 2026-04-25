@@ -66,6 +66,7 @@ hud.update({
     level: 1,
     totalTokenXp: 0,
     droppedTokens: 0,
+    activeTokens: 0,
     queuedTokens: 0,
     isTokenInFlight: false,
     latestReward: null,
