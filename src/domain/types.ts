@@ -118,6 +118,36 @@ export interface WeaponTurretDefinition {
   projectileDamage: number
 }
 
+export type WeaponElementKind =
+  | 'kinetic'
+  | 'acid'
+  | 'fire'
+  | 'ice'
+  | 'electric'
+  | 'blood'
+  | 'necro'
+  | 'code'
+  | 'explosive'
+
+export type WeaponStatusEffectKind = 'burn' | 'poison' | 'chill' | 'shock' | 'bleed'
+
+export interface WeaponStatusEffectDefinition {
+  kind: WeaponStatusEffectKind
+  label: string
+  durationMs: number
+  applicationChance?: number
+  tickEveryMs?: number
+  tickDamage?: number
+  speedMultiplier?: number
+}
+
+export interface WeaponAttributeDefinition {
+  element: WeaponElementKind
+  elementLabel: string
+  traitLabel: string
+  statusEffect?: WeaponStatusEffectDefinition
+}
+
 export interface WeaponSingleBehavior {
   kind: 'single'
   projectileLifetimeMs: number
@@ -278,6 +308,7 @@ export interface WeaponDefinition {
   description: string
   identityLabel?: string
   identityHint?: string
+  attribute?: WeaponAttributeDefinition
   range?: number
   damage: number
   fireRateMs: number
@@ -289,6 +320,7 @@ export interface WeaponDefinition {
   visual: WeaponVisualDefinition
   levelUpgradeLabel?: string
   levelUpgradeDescription?: string
+  projectileSizeMultiplier?: number
   visualPowerTier?: number
 }
 
@@ -495,6 +527,7 @@ export interface HudOwnedWeaponView {
   name: string
   description: string
   identityLabel: string
+  attributeLabel?: string
   summary: string
   star?: WeaponStar
   count?: number

@@ -1,5 +1,5 @@
 import type { WeaponId } from '../data/contentIds.js'
-import type { WeaponAttackBehavior, WeaponDefinition } from '../domain/types.js'
+import type { WeaponAttackBehavior, WeaponAttributeDefinition, WeaponDefinition } from '../domain/types.js'
 import { getPachinkoWeaponFamily, type PachinkoWeaponFamily } from './pachinkoRewards.js'
 
 interface PassiveEffects {
@@ -7,6 +7,7 @@ interface PassiveEffects {
   fireRateMultiplier?: number
   projectileSpeedMultiplier?: number
   projectileLifetimeMultiplier?: number
+  projectileSizeMultiplier?: number
   rangeDelta?: number
   knockbackForceMultiplier?: number
   hazardRadiusMultiplier?: number
@@ -19,6 +20,9 @@ interface PassiveEffects {
   ricochetBouncesDelta?: number
   ricochetRangeMultiplier?: number
   healOnHitDelta?: number
+  statusDurationMultiplier?: number
+  statusDamageMultiplier?: number
+  statusSlowMultiplier?: number
   critChanceDelta?: number
   critDamageMultiplierDelta?: number
   playerSpeedMultiplier?: number
@@ -749,6 +753,69 @@ const PASSIVE_CARD_TEMPLATES = [
       }
     },
   },
+  {
+    id: 'hitbox-bloom',
+    name: '히트박스 팽창',
+    description: '투사체 크기가 커져 맞히기 쉬워지고 범위형 무기도 존재감이 커집니다.',
+    kind: 'general',
+    preferredFamilies: ['starter', 'zone', 'heavy'],
+    weight: { base: 0.74, levelScale: 0.02, repeatPenalty: 0.36, familyBonus: 0.34 },
+    roll(level, random) {
+      const [sizeMin, sizeMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.02, 0.05, level, 0.003, 0.1)
+      const size = rollNumber(random, sizeMin, sizeMax, 2)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      return {
+        effects: {
+          projectileSizeMultiplier: 1 + size.value,
+          damageMultiplier: 1 + damage.value,
+        },
+        quality: averageQuality(size.quality, damage.quality),
+      }
+    },
+  },
+  {
+    id: 'status-overclock',
+    name: '상태 오버클럭',
+    description: '화상·중독·출혈 같은 속성 상태가 더 오래 남고 틱 피해도 강해집니다.',
+    kind: 'general',
+    preferredFamilies: ['zone', 'heavy', 'melee'],
+    weight: { base: 0.74, levelScale: 0.02, repeatPenalty: 0.38, familyBonus: 0.34 },
+    roll(level, random) {
+      const [durationMin, durationMax] = createLevelScaledPercentRange(0.1, 0.18, level, 0.006, 0.28)
+      const [damageMin, damageMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.24)
+      const duration = rollNumber(random, durationMin, durationMax, 2)
+      const damage = rollNumber(random, damageMin, damageMax, 2)
+      return {
+        effects: {
+          statusDurationMultiplier: 1 + duration.value,
+          statusDamageMultiplier: 1 + damage.value,
+        },
+        quality: averageQuality(duration.quality, damage.quality),
+      }
+    },
+  },
+  {
+    id: 'cold-logic',
+    name: '냉각 로직',
+    description: '빙결·감전 계열 둔화가 더 오래, 더 강하게 붙습니다.',
+    kind: 'general',
+    preferredFamilies: ['precision', 'rapid', 'zone'],
+    weight: { base: 0.68, levelScale: 0.02, repeatPenalty: 0.4, familyBonus: 0.32 },
+    roll(level, random) {
+      const [durationMin, durationMax] = createLevelScaledPercentRange(0.08, 0.16, level, 0.006, 0.26)
+      const [slowMin, slowMax] = createLevelScaledPercentRange(0.08, 0.18, level, 0.006, 0.28)
+      const duration = rollNumber(random, durationMin, durationMax, 2)
+      const slow = rollNumber(random, slowMin, slowMax, 2)
+      return {
+        effects: {
+          statusDurationMultiplier: 1 + duration.value,
+          statusSlowMultiplier: 1 + slow.value,
+        },
+        quality: averageQuality(duration.quality, slow.quality),
+      }
+    },
+  },
 ] as const satisfies ReadonlyArray<PassiveCardTemplate>
 
 const WEAPON_SPECIALIZATION_TEMPLATES = [
@@ -992,6 +1059,7 @@ export interface PassiveTotals {
   fireRateMultiplier: number
   projectileSpeedMultiplier: number
   projectileLifetimeMultiplier: number
+  projectileSizeMultiplier: number
   rangeDelta: number
   knockbackForceMultiplier: number
   hazardRadiusMultiplier: number
@@ -1004,6 +1072,9 @@ export interface PassiveTotals {
   ricochetBouncesDelta: number
   ricochetRangeMultiplier: number
   healOnHitDelta: number
+  statusDurationMultiplier: number
+  statusDamageMultiplier: number
+  statusSlowMultiplier: number
   critChance: number
   critDamageMultiplier: number
   playerSpeedMultiplier: number
@@ -1075,6 +1146,9 @@ function formatEffectSummary(effects: PassiveEffects): string {
   if (effects.projectileLifetimeMultiplier !== undefined && effects.projectileLifetimeMultiplier > 1) {
     lines.push(`투사체 지속 +${roundPercent(effects.projectileLifetimeMultiplier - 1)}%`)
   }
+  if (effects.projectileSizeMultiplier !== undefined && effects.projectileSizeMultiplier > 1) {
+    lines.push(`투사체 크기 +${roundPercent(effects.projectileSizeMultiplier - 1)}%`)
+  }
   if (effects.rangeDelta) {
     lines.push(`범위 +${Math.round(effects.rangeDelta)}`)
   }
@@ -1113,6 +1187,15 @@ function formatEffectSummary(effects: PassiveEffects): string {
   }
   if (effects.healOnHitDelta) {
     lines.push(`흡혈 +${Math.round(effects.healOnHitDelta)}`)
+  }
+  if (effects.statusDurationMultiplier !== undefined && effects.statusDurationMultiplier > 1) {
+    lines.push(`상태시간 +${roundPercent(effects.statusDurationMultiplier - 1)}%`)
+  }
+  if (effects.statusDamageMultiplier !== undefined && effects.statusDamageMultiplier > 1) {
+    lines.push(`지속피해 +${roundPercent(effects.statusDamageMultiplier - 1)}%`)
+  }
+  if (effects.statusSlowMultiplier !== undefined && effects.statusSlowMultiplier > 1) {
+    lines.push(`둔화강도 +${roundPercent(effects.statusSlowMultiplier - 1)}%`)
   }
   if (effects.playerSpeedMultiplier !== undefined && effects.playerSpeedMultiplier > 1) {
     lines.push(`이동속도 +${roundPercent(effects.playerSpeedMultiplier - 1)}%`)
@@ -1326,6 +1409,7 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     fireRateMultiplier: 1,
     projectileSpeedMultiplier: 1,
     projectileLifetimeMultiplier: 1,
+    projectileSizeMultiplier: 1,
     rangeDelta: 0,
     knockbackForceMultiplier: 1,
     hazardRadiusMultiplier: 1,
@@ -1338,6 +1422,9 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     ricochetBouncesDelta: 0,
     ricochetRangeMultiplier: 1,
     healOnHitDelta: 0,
+    statusDurationMultiplier: 1,
+    statusDamageMultiplier: 1,
+    statusSlowMultiplier: 1,
     critChance: 0,
     critDamageMultiplier: BASE_CRIT_DAMAGE_MULTIPLIER,
     playerSpeedMultiplier: 1,
@@ -1364,6 +1451,7 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     totals.fireRateMultiplier *= effects.fireRateMultiplier ?? 1
     totals.projectileSpeedMultiplier *= effects.projectileSpeedMultiplier ?? 1
     totals.projectileLifetimeMultiplier *= effects.projectileLifetimeMultiplier ?? 1
+    totals.projectileSizeMultiplier *= effects.projectileSizeMultiplier ?? 1
     totals.rangeDelta += effects.rangeDelta ?? 0
     totals.knockbackForceMultiplier *= effects.knockbackForceMultiplier ?? 1
     totals.hazardRadiusMultiplier *= effects.hazardRadiusMultiplier ?? 1
@@ -1376,6 +1464,9 @@ export function getPassiveTotals(state: PassiveState = {}): PassiveTotals {
     totals.ricochetBouncesDelta += effects.ricochetBouncesDelta ?? 0
     totals.ricochetRangeMultiplier *= effects.ricochetRangeMultiplier ?? 1
     totals.healOnHitDelta += effects.healOnHitDelta ?? 0
+    totals.statusDurationMultiplier *= effects.statusDurationMultiplier ?? 1
+    totals.statusDamageMultiplier *= effects.statusDamageMultiplier ?? 1
+    totals.statusSlowMultiplier *= effects.statusSlowMultiplier ?? 1
     totals.critChance += effects.critChanceDelta ?? 0
     totals.critDamageMultiplier += effects.critDamageMultiplierDelta ?? 0
     totals.playerSpeedMultiplier *= effects.playerSpeedMultiplier ?? 1
@@ -1516,20 +1607,46 @@ export function applyPassiveWeaponEffects(
 ): WeaponDefinition {
   const totals = getPassiveTotals(state)
   const attackBehavior = applyAttackBehaviorPassives(weapon.attackBehavior, totals)
+  const attribute = applyAttributePassives(weapon.attribute, totals)
 
   return {
     ...weapon,
+    attribute,
     range: typeof weapon.range === 'number'
       ? Math.max(1, Math.round(weapon.range + totals.rangeDelta))
       : weapon.range,
     damage: Math.max(1, Math.round(weapon.damage * totals.damageMultiplier)),
     fireRateMs: Math.max(65, Math.round(weapon.fireRateMs * totals.fireRateMultiplier)),
     projectileSpeed: Math.max(0, Math.round(weapon.projectileSpeed * totals.projectileSpeedMultiplier)),
+    projectileSizeMultiplier: (weapon.projectileSizeMultiplier ?? 1) * totals.projectileSizeMultiplier,
     knockback: {
       ...weapon.knockback,
       force: Math.round(weapon.knockback.force * totals.knockbackForceMultiplier),
     },
     attackBehavior,
+  }
+}
+
+function applyAttributePassives(
+  attribute: WeaponAttributeDefinition | undefined,
+  totals: PassiveTotals,
+): WeaponAttributeDefinition | undefined {
+  if (!attribute?.statusEffect) {
+    return attribute
+  }
+
+  return {
+    ...attribute,
+    statusEffect: {
+      ...attribute.statusEffect,
+      durationMs: Math.max(200, Math.round(attribute.statusEffect.durationMs * totals.statusDurationMultiplier)),
+      tickDamage: attribute.statusEffect.tickDamage !== undefined
+        ? Math.max(1, Math.round(attribute.statusEffect.tickDamage * totals.statusDamageMultiplier))
+        : undefined,
+      speedMultiplier: attribute.statusEffect.speedMultiplier !== undefined
+        ? Math.max(0.2, 1 - (1 - attribute.statusEffect.speedMultiplier) * totals.statusSlowMultiplier)
+        : undefined,
+    },
   }
 }
 

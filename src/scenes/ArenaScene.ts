@@ -6,6 +6,7 @@ import type {
   HudCharacterStatView,
   HudOwnedWeaponView,
   RunEndReason,
+  WeaponAttributeDefinition,
   WeaponStack,
   WeaponStackKey,
 } from '../domain/types.js'
@@ -308,6 +309,7 @@ interface EnemyEntity {
   telegraph?: EnemyTelegraph
   spreadBurst?: EnemySpreadBurstCharge
   lineBeam?: EnemyLineBeamCharge
+  statusEffects: EnemyStatusEffectState[]
 }
 
 interface PachinkoTokenEntity {
@@ -394,6 +396,7 @@ interface ProjectileEntity {
   direction: ProjectileSpawnSpec['direction']
   maxTravelDistance: number
   knockback: ProjectileSpawnSpec['knockback']
+  attribute?: WeaponAttributeDefinition
   chain?: ChainSpec
   explosionOnHit?: HazardSpawnSpec
   explosionOnExpire?: HazardSpawnSpec
@@ -425,6 +428,7 @@ interface HazardZoneEntity {
   radius: number
   damage: number
   baseDamage: number
+  attribute?: WeaponAttributeDefinition
   mode: 'damage-zone' | 'trigger-trap'
   armingDelayMs: number
   remainingLifetimeMs: number
@@ -443,6 +447,7 @@ interface DeployedTurretEntity {
   y: number
   range: number
   damage: number
+  attribute?: WeaponAttributeDefinition
   projectileSpeed: number
   projectileLifetimeMs: number
   fireRateMs: number
@@ -456,11 +461,23 @@ interface AlliedMinionEntity {
   runtimeId: number
   sprite: PhysicsSprite
   damage: number
+  attribute?: WeaponAttributeDefinition
   speed: number
   remainingLifetimeMs: number
   attackIntervalMs: number
   attackCooldownMs: number
   contactRadius: number
+}
+
+interface EnemyStatusEffectState {
+  kind: NonNullable<WeaponAttributeDefinition['statusEffect']>['kind']
+  label: string
+  remainingMs: number
+  totalMs: number
+  tickEveryMs: number
+  tickCountdownMs: number
+  tickDamage: number
+  speedMultiplier: number
 }
 
 const MINI_MAP_SYNC_INTERVAL_MS = 100
@@ -1193,6 +1210,7 @@ export class ArenaScene extends Phaser.Scene {
         this.damageEnemy(enemy, auraDamage, {
           ignoreRecentHit: true,
           baseDamage: auraDamage,
+          attribute: weapon.attribute,
         })
         if (this.isRunEnding) {
           return
@@ -1224,6 +1242,7 @@ export class ArenaScene extends Phaser.Scene {
         this.damageEnemy(enemy, sweepDamage, {
           ignoreRecentHit: true,
           baseDamage: sweepDamage,
+          attribute: weapon.attribute,
         })
         this.playerHealth = Math.min(this.playerMaxHealth, this.playerHealth + 1)
         if (this.isRunEnding) {
@@ -1251,6 +1270,10 @@ export class ArenaScene extends Phaser.Scene {
   private updateEnemies(delta: number): void {
     for (const enemy of this.enemies) {
       if (!enemy.sprite.active) {
+        continue
+      }
+
+      if (!this.updateEnemyStatusEffects(enemy, delta)) {
         continue
       }
 
@@ -1503,7 +1526,7 @@ export class ArenaScene extends Phaser.Scene {
       const movementStep = resolveEnemyVelocityStep(
         { x: enemy.sprite.x, y: enemy.sprite.y },
         { x: this.player.x, y: this.player.y },
-        enemy.config.speed,
+        enemy.config.speed * this.getEnemyStatusSpeedMultiplier(enemy),
         enemy.config.movementBehavior,
         enemy.runtimeState,
         this.time.now,
@@ -1655,6 +1678,7 @@ export class ArenaScene extends Phaser.Scene {
         maxTravelDistance: turret.range,
         maxHits: 1,
         knockback: { force: 42, durationMs: 68 },
+        attribute: turret.attribute,
         visualPowerTier: turret.visualPowerTier,
       }, 'spark-projectile')
       turret.nextFireAt = time + turret.fireRateMs
@@ -1761,6 +1785,7 @@ export class ArenaScene extends Phaser.Scene {
           const didDamage = this.damageEnemy(enemy, damageProfile.damage, {
             canCrit: true,
             baseDamage: damageProfile.baseDamage,
+            attribute: projectile.attribute,
             summonOnKill: projectile.summonOnKill,
           })
           if (this.isRunEnding || this.isInteractionBlocked()) {
@@ -1772,7 +1797,7 @@ export class ArenaScene extends Phaser.Scene {
           }
 
           if (projectile.chain) {
-            this.applyChainDamage(enemy, projectile.chain, projectile.damage)
+            this.applyChainDamage(enemy, projectile.chain, projectile.damage, projectile.attribute)
           }
 
           if (projectile.explosionOnHit) {
@@ -2050,6 +2075,7 @@ export class ArenaScene extends Phaser.Scene {
       y,
       range: deploy.range,
       damage: deploy.projectileDamage,
+      attribute: deploy.attribute,
       projectileSpeed: deploy.projectileSpeed,
       projectileLifetimeMs: deploy.projectileLifetimeMs,
       fireRateMs: deploy.fireRateMs,
@@ -2567,6 +2593,7 @@ export class ArenaScene extends Phaser.Scene {
               tickEveryMs: 1,
               damage: hazard.damage,
               tint: hazard.tint,
+              attribute: hazard.attribute,
               mode: 'trigger-trap',
               visualPowerTier: hazard.visualPowerTier,
             })
@@ -2609,6 +2636,7 @@ export class ArenaScene extends Phaser.Scene {
             ignoreRecentHit: true,
             canCrit: true,
             baseDamage: hazard.baseDamage,
+            attribute: hazard.attribute,
           })
           spawnHazardTickEffect(this, {
             radius: hazard.radius,
@@ -2742,6 +2770,7 @@ export class ArenaScene extends Phaser.Scene {
       attackCooldownMs: 'cooldownMs' in config.attackBehavior
         ? Math.round(config.attackBehavior.cooldownMs * 0.35)
         : 0,
+      statusEffects: [],
     }
 
     this.nextEnemyRuntimeId += 1
@@ -2756,6 +2785,7 @@ export class ArenaScene extends Phaser.Scene {
       ignoreRecentHit?: boolean
       canCrit?: boolean
       baseDamage?: number
+      attribute?: WeaponAttributeDefinition
       summonOnKill?: ProjectileSpawnSpec['summonOnKill']
     },
   ): boolean {
@@ -2785,6 +2815,10 @@ export class ArenaScene extends Phaser.Scene {
     enemy.currentHealth -= criticalHit.damage
     this.syncEnemyHealthBar(enemy)
     this.showDamageFeedback(enemy.sprite.x, enemy.sprite.y, criticalHit.damage, criticalHit.isCritical)
+
+    if (enemy.currentHealth > 0 && options?.attribute) {
+      this.applyWeaponAttributeToEnemy(enemy, options.attribute)
+    }
 
     if (enemy.currentHealth > 0) {
       this.playEnemyHitMotion(enemy)
@@ -2843,6 +2877,86 @@ export class ArenaScene extends Phaser.Scene {
       this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
     }
     return true
+  }
+
+  private applyWeaponAttributeToEnemy(enemy: EnemyEntity, attribute: WeaponAttributeDefinition): void {
+    const status = attribute.statusEffect
+    if (!status) {
+      return
+    }
+
+    const applicationChance = Math.max(0, Math.min(1, status.applicationChance ?? 1))
+    if (applicationChance <= 0 || Math.random() > applicationChance) {
+      return
+    }
+
+    const existing = enemy.statusEffects.find((effect) => effect.kind === status.kind)
+    const nextEffect: EnemyStatusEffectState = {
+      kind: status.kind,
+      label: status.label,
+      remainingMs: status.durationMs,
+      totalMs: status.durationMs,
+      tickEveryMs: Math.max(1, status.tickEveryMs ?? status.durationMs),
+      tickCountdownMs: Math.max(1, status.tickEveryMs ?? status.durationMs),
+      tickDamage: Math.max(0, status.tickDamage ?? 0),
+      speedMultiplier: Math.max(0.2, Math.min(1, status.speedMultiplier ?? 1)),
+    }
+
+    if (existing) {
+      existing.remainingMs = Math.max(existing.remainingMs, nextEffect.remainingMs)
+      existing.totalMs = Math.max(existing.totalMs, nextEffect.totalMs)
+      existing.tickEveryMs = nextEffect.tickEveryMs
+      existing.tickCountdownMs = Math.min(existing.tickCountdownMs, nextEffect.tickEveryMs)
+      existing.tickDamage = Math.max(existing.tickDamage, nextEffect.tickDamage)
+      existing.speedMultiplier = Math.min(existing.speedMultiplier, nextEffect.speedMultiplier)
+      return
+    }
+
+    enemy.statusEffects.push(nextEffect)
+  }
+
+  private updateEnemyStatusEffects(enemy: EnemyEntity, delta: number): boolean {
+    if (!enemy.sprite.active || enemy.statusEffects.length === 0) {
+      return enemy.sprite.active
+    }
+
+    const activeEffects: EnemyStatusEffectState[] = []
+
+    for (const effect of enemy.statusEffects) {
+      effect.remainingMs -= delta
+      effect.tickCountdownMs -= delta
+
+      while (effect.tickDamage > 0 && effect.tickCountdownMs <= 0 && effect.remainingMs > 0 && enemy.sprite.active) {
+        const survived = this.damageEnemy(enemy, effect.tickDamage, {
+          ignoreRecentHit: true,
+          canCrit: false,
+          baseDamage: effect.tickDamage,
+        })
+        if (!survived || !enemy.sprite.active) {
+          enemy.statusEffects = []
+          return false
+        }
+        effect.tickCountdownMs += effect.tickEveryMs
+      }
+
+      if (effect.remainingMs > 0) {
+        activeEffects.push(effect)
+      }
+    }
+
+    enemy.statusEffects = activeEffects
+    return enemy.sprite.active
+  }
+
+  private getEnemyStatusSpeedMultiplier(enemy: EnemyEntity): number {
+    if (enemy.statusEffects.length === 0) {
+      return 1
+    }
+
+    return enemy.statusEffects.reduce(
+      (multiplier, effect) => Math.min(multiplier, effect.speedMultiplier),
+      1,
+    )
   }
 
   private getExecuteDamageMultiplier(
@@ -4019,6 +4133,9 @@ export class ArenaScene extends Phaser.Scene {
         name: ownedWeapon.name,
         description: getWeaponStarHopeDescription(ownedWeapon.description, stack.star),
         identityLabel: getWeaponIdentityLabel(effectiveWeapon),
+        attributeLabel: effectiveWeapon.attribute
+          ? `${effectiveWeapon.attribute.elementLabel} · ${effectiveWeapon.attribute.traitLabel}${effectiveWeapon.attribute.statusEffect ? ` · ${effectiveWeapon.attribute.statusEffect.label}` : ''}`
+          : undefined,
         summary: getWeaponSummary(effectiveWeapon),
         star: stack.star,
         count: stack.count,
@@ -4748,6 +4865,7 @@ export class ArenaScene extends Phaser.Scene {
       direction: projectileSpec.direction,
       maxTravelDistance: projectileSpec.maxTravelDistance,
       knockback: projectileSpec.knockback,
+      attribute: projectileSpec.attribute,
       chain: projectileSpec.chain,
       explosionOnHit: projectileSpec.explosionOnHit,
       explosionOnExpire: projectileSpec.explosionOnExpire,
@@ -4856,6 +4974,7 @@ export class ArenaScene extends Phaser.Scene {
       const didDamage = this.damageEnemy(enemy, swingDamage, {
         canCrit: true,
         baseDamage: swingDamage,
+        attribute: swing.attribute,
       })
       if (this.isRunEnding || this.isInteractionBlocked()) {
         return
@@ -4975,6 +5094,7 @@ export class ArenaScene extends Phaser.Scene {
       const didDamage = this.damageEnemy(enemy, impactBurst.damage, {
         ignoreRecentHit: true,
         baseDamage: impactBurst.baseDamage,
+        attribute: projectile.attribute,
       })
       if (this.isRunEnding || this.isInteractionBlocked()) {
         return
@@ -5037,6 +5157,7 @@ export class ArenaScene extends Phaser.Scene {
       radius: hazard.radius,
       damage: hazard.damage,
       baseDamage: hazard.damage,
+      attribute: hazard.attribute,
       mode: hazard.mode ?? 'damage-zone',
       armingDelayMs: Math.max(0, hazard.armingDelayMs ?? 0),
       remainingLifetimeMs: hazard.durationMs,
@@ -5071,7 +5192,11 @@ export class ArenaScene extends Phaser.Scene {
         continue
       }
 
-      this.damageEnemy(enemy, explosion.damage)
+      this.damageEnemy(enemy, explosion.damage, {
+        ignoreRecentHit: true,
+        baseDamage: explosion.damage,
+        attribute: explosion.attribute,
+      })
       if (this.isRunEnding) {
         return
       }
@@ -5082,6 +5207,7 @@ export class ArenaScene extends Phaser.Scene {
     primaryEnemy: EnemyEntity,
     chain: ChainSpec,
     baseDamage: number,
+    attribute?: WeaponAttributeDefinition,
   ): void {
     const nearbyTargetIds = selectChainTargets(
       {
@@ -5118,6 +5244,7 @@ export class ArenaScene extends Phaser.Scene {
       this.damageEnemy(target, chainBaseDamage, {
         canCrit: true,
         baseDamage: chainBaseDamage,
+        attribute,
       })
       if (this.isRunEnding || this.isInteractionBlocked()) {
         return

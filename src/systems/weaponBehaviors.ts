@@ -1,4 +1,5 @@
 import type {
+  WeaponAttributeDefinition,
   WeaponBoomerangDefinition,
   WeaponBurstFireBehavior,
   WeaponChainBehavior,
@@ -39,6 +40,7 @@ export interface HazardSpawnSpec {
   tickEveryMs: number
   damage: number
   tint: number
+  attribute?: WeaponAttributeDefinition
   mode?: 'damage-zone' | 'trigger-trap'
   armingDelayMs?: number
   visualPowerTier?: number
@@ -61,6 +63,7 @@ export interface ImpactBurstSpec {
 
 export interface TurretDeploySpec extends WeaponTurretDefinition {
   tint: number
+  attribute?: WeaponAttributeDefinition
   visualPowerTier?: number
 }
 
@@ -76,6 +79,7 @@ export interface ProjectileSpawnSpec {
   maxTravelDistance: number
   maxHits: number
   knockback: WeaponKnockbackDefinition
+  attribute?: WeaponAttributeDefinition
   chain?: ChainSpec
   explosionOnHit?: HazardSpawnSpec
   explosionOnExpire?: HazardSpawnSpec
@@ -104,6 +108,7 @@ export interface MeleeSwingSpec {
   visualDurationMs: number
   maxTargets: number
   knockback: WeaponKnockbackDefinition
+  attribute?: WeaponAttributeDefinition
   execute?: WeaponExecuteDefinition
   healOnHit?: number
   visualPowerTier?: number
@@ -228,6 +233,7 @@ const createHazardSpec = (
   tickEveryMs: behavior.kind === 'zone-control' ? behavior.zoneTickMs : behavior.hazardTickMs,
   damage: behavior.kind === 'zone-control' ? behavior.zoneDamage : behavior.hazardDamage,
   tint: weapon.projectileTint,
+  attribute: weapon.attribute,
   mode: behavior.kind === 'zone-control' && behavior.zoneTriggerMode === 'trigger-explode'
     ? 'trigger-trap'
     : 'damage-zone',
@@ -247,11 +253,15 @@ const createBaseProjectile = (
   speed: weapon.projectileSpeed,
   damage: weapon.damage,
   tint: weapon.projectileTint,
-  radius: BASE_PROJECTILE_RADIUS + Math.max(0, weapon.visualPowerTier ?? 0),
+  radius: Math.max(
+    2,
+    Math.round((BASE_PROJECTILE_RADIUS + Math.max(0, weapon.visualPowerTier ?? 0)) * (weapon.projectileSizeMultiplier ?? 1)),
+  ),
   lifetimeMs,
   maxTravelDistance: getWeaponAttackRange(weapon),
   maxHits: 1,
   knockback: weapon.knockback,
+  attribute: weapon.attribute,
   visualPowerTier: weapon.visualPowerTier,
   ...overrides,
 })
@@ -451,6 +461,7 @@ const createDeployTurretProjectile = (
     speed: Math.max(1, Math.round(weapon.projectileSpeed * (behavior.speedMultiplier ?? 1))),
     deployTurret: {
       ...behavior.deploy,
+      attribute: weapon.attribute,
       tint: weapon.projectileTint,
       visualPowerTier: weapon.visualPowerTier,
     },
@@ -471,6 +482,7 @@ const createMeleeSwing = (
   visualDurationMs: behavior.visualDurationMs,
   maxTargets: behavior.maxTargets,
   knockback: weapon.knockback,
+  attribute: weapon.attribute,
   execute: behavior.execute,
   healOnHit: behavior.healOnHit,
   visualPowerTier: weapon.visualPowerTier,
@@ -498,6 +510,7 @@ const createComboMeleeSwings = (
       force: Math.max(1, Math.round(weapon.knockback.force * (step.knockbackMultiplier ?? 1))),
       durationMs: Math.max(40, Math.round(weapon.knockback.durationMs * (step.knockbackMultiplier ?? 1))),
     },
+    attribute: weapon.attribute,
     execute: step.execute,
     healOnHit: step.healOnHit,
     visualPowerTier: weapon.visualPowerTier,
@@ -808,49 +821,52 @@ export function getWeaponSpecialEffectProfile(weapon: WeaponDefinition): WeaponS
 
 export function getWeaponSummary(weapon: WeaponDefinition): string {
   const range = getWeaponAttackRange(weapon)
+  const attributeSummary = weapon.attribute
+    ? ` · ${weapon.attribute.elementLabel} · ${weapon.attribute.traitLabel}${weapon.attribute.statusEffect ? ` · ${weapon.attribute.statusEffect.label}` : ''}`
+    : ''
 
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.ricochet) {
-    return `피해 ${weapon.damage} · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    return `피해 ${weapon.damage} · ${weapon.attackBehavior.ricochet.maxBounces}연쇄 튕김 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
   }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.summonOnKill) {
-    return `피해 ${weapon.damage} · 처치 시 아군화 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    return `피해 ${weapon.damage} · 처치 시 아군화 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
   }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.boomerang) {
-    return `피해 ${weapon.damage} · 귀환 재타격 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    return `피해 ${weapon.damage} · 귀환 재타격 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
   }
   if (weapon.attackBehavior.kind === 'single' && weapon.attackBehavior.distanceScaling) {
-    return `피해 ${weapon.damage} · 멀수록 증폭 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+    return `피해 ${weapon.damage} · 멀수록 증폭 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
   }
 
   switch (weapon.attackBehavior.kind) {
     case 'single':
-      return `피해 ${weapon.damage} · 단발 견제 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · 단발 견제 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'split-shot':
-      return `${weapon.attackBehavior.execute ? '마무리' : '갈래당'} ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.projectileCount}갈래 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `${weapon.attackBehavior.execute ? '마무리' : '갈래당'} ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.projectileCount}갈래 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'burst-fire':
-      return `탄당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.shotsPerBurst}박자 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `탄당 ${Math.max(1, Math.round(weapon.damage * (weapon.attackBehavior.damageMultiplier ?? 1)))} · ${weapon.attackBehavior.shotsPerBurst}박자 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'spray-hazard':
-      return `피해 ${weapon.damage} · ${weapon.attackBehavior.execute ? '빈사 처형' : '장판 압박'} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.execute ? '빈사 처형' : '장판 압박'} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'volley':
-      return `피해 ${weapon.damage} · ${weapon.attackBehavior.projectileCount}연발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.projectileCount}연발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'pierce':
-      return `피해 ${weapon.damage} · 관통 ${weapon.attackBehavior.maxHits}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · 관통 ${weapon.attackBehavior.maxHits}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'chain':
-      return `피해 ${weapon.damage} · 연쇄 ${weapon.attackBehavior.maxChains}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · 연쇄 ${weapon.attackBehavior.maxChains}회 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'impact-burst':
-      return `피해 ${weapon.damage} · 착탄 폭발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · 착탄 폭발 · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'impact-aoe':
-      return `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.explosionDamage} · 반경 ${weapon.attackBehavior.explosionRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.explosionDamage} · 반경 ${weapon.attackBehavior.explosionRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'zone-control':
       return weapon.attackBehavior.zoneTriggerMode === 'trigger-explode'
-        ? `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.zoneDamage} · 함정 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
-        : `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+        ? `직격 ${weapon.damage} · 폭발 ${weapon.attackBehavior.zoneDamage} · 함정 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
+        : `직격 ${weapon.damage} · 틱 ${weapon.attackBehavior.zoneDamage} · 지대 ${weapon.attackBehavior.zoneRadius} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'deploy-turret':
-      return `배치 ${weapon.attackBehavior.deploy.maxTurrets}기 · 포탑당 ${weapon.attackBehavior.deploy.projectileDamage} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `배치 ${weapon.attackBehavior.deploy.maxTurrets}기 · 포탑당 ${weapon.attackBehavior.deploy.projectileDamage} · 사거리 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'melee-cleave':
-      return `피해 ${weapon.damage} · ${weapon.attackBehavior.healOnHit ? `흡혈 ${weapon.attackBehavior.healOnHit}` : weapon.attackBehavior.execute ? '빈사 수확' : `전방 ${weapon.attackBehavior.arcDegrees}°`} · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `피해 ${weapon.damage} · ${weapon.attackBehavior.healOnHit ? `흡혈 ${weapon.attackBehavior.healOnHit}` : weapon.attackBehavior.execute ? '빈사 수확' : `전방 ${weapon.attackBehavior.arcDegrees}°`} · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     case 'combo-melee':
-      return `탄당 ${weapon.damage} · ${weapon.attackBehavior.steps.length}연 콤보 · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}`
+      return `탄당 ${weapon.damage} · ${weapon.attackBehavior.steps.length}연 콤보 · 범위 ${range} · ${getWeaponIdentityLabel(weapon)}${attributeSummary}`
     default:
       return assertNever(weapon.attackBehavior, 'Unhandled weapon attack behavior in getWeaponSummary')
   }
