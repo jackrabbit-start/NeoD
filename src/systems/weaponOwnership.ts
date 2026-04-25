@@ -68,6 +68,23 @@ export function formatWeaponStarLabel(star: WeaponStar | undefined): string {
   return `★×${star}`
 }
 
+export function getWeaponStarHopeDescription(description: string, star: WeaponStar | undefined): string {
+  const normalizedStar = Number.isInteger(star) ? Math.max(1, Math.floor(star ?? 1)) : 1
+  if (normalizedStar <= 1) {
+    return description
+  }
+
+  const hopefulLine = normalizedStar >= 5
+    ? '★5 이상: 김동성은 더는 잭팟을 기다리지 않고, 이 무기로 직접 길을 엽니다.'
+    : normalizedStar >= 4
+      ? '★4: 빚진 과거보다 내일을 더 크게 밀어붙일 힘이 생겼습니다.'
+      : normalizedStar >= 3
+        ? '★3: 실패담이 조금씩 생존기로 바뀌고, 버틸 이유가 선명해집니다.'
+        : '★2: 도망만 치던 손이 다음 수를 찾기 시작합니다.'
+
+  return `${description} ${hopefulLine}`
+}
+
 export function seedOwnedWeapons(): WeaponId[] {
   return [STARTER_WEAPON_ID]
 }

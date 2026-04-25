@@ -108,6 +108,7 @@ import {
   equipOwnedWeapon,
   equipWeaponStack,
   formatWeaponStarLabel,
+  getWeaponStarHopeDescription,
   fuseWeaponStack,
   getActionableRecipes,
   seedOwnedWeapons,
@@ -1712,6 +1713,16 @@ test('game title, narration, and control hints stay aligned with playable keyboa
 })
 
 
+test('weapon star descriptions become more hopeful as stars rise', () => {
+  const base = WEAPON_DEFINITIONS['starter-blaster'].description
+
+  assert.equal(getWeaponStarHopeDescription(base, 1), base)
+  assert.match(getWeaponStarHopeDescription(base, 2), /다음 수/)
+  assert.match(getWeaponStarHopeDescription(base, 3), /생존기/)
+  assert.match(getWeaponStarHopeDescription(base, 4), /내일/)
+  assert.match(getWeaponStarHopeDescription(base, 5), /직접 길/)
+})
+
 test('weapon descriptions carry Kim-flavored personal hooks', () => {
   assert.equal(WEAPON_DEFINITIONS['arc-loom'].name, '낡은 축구공')
   assert.equal(WEAPON_DEFINITIONS['acid-sprayer'].name, '술먹고 난 토')
@@ -2252,7 +2263,7 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
             id: 'spark-carbine',
             stackKey: 'spark-carbine:2',
             name: '오버드라이브 카빈',
-            description: '속도감 있는 전격 점사입니다.',
+            description: getWeaponStarHopeDescription('속도감 있는 전격 점사입니다.', 2),
             summary: '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사',
             star: 2,
             count: 1,
@@ -2289,11 +2300,13 @@ test('hud weapon modal renders the owned-weapon summary path with redesigned sum
     const firstWeaponRow = firstWeaponEntry.children[1] ? firstWeaponEntry : firstWeaponEntry.children[0]
     const left = firstWeaponRow.children[0]
     const textGroup = left.children[left.children.length - 1]
+    const description = textGroup.children[1]
     const meta = textGroup.children[2]
 
     assert.equal(firstWeaponRow.children.length, 2)
     assert.equal(firstWeaponRow.children[1].children.length, 1)
     assert.equal(firstWeaponRow.children[1].children[0].textContent, '장착 중')
+    assert.match(description.textContent, /다음 수/)
     assert.equal(meta.textContent, '탄당 11 · 3점사 · 사거리 560 · 오버드라이브 속사')
 
     const equippedRow = controller.equippedWeaponList.children[0]

@@ -11,6 +11,7 @@ import {
   getPassiveEnemyDamageMultiplier,
   getPassiveIncomingDamageMultiplier,
   getPassivePachinkoActiveWeaponWeightMultiplier,
+  getPassivePlayerXpMultiplier,
   getPassivePachinkoNonActiveWeaponWeightMultiplier,
   getPassiveSummaryLines,
   getPassiveTokenXpMultiplier,
@@ -44,6 +45,39 @@ test('level-up passive choices are varied but deterministic from the injected ra
     createSequenceRandom([0.2, 0.4, 0.6, 0.8, 0.1, 0.3, 0.5, 0.7]),
   )
   assert.equal(weightedChoices.some((choice) => choice.id === 'rapid-trigger'), false)
+})
+
+test('active weapon always gets its own specialization card until the cap is reached', () => {
+  const choices = getPassiveCardChoices(
+    9,
+    {},
+    createSequenceRandom([0.1, 0.3, 0.5, 0.7, 0.9, 0.2, 0.4, 0.6]),
+    'slime-glaive',
+  )
+
+  const specialized = choices.find((choice) => choice.kind === 'weapon-specialized')
+  assert.ok(specialized)
+  assert.equal(specialized?.id, 'slime-glaive-special')
+  assert.match(specialized?.description ?? '', /최대 2회/)
+  assert.equal(specialized?.iconKey, 'weapon-slime-glaive')
+
+  let cappedState = {}
+  const first = createPassiveCardChoice('slime-glaive-special', 9, createSequenceRandom([0.4, 0.6]), 'slime-glaive')
+  const second = createPassiveCardChoice('slime-glaive-special', 9, createSequenceRandom([0.5, 0.7]), 'slime-glaive')
+  const third = createPassiveCardChoice('slime-glaive-special', 9, createSequenceRandom([0.8, 0.9]), 'slime-glaive')
+  cappedState = addPassiveCard(cappedState, first)
+  cappedState = addPassiveCard(cappedState, second)
+  cappedState = addPassiveCard(cappedState, third)
+
+  assert.equal(cappedState['slime-glaive-special']?.count, 2)
+
+  const cappedChoices = getPassiveCardChoices(
+    9,
+    cappedState,
+    createSequenceRandom([0.2, 0.4, 0.6, 0.8, 0.1, 0.3]),
+    'slime-glaive',
+  )
+  assert.equal(cappedChoices.some((choice) => choice.id === 'slime-glaive-special'), false)
 })
 
 test('passives modify hazard, burst, impact, and melee behavior safely with rolled values', () => {
@@ -163,4 +197,20 @@ test('new pachinko and enemy cards expose varied utility modifiers', () => {
   assert.ok(lines.some((line) => /보스 피해/.test(line)))
   assert.ok(lines.some((line) => /일반 적 피해/.test(line)))
   assert.ok([jackpot.grade, shield.grade, boss.grade, crowd.grade].every(Boolean))
+})
+
+test('general progression cards can boost character xp separately from token xp', () => {
+  const growth = createPassiveCardChoice('growth-cache', 10, createSequenceRandom([0.9, 0.4]))
+  const dividend = createPassiveCardChoice('token-dividend', 10, createSequenceRandom([0.8]))
+
+  let state = {}
+  state = addPassiveCard(state, growth)
+  state = addPassiveCard(state, dividend)
+
+  assert.ok(getPassivePlayerXpMultiplier(state) > 1)
+  assert.ok(getPassiveTokenXpMultiplier(state) > 1)
+
+  const lines = getPassiveSummaryLines(state)
+  assert.ok(lines.some((line) => /캐릭터 XP/.test(line)))
+  assert.ok(lines.some((line) => /토큰 XP/.test(line)))
 })
