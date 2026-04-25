@@ -16,6 +16,7 @@ import { ENEMY_CONTACT_PADDING, PLAYER_COLLISION_RADIUS, PROJECTILE_COLLISION_RA
 import { VECTOR_ASSETS } from '../.tmp-test/src/game/visualManifest.js'
 import { resolveWeightedDrop } from '../.tmp-test/src/systems/drop.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../.tmp-test/src/systems/enemyHealthBar.js'
+import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../.tmp-test/src/systems/playerHealthBar.js'
 import { addItem } from '../.tmp-test/src/systems/inventory.js'
 import { createInitialArenaRunState } from '../.tmp-test/src/systems/runState.js'
 import {
@@ -1086,4 +1087,22 @@ test('enemy health bar fill width tracks clamped health ratio', () => {
   assert.equal(getEnemyHealthFillWidth(-10, 26, 32), 0)
   assert.equal(getEnemyHealthFillWidth(40, 26, 32), 32)
   assert.equal(getEnemyHealthFillWidth(5, 0, 32), 0)
+})
+
+test('player health bar metrics place a compact bar at the canvas bottom', () => {
+  assert.deepEqual(getPlayerHealthBarMetrics(960, 540), {
+    x: 360,
+    y: 518,
+    width: 240,
+    height: 10,
+  })
+})
+
+test('player health bar fill width tracks clamped health ratio', () => {
+  assert.equal(getPlayerHealthFillWidth(100, 100, 236), 236)
+  assert.equal(getPlayerHealthFillWidth(50, 100, 236), 118)
+  assert.equal(getPlayerHealthFillWidth(0, 100, 236), 0)
+  assert.equal(getPlayerHealthFillWidth(-10, 100, 236), 0)
+  assert.equal(getPlayerHealthFillWidth(140, 100, 236), 236)
+  assert.equal(getPlayerHealthFillWidth(20, 0, 236), 0)
 })

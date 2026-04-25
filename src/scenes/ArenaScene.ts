@@ -33,6 +33,7 @@ import {
   type EnemyRuntimeState,
 } from '../systems/enemyBehaviors.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import { getPlayerHealthBarMetrics, getPlayerHealthFillWidth } from '../systems/playerHealthBar.js'
 import { createRunResultHudState, type RunOutcome, type RunResultPayload } from '../systems/runResult.js'
 import { createInitialArenaRunState } from '../systems/runState.js'
 import {
@@ -88,6 +89,14 @@ interface EnemyHealthBar {
   width: number
   height: number
   offsetY: number
+}
+
+interface PlayerHealthBar {
+  background: Phaser.GameObjects.Rectangle
+  fill: Phaser.GameObjects.Rectangle
+  label: Phaser.GameObjects.Text
+  width: number
+  height: number
 }
 
 interface EnemyTelegraph {
@@ -151,6 +160,8 @@ export class ArenaScene extends Phaser.Scene {
   private codex!: CodexController
 
   private player!: PhysicsSprite
+
+  private playerHealthBar?: PlayerHealthBar
 
   private enemySprites!: Phaser.Physics.Arcade.Group
 
@@ -244,6 +255,8 @@ export class ArenaScene extends Phaser.Scene {
     this.player.setCircle(PLAYER_COLLISION_RADIUS)
     this.player.setCollideWorldBounds(true)
     this.player.play('player-idle')
+    this.playerHealthBar = this.createPlayerHealthBar()
+    this.syncPlayerHealthBar()
 
     this.enemySprites = this.physics.add.group()
     this.enemySpacingCollider = this.physics.add.collider(this.enemySprites, this.enemySprites)
@@ -795,6 +808,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.lastPlayerHitAt = now
     this.playerHealth = Math.max(0, this.playerHealth - damage)
+    this.syncPlayerHealthBar()
     this.statusMessage = `Player hit for ${damage}. Stay mobile.`
     this.player.setAlpha(0.55)
     this.tweens.add({
@@ -999,6 +1013,77 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private createPlayerHealthBar(): PlayerHealthBar {
+    const { x, y, width, height } = getPlayerHealthBarMetrics(GAME_WIDTH, GAME_HEIGHT)
+    const depth = 30
+
+    const background = this.add
+      .rectangle(x, y, width, height, 0x020713, 0.68)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(1, 0x9cb5ff, 0.36)
+      .setDepth(depth)
+
+    const fill = this.add
+      .rectangle(x + 2, y, width - 4, height - 4, 0x43ef9a, 0.92)
+      .setOrigin(0, 0.5)
+      .setDepth(depth + 1)
+
+    const label = this.add
+      .text(GAME_WIDTH / 2, y - 1, '', {
+        color: '#f7fbff',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '10px',
+        fontStyle: '700',
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + 2)
+      .setShadow(0, 1, '#020713', 2)
+
+    return {
+      background,
+      fill,
+      label,
+      width,
+      height,
+    }
+  }
+
+  private syncPlayerHealthBar(): void {
+    if (!this.playerHealthBar) {
+      return
+    }
+
+    const { fill, label, width, height } = this.playerHealthBar
+    const fillAreaWidth = width - 4
+    const fillWidth = getPlayerHealthFillWidth(this.playerHealth, this.playerMaxHealth, fillAreaWidth)
+    const healthRatio = this.playerMaxHealth > 0 ? this.playerHealth / this.playerMaxHealth : 0
+    const fillColor = healthRatio <= 0.3 ? 0xff5c6c : healthRatio <= 0.6 ? 0xffd166 : 0x43ef9a
+
+    fill.setFillStyle(fillColor, 0.92)
+    fill.setVisible(fillWidth > 0)
+    fill.setDisplaySize(fillWidth, height - 4)
+    label.setText(`HP ${this.playerHealth}/${this.playerMaxHealth}`)
+  }
+
+  private destroyPlayerHealthBar(): void {
+    if (!this.playerHealthBar) {
+      return
+    }
+
+    const { background, fill, label } = this.playerHealthBar
+    if (background.active) {
+      background.destroy()
+    }
+    if (fill.active) {
+      fill.destroy()
+    }
+    if (label.active) {
+      label.destroy()
+    }
+
+    this.playerHealthBar = undefined
+  }
+
   private resetRunState(): void {
     this.destroyRunEntities()
     this.physics.world.resume()
@@ -1030,6 +1115,7 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnTimer = undefined
     this.enemySpacingCollider?.destroy()
     this.enemySpacingCollider = undefined
+    this.destroyPlayerHealthBar()
 
     if (this.player?.active) {
       this.player.destroy()
