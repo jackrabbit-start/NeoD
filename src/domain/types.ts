@@ -108,6 +108,9 @@ export interface WeaponDefinition {
   knockback: WeaponKnockbackDefinition
   attackBehavior: WeaponAttackBehavior
   visual: WeaponVisualDefinition
+  levelUpgradeLabel?: string
+  levelUpgradeDescription?: string
+  visualPowerTier?: number
 }
 
 export interface RecipeDefinition {
@@ -314,6 +317,8 @@ export interface HudOwnedWeaponView {
   damage: number
   fireRateMs: number
   projectileSpeed: number
+  levelUpgradeLabel?: string
+  levelUpgradeDescription?: string
   isEquipped: boolean
   hudIconKey?: string
   accentColor?: number

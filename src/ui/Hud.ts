@@ -416,7 +416,9 @@ export class HudController {
     const countText = weapon.count != null ? ` × ${weapon.count}` : ''
     title.textContent = `${weapon.name}${starText ? ` · ${starText}` : ''}${countText}`
     const description = document.createElement('small')
-    description.textContent = weapon.description
+    description.textContent = weapon.levelUpgradeDescription
+      ? `${weapon.description} · ${weapon.levelUpgradeDescription}`
+      : weapon.description
     textGroup.append(title, description)
 
     const left = document.createElement('div')
@@ -453,7 +455,8 @@ export class HudController {
   private createWeaponStats(weapon: HudOwnedWeaponView, variant: 'equipped' | 'owned'): HTMLElement {
     const stats = document.createElement('small')
     stats.className = `hud-modal__weapon-meta hud-modal__weapon-stats hud-modal__weapon-stats--${variant}`
-    stats.textContent = `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · 탄속 ${weapon.projectileSpeed}`
+    const upgradeText = weapon.levelUpgradeLabel ? ` · ${weapon.levelUpgradeLabel}` : ''
+    stats.textContent = `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · 탄속 ${weapon.projectileSpeed}${upgradeText}`
     if (weapon.accentColor != null) {
       stats.style.color = `#${weapon.accentColor.toString(16).padStart(6, '0')}`
     }

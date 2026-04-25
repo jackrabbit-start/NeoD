@@ -2786,6 +2786,8 @@ export class ArenaScene extends Phaser.Scene {
         damage: effectiveWeapon.damage,
         fireRateMs: effectiveWeapon.fireRateMs,
         projectileSpeed: effectiveWeapon.projectileSpeed,
+        levelUpgradeLabel: effectiveWeapon.levelUpgradeLabel,
+        levelUpgradeDescription: effectiveWeapon.levelUpgradeDescription,
         isEquipped: stackKey === this.activeWeaponKey,
         hudIconKey: ownedWeapon.visual.hudIconKey,
         accentColor: ownedWeapon.visual.accentColor,
@@ -3253,8 +3255,11 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnProjectile(projectileSpec: ProjectileSpawnSpec, textureKey: string): void {
     const projectile = this.physics.add.image(this.player.x, this.player.y, textureKey)
+    const visualTier = Math.max(0, projectileSpec.visualPowerTier ?? 0)
     projectile.setTint(projectileSpec.tint)
     projectile.setCircle(projectileSpec.radius)
+    projectile.setScale(1 + visualTier * 0.08)
+    projectile.setAlpha(Math.max(0.72, 0.95 - visualTier * 0.03))
     projectile.setRotation(Math.atan2(projectileSpec.direction.y, projectileSpec.direction.x))
     projectile.setVelocity(
       projectileSpec.direction.x * projectileSpec.speed,
@@ -3319,9 +3324,10 @@ export class ArenaScene extends Phaser.Scene {
   private spawnMeleeSwingVisual(swing: MeleeSwingSpec): void {
     const graphics = this.add.graphics({ x: this.player.x, y: this.player.y })
     const halfArcRadians = (swing.arcDegrees * Math.PI) / 360
+    const visualTier = Math.max(0, swing.visualPowerTier ?? 0)
 
-    graphics.fillStyle(swing.tint, 0.28)
-    graphics.lineStyle(3, swing.tint, 0.65)
+    graphics.fillStyle(swing.tint, Math.min(0.44, 0.28 + visualTier * 0.04))
+    graphics.lineStyle(3 + visualTier, swing.tint, Math.min(0.9, 0.65 + visualTier * 0.05))
     graphics.beginPath()
     graphics.moveTo(0, 0)
     graphics.slice(0, 0, swing.range, -halfArcRadians, halfArcRadians, false)
@@ -3334,8 +3340,8 @@ export class ArenaScene extends Phaser.Scene {
     this.tweens.add({
       targets: graphics,
       alpha: 0,
-      scaleX: 1.08,
-      scaleY: 1.08,
+      scaleX: 1.08 + visualTier * 0.03,
+      scaleY: 1.08 + visualTier * 0.03,
       duration: swing.visualDurationMs,
       onComplete: () => graphics.destroy(),
     })
