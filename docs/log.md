@@ -55,3 +55,9 @@
 - Added `docs/wiki/melee-weapon-line.md` to synthesize the melee-first interview, PRD, test spec, and implementation verification.
 - Updated `docs/index.md` so future agents can find the melee architecture guidance.
 - Source artifacts: `.omx/specs/deep-interview-weapon-capsule-variety.md`, `.omx/plans/prd-melee-weapon-line.md`, `.omx/plans/test-spec-melee-weapon-line.md`, and `.omx/context/post-interview-melee-weapon-line-20260425T114954Z.md`.
+
+## [2026-04-25] gameplay | Captured map traversal and obstacle architecture
+
+- Added `docs/wiki/map-traversal-obstacles.md` to synthesize the larger scrolling map, sparse blocking obstacle, ambient item, and safe spawn rules.
+- Updated `docs/index.md` so future agents can find the traversal/obstacle guidance.
+- Source artifacts: `.omx/specs/deep-interview-map-traversal-obstacles-items.md`, `.omx/plans/prd-map-traversal-obstacles-items.md`, `.omx/plans/test-spec-map-traversal-obstacles-items.md`, and `.omx/context/post-interview-map-traversal-obstacles-items-20260425T123230Z.md`.
