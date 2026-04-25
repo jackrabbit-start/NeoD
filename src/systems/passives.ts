@@ -222,7 +222,7 @@ const PASSIVE_CARD_TEMPLATES = [
   {
     id: 'split-focus',
     name: '분산 집중',
-    description: '분사형 무기가 탄을 더 흩뿌립니다.',
+    description: '분사형·연발형 무기가 투사체를 더 뿌립니다.',
     preferredFamilies: ['spray', 'zone'],
     weight: { base: 0.82, levelScale: 0.03, repeatPenalty: 0.55, familyBonus: 0.72 },
     roll(level, random) {
@@ -685,7 +685,7 @@ function formatEffectSummary(effects: PassiveEffects): string {
     lines.push(`장판 반경 +${roundPercent(effects.hazardRadiusMultiplier - 1)}%`)
   }
   if (effects.projectileCountDelta) {
-    lines.push(`분사 투사체 +${Math.round(effects.projectileCountDelta)}`)
+    lines.push(`투사체 +${Math.round(effects.projectileCountDelta)}`)
   }
   if (effects.playerSpeedMultiplier !== undefined && effects.playerSpeedMultiplier > 1) {
     lines.push(`이동속도 +${roundPercent(effects.playerSpeedMultiplier - 1)}%`)
@@ -916,22 +916,31 @@ function applyAttackBehaviorPassives(
   behavior: WeaponAttackBehavior,
   totals: PassiveTotals,
 ): WeaponAttackBehavior {
-  if (behavior.kind === 'melee-cleave') {
-    return {
-      ...behavior,
-      range: Math.max(1, Math.round(behavior.range + totals.rangeDelta)),
-    }
+  switch (behavior.kind) {
+    case 'melee-cleave':
+      return {
+        ...behavior,
+        range: Math.max(1, Math.round(behavior.range + totals.rangeDelta)),
+      }
+    case 'spray-hazard':
+      return {
+        ...behavior,
+        projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
+        hazardRadius: Math.max(1, Math.round(behavior.hazardRadius * totals.hazardRadiusMultiplier)),
+      }
+    case 'volley':
+      return {
+        ...behavior,
+        projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
+      }
+    case 'single':
+    case 'pierce':
+    case 'chain':
+    case 'impact-burst':
+      return behavior
+    default:
+      return behavior
   }
-
-  if (behavior.kind === 'spray-hazard') {
-    return {
-      ...behavior,
-      projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
-      hazardRadius: Math.max(1, Math.round(behavior.hazardRadius * totals.hazardRadiusMultiplier)),
-    }
-  }
-
-  return behavior
 }
 
 export function applyPassiveWeaponEffects(
