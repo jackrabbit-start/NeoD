@@ -43,26 +43,28 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
   const lateRamp = Math.max(0, clampedMinute - 15)
   const finaleRamp = Math.max(0, clampedMinute - 24)
 
-  const weights: RunSpawnEntryDefinition[] = [
-    { enemyId: 'slime', count: Math.max(2, 16 - clampedMinute) },
-  ]
+  const weights: RunSpawnEntryDefinition[] = []
 
-  if (clampedMinute >= 1) {
+  if (clampedMinute < 6) {
+    weights.push({ enemyId: 'slime', count: Math.max(2, 16 - clampedMinute) })
+  }
+
+  if (clampedMinute >= 1 && clampedMinute < 12) {
     weights.push({ enemyId: 'dash-slime', count: 2 + Math.min(7, clampedMinute) })
   }
-  if (clampedMinute >= 2) {
+  if (clampedMinute >= 2 && clampedMinute < 16) {
     weights.push({ enemyId: 'spark-slime', count: 2 + Math.floor(clampedMinute / 2) })
   }
-  if (clampedMinute >= 3) {
+  if (clampedMinute >= 3 && clampedMinute < 18) {
     weights.push({ enemyId: 'splitter-slime', count: 2 + Math.floor((clampedMinute - 3) / 2) })
   }
-  if (clampedMinute >= 10) {
+  if (clampedMinute >= 10 && clampedMinute < 22) {
     weights.push({ enemyId: 'orbit-slime', count: 5 + Math.floor((clampedMinute - 10) / 3) })
   }
-  if (clampedMinute >= 12) {
+  if (clampedMinute >= 12 && clampedMinute < 24) {
     weights.push({ enemyId: 'needle-wasp', count: 3 + Math.floor((clampedMinute - 12) / 3) })
   }
-  if (clampedMinute >= 14) {
+  if (clampedMinute >= 14 && clampedMinute < 24) {
     weights.push({ enemyId: 'mender-slime', count: 2 + Math.floor((clampedMinute - 14) / 4) })
   }
   if (clampedMinute >= 16) {

@@ -1218,6 +1218,7 @@ test('run progression exposes per-enemy spawn chance rows for the current half-m
   assert.ok(lateRows.length > 4)
   assert.ok(lateRows.some((row) => row.enemyId === 'crusher-slime'))
   assert.ok(lateRows.some((row) => row.enemyId === 'void-orb'))
+  assert.equal(lateRows.some((row) => ['slime', 'dash-slime', 'spark-slime', 'splitter-slime'].includes(row.enemyId)), false)
   assert.equal(lateRows.reduce((sum, row) => sum + row.count, 0) > 0, true)
   assert.equal(lateRows.reduce((sum, row) => sum + row.ratio, 0).toFixed(4), '1.0000')
 })

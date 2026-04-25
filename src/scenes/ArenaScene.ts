@@ -26,6 +26,7 @@ import {
   createEnemyRadialBurstProjectiles,
   createEnemySpreadBurstProjectiles,
   createEnemyRuntimeState,
+  createEnemyAttackTarget,
   createEnemyTelegraph,
   getDistanceBetween,
   isPointInsideCircle,
@@ -1107,9 +1108,16 @@ export class ArenaScene extends Phaser.Scene {
           enemy.attackCooldownMs,
         )
       ) {
+        const attackTarget = createEnemyAttackTarget(
+          { x: this.player.x, y: this.player.y },
+          enemy.config.attackBehavior.kind === 'telegraphed-aoe'
+            ? enemy.config.attackBehavior.targetJitterRadius ?? 0
+            : 0,
+          Math.random,
+        )
         const telegraphSpec = createEnemyTelegraph(
           { x: enemy.sprite.x, y: enemy.sprite.y },
-          { x: this.player.x, y: this.player.y },
+          attackTarget,
           enemy.config.attackBehavior,
         )
 
@@ -1145,9 +1153,14 @@ export class ArenaScene extends Phaser.Scene {
           enemy.attackCooldownMs,
         )
       ) {
+        const attackTarget = createEnemyAttackTarget(
+          { x: this.player.x, y: this.player.y },
+          attackBehavior.targetJitterRadius ?? 0,
+          Math.random,
+        )
         const projectiles = createEnemySpreadBurstProjectiles(
           { x: enemy.sprite.x, y: enemy.sprite.y },
-          { x: this.player.x, y: this.player.y },
+          attackTarget,
           attackBehavior,
         )
 
@@ -1174,9 +1187,14 @@ export class ArenaScene extends Phaser.Scene {
           enemy.attackCooldownMs,
         )
       ) {
+        const attackTarget = createEnemyAttackTarget(
+          { x: this.player.x, y: this.player.y },
+          attackBehavior.targetJitterRadius ?? 0,
+          Math.random,
+        )
         const beam = createEnemyLineBeam(
           { x: enemy.sprite.x, y: enemy.sprite.y },
-          { x: this.player.x, y: this.player.y },
+          attackTarget,
           attackBehavior,
         )
 

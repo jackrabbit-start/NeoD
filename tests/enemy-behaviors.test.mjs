@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { ENEMY_DEFINITIONS } from '../.tmp-test/src/data/enemies.js'
 import {
   advanceEnemyCooldown,
+  createEnemyAttackTarget,
   createEnemyLineBeam,
   createEnemyRadialBurstProjectiles,
   createEnemySpreadBurstProjectiles,
@@ -73,10 +74,11 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   assert.equal(spark.movementBehavior.distanceTolerance, 22)
   assert.equal(spark.attackBehavior.kind, 'telegraphed-aoe')
   assert.equal(spark.attackBehavior.damage, 24)
-  assert.equal(spark.attackBehavior.cooldownMs, 1050)
-  assert.equal(spark.attackBehavior.telegraphMs, 520)
+  assert.equal(spark.attackBehavior.cooldownMs, 820)
+  assert.equal(spark.attackBehavior.telegraphMs, 500)
   assert.equal(spark.attackBehavior.radius, 72)
   assert.equal(spark.attackBehavior.range, 290)
+  assert.equal(spark.attackBehavior.targetJitterRadius, 86)
 
   assert.equal(prism.maxHealth, 110)
   assert.equal(prism.speed, 82)
@@ -119,11 +121,12 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   assert.equal(boss.contactDamage, 34)
   assert.equal(boss.attackBehavior.kind, 'telegraphed-aoe')
   assert.equal(boss.attackBehavior.damage, 42)
-  assert.equal(boss.attackBehavior.cooldownMs, 1050)
-  assert.equal(boss.attackBehavior.telegraphMs, 470)
+  assert.equal(boss.attackBehavior.cooldownMs, 820)
+  assert.equal(boss.attackBehavior.telegraphMs, 450)
   assert.equal(boss.attackBehavior.radius, 145)
   assert.equal(boss.attackBehavior.range, 330)
   assert.equal(boss.attackBehavior.anchor, 'player')
+  assert.equal(boss.attackBehavior.targetJitterRadius, 120)
 })
 
 test('telegraphed aoe uses configured anchors for readable pressure zones', () => {
@@ -168,6 +171,17 @@ test('telegraphed aoe uses configured anchors for readable pressure zones', () =
     },
     { x: 44, y: 55, radius: 33 },
   )
+})
+
+
+test('enemy attack target jitter offsets player-targeted attacks deterministically', () => {
+  const target = createEnemyAttackTarget({ x: 100, y: 100 }, 80, (() => {
+    const rolls = [0, 0.25]
+    return () => rolls.shift() ?? 0
+  })())
+
+  assert.deepEqual(target, { x: 140, y: 100 })
+  assert.deepEqual(createEnemyAttackTarget({ x: 100, y: 100 }, 0, () => 0.5), { x: 100, y: 100 })
 })
 
 test('telegraph start and cooldown helpers remain deterministic', () => {

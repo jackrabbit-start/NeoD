@@ -215,6 +215,7 @@ export interface EnemyTelegraphedAoeAttackBehavior {
   damage: number
   range: number
   anchor: 'self' | 'player'
+  targetJitterRadius?: number
   tint: number
 }
 
@@ -231,6 +232,7 @@ export interface EnemySpreadBurstAttackBehavior {
   damage: number
   tint: number
   projectileTextureKey: string
+  targetJitterRadius?: number
 }
 
 export interface EnemyLineBeamAttackBehavior {
@@ -241,6 +243,7 @@ export interface EnemyLineBeamAttackBehavior {
   width: number
   damage: number
   tint: number
+  targetJitterRadius?: number
 }
 
 export interface EnemyRadialBurstAttackBehavior {
