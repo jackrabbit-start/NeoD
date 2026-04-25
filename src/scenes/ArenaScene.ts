@@ -31,6 +31,7 @@ import {
   shouldEnemyStartTelegraph,
 } from '../systems/enemyBehaviors.js'
 import { getEnemyHealthBarMetrics, getEnemyHealthFillWidth } from '../systems/enemyHealthBar.js'
+import { createInitialArenaRunState } from '../systems/runState.js'
 import {
   advanceHazardState,
   applyProjectileHitState,
@@ -52,7 +53,6 @@ import {
 import {
   equipOwnedWeapon,
   getActionableRecipes,
-  seedOwnedWeapons,
 } from '../systems/weaponOwnership.js'
 import { shouldAdvanceWave } from '../systems/waves.js'
 import { resolveAutoAttackShot } from './arena/autoAttack.js'
@@ -155,7 +155,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private hazardZones: HazardZoneEntity[] = []
 
-  private ownedWeaponIds: WeaponId[] = seedOwnedWeapons()
+  private ownedWeaponIds: WeaponId[] = []
 
   private activeWeaponId: WeaponId = 'starter-blaster'
 
@@ -166,6 +166,8 @@ export class ArenaScene extends Phaser.Scene {
   private isInventoryOpen = false
 
   private isCodexOpen = false
+
+  private isRunEnding = false
 
   private playerHealth = 100
 
@@ -185,6 +187,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnTimer?: Phaser.Time.TimerEvent
 
+  private resultTransitionTimer?: Phaser.Time.TimerEvent
+
   private isBossActive = false
 
   private statusMessage = 'Move with WASD and let your weapon auto-fire while you dodge.'
@@ -198,6 +202,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.resetRunState()
+
     this.hud = this.game.registry.get('hud') as HudController
     this.codex = this.game.registry.get('codex') as CodexController
     this.hud.setHandlers({
@@ -249,6 +255,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    if (this.isRunEnding) {
+      return
+    }
+
     this.handleInventoryToggle()
     this.handleCodexToggle()
     this.handlePlayerMovement()
@@ -958,11 +968,94 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private endRun(outcome: 'win' | 'loss'): void {
+  private resetRunState(): void {
+    this.destroyRunEntities()
+    this.physics.world.resume()
+
+    const initialState = createInitialArenaRunState()
+    this.ownedWeaponIds = initialState.ownedWeaponIds
+    this.activeWeaponId = initialState.activeWeaponId
+    this.inventory = initialState.inventory
+    this.tuningState = initialState.tuningState
+    this.isInventoryOpen = initialState.isInventoryOpen
+    this.isCodexOpen = initialState.isCodexOpen
+    this.isRunEnding = initialState.isRunEnding
+    this.playerHealth = initialState.playerHealth
+    this.playerMaxHealth = initialState.playerMaxHealth
+    this.playerSpeed = initialState.playerSpeed
+    this.nextFireAt = initialState.nextFireAt
+    this.remainingSpawns = initialState.remainingSpawns
+    this.currentWaveIndex = initialState.currentWaveIndex
+    this.activeWaveLabel = initialState.activeWaveLabel
+    this.wavesCleared = initialState.wavesCleared
+    this.isBossActive = initialState.isBossActive
+    this.statusMessage = initialState.statusMessage
+    this.lastPlayerHitAt = initialState.lastPlayerHitAt
+    this.nextEnemyRuntimeId = initialState.nextEnemyRuntimeId
+  }
+
+  private destroyRunEntities(): void {
     this.spawnTimer?.remove(false)
+    this.spawnTimer = undefined
+    this.resultTransitionTimer?.remove(false)
+    this.resultTransitionTimer = undefined
+    this.enemySpacingCollider?.destroy()
+    this.enemySpacingCollider = undefined
+
+    if (this.player?.active) {
+      this.player.destroy()
+    }
+
+    for (const enemy of this.enemies) {
+      if (enemy.telegraph?.visual.active) {
+        enemy.telegraph.visual.destroy()
+      }
+      this.destroyEnemyHealthBar(enemy)
+      if (enemy.sprite.active) {
+        enemy.sprite.destroy()
+      }
+    }
+
+    for (const loot of this.lootDrops) {
+      if (loot.sprite.active) {
+        loot.sprite.destroy()
+      }
+    }
+
+    for (const projectile of this.projectiles) {
+      if (projectile.sprite.active) {
+        projectile.sprite.destroy()
+      }
+    }
+
+    for (const hazard of this.hazardZones) {
+      if (hazard.visual.active) {
+        hazard.visual.destroy()
+      }
+    }
+
+    if (this.enemySprites) {
+      this.enemySprites.clear(true, true)
+    }
+
+    this.enemies = []
+    this.lootDrops = []
+    this.projectiles = []
+    this.hazardZones = []
+  }
+
+  private endRun(outcome: 'win' | 'loss'): void {
+    if (this.isRunEnding) {
+      return
+    }
+
+    this.isRunEnding = true
+    this.spawnTimer?.remove(false)
+    this.spawnTimer = undefined
     this.isInventoryOpen = false
     this.isCodexOpen = false
     this.codex.update(getCodexState(false))
+    this.physics.world.pause()
     this.freezeCombat(true)
     this.hud.update({
       title: outcome === 'win' ? 'Run complete' : 'Run failed',
@@ -986,7 +1079,8 @@ export class ArenaScene extends Phaser.Scene {
       },
     })
 
-    this.time.delayedCall(600, () => {
+    this.resultTransitionTimer?.remove(false)
+    this.resultTransitionTimer = this.time.delayedCall(600, () => {
       this.scene.start('result', {
         outcome,
         weaponName: WEAPON_DEFINITIONS[this.activeWeaponId].name,
