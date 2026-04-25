@@ -408,6 +408,9 @@ test('pachinko reward levels and enemy token xp follow the approved thresholds',
   assert.equal(getTokenXpForEnemy('dash-slime'), 2)
   assert.equal(getTokenXpForEnemy('orbit-slime'), 2)
   assert.equal(getTokenXpForEnemy('prism-slime'), 4)
+  assert.equal(getTokenXpForEnemy('lantern-moth'), 3)
+  assert.equal(getTokenXpForEnemy('mirror-wisp'), 3)
+  assert.equal(getTokenXpForEnemy('siege-toad'), 5)
   assert.equal(getTokenXpForEnemy('slime-boss'), 0)
   assert.equal(shouldEnemyGrantPachinkoToken('slime'), true)
   assert.equal(shouldEnemyGrantPachinkoToken('slime-boss'), false)
@@ -504,6 +507,9 @@ test('player progression starts per run and levels from enemy defeat xp', () => 
     'mender-slime': 2,
     'void-orb': 3,
     'crusher-slime': 4,
+    'lantern-moth': 3,
+    'mirror-wisp': 3,
+    'siege-toad': 5,
     'slime-boss': 0,
   })
 
@@ -1364,6 +1370,9 @@ test('content id catalogs include scoped enemy and reward branches', () => {
     'mender-slime',
     'void-orb',
     'crusher-slime',
+    'lantern-moth',
+    'mirror-wisp',
+    'siege-toad',
     'slime-boss',
   ])
 })
@@ -1579,7 +1588,7 @@ test('codex selectors expose hidden materials and token enemy rewards', () => {
   assert.equal(codex.isOpen, true)
   assert.equal(codex.items.length, 0)
   assert.equal(codex.recipes.length, 0)
-  assert.equal(codex.enemies.length, 12)
+  assert.equal(codex.enemies.length, 15)
   assert.match(codex.hint, /토큰 파친코/)
 
 
@@ -2062,11 +2071,14 @@ test('enemy visual metadata keeps immutable gameplay geometry while adding art h
       'dash-slime': { size: 24, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
       'orbit-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
       'needle-wasp': { size: 24, textureKey: 'needle-wasp', animationKey: 'needle-wasp-idle' },
-      'splitter-slime': { size: 24, textureKey: 'slime', animationKey: 'slime-idle' },
-      'shard-sentinel': { size: 28, textureKey: 'spark-slime', animationKey: 'spark-slime-idle' },
-      'mender-slime': { size: 22, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
-      'void-orb': { size: 24, textureKey: 'orbit-slime', animationKey: 'orbit-slime-idle' },
-      'crusher-slime': { size: 34, textureKey: 'dash-slime', animationKey: 'dash-slime-idle' },
+      'splitter-slime': { size: 24, textureKey: 'splitter-slime', animationKey: 'splitter-slime-idle' },
+      'shard-sentinel': { size: 28, textureKey: 'shard-sentinel', animationKey: 'shard-sentinel-idle' },
+      'mender-slime': { size: 22, textureKey: 'mender-slime', animationKey: 'mender-slime-idle' },
+      'void-orb': { size: 24, textureKey: 'void-orb', animationKey: 'void-orb-idle' },
+      'crusher-slime': { size: 34, textureKey: 'crusher-slime', animationKey: 'crusher-slime-idle' },
+      'lantern-moth': { size: 26, textureKey: 'lantern-moth', animationKey: 'lantern-moth-idle' },
+      'mirror-wisp': { size: 22, textureKey: 'mirror-wisp', animationKey: 'mirror-wisp-idle' },
+      'siege-toad': { size: 36, textureKey: 'siege-toad', animationKey: 'siege-toad-idle' },
       'slime-boss': { size: 44, textureKey: 'slime-boss', animationKey: 'slime-boss-idle' },
     },
   )

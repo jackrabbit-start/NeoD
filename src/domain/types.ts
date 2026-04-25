@@ -29,6 +29,14 @@ export type EnemyAnimationKey =
   | 'dash-slime-idle'
   | 'orbit-slime-idle'
   | 'needle-wasp-idle'
+  | 'splitter-slime-idle'
+  | 'shard-sentinel-idle'
+  | 'mender-slime-idle'
+  | 'void-orb-idle'
+  | 'crusher-slime-idle'
+  | 'lantern-moth-idle'
+  | 'mirror-wisp-idle'
+  | 'siege-toad-idle'
   | 'slime-boss-idle'
 
 export interface ItemDefinition {

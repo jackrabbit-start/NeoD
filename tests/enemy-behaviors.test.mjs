@@ -56,6 +56,9 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   const mender = ENEMY_DEFINITIONS['mender-slime']
   const voidOrb = ENEMY_DEFINITIONS['void-orb']
   const crusher = ENEMY_DEFINITIONS['crusher-slime']
+  const moth = ENEMY_DEFINITIONS['lantern-moth']
+  const wisp = ENEMY_DEFINITIONS['mirror-wisp']
+  const toad = ENEMY_DEFINITIONS['siege-toad']
   const boss = ENEMY_DEFINITIONS['slime-boss']
 
   assert.equal(slime.maxHealth, 30)
@@ -106,6 +109,10 @@ test('enemy pressure constants match the near-miss low-clear-rate pass', () => {
   assert.equal(crusher.attackBehavior.kind, 'telegraphed-aoe')
   assert.equal(crusher.attackBehavior.anchor, 'self')
   assert.ok(crusher.maxHealth > prism.maxHealth)
+  assert.equal(moth.attackBehavior.kind, 'spread-burst')
+  assert.equal(wisp.attackBehavior.kind, 'line-beam')
+  assert.equal(toad.attackBehavior.kind, 'radial-burst')
+  assert.ok(toad.maxHealth > crusher.maxHealth)
 
   assert.equal(boss.maxHealth, 720)
   assert.equal(boss.speed, 64)
@@ -263,4 +270,6 @@ test('circle hit test and codex enemy summary expose the new enemy identities', 
   assert.ok(shardSentinel?.stats.some((entry) => /직선 광선/.test(entry)))
   const splitterSlime = codex.enemies.find((enemy) => enemy.id === 'splitter-slime')
   assert.ok(splitterSlime?.stats.some((entry) => /전방위/.test(entry)))
+  const lanternMoth = codex.enemies.find((enemy) => enemy.id === 'lantern-moth')
+  assert.ok(lanternMoth?.stats.some((entry) => /침 비/.test(entry)))
 })

@@ -71,11 +71,20 @@ function entriesForMinute(minuteIndex: number): RunSpawnEntryDefinition[] {
   if (clampedMinute >= 18) {
     weights.push({ enemyId: 'prism-slime', count: 2 + Math.floor((clampedMinute - 18) / 4) })
   }
+  if (clampedMinute >= 19) {
+    weights.push({ enemyId: 'lantern-moth', count: 2 + Math.floor((clampedMinute - 19) / 3) })
+  }
   if (clampedMinute >= 20) {
     weights.push({ enemyId: 'void-orb', count: 2 + Math.floor((clampedMinute - 20) / 3) })
   }
+  if (clampedMinute >= 21) {
+    weights.push({ enemyId: 'mirror-wisp', count: 2 + Math.floor((clampedMinute - 21) / 3) })
+  }
   if (clampedMinute >= 23) {
     weights.push({ enemyId: 'crusher-slime', count: 1 + Math.floor((clampedMinute - 23) / 3) + Math.floor(finaleRamp / 2) })
+  }
+  if (clampedMinute >= 24) {
+    weights.push({ enemyId: 'siege-toad', count: 1 + Math.floor((clampedMinute - 24) / 3) + Math.floor(finaleRamp / 2) })
   }
 
   return weights.filter((entry) => entry.count > 0)
