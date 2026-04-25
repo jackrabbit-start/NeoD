@@ -187,7 +187,7 @@ test('recipe selection workflow returns the equipped upgrade state on success', 
     nextInventory: {},
     ownedWeaponIds: ['starter-blaster', 'acid-sprayer'],
     activeWeaponId: 'acid-sprayer',
-    statusMessage: 'Acid Sprayer 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
+    statusMessage: '산성 분사기 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.',
   })
 })
 

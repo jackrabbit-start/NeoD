@@ -215,7 +215,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private isBossActive = false
 
-  private statusMessage = 'Move with WASD and let your weapon auto-fire while you dodge.'
+  private statusMessage = 'WASD로 이동하고 회피하는 동안 무기가 자동으로 발사됩니다.'
 
   private lastPlayerHitAt = 0
 
@@ -263,7 +263,7 @@ export class ArenaScene extends Phaser.Scene {
 
     const keyboard = this.input.keyboard
     if (!keyboard) {
-      throw new Error('Keyboard input is required for the NeoD prototype.')
+      throw new Error('NeoD 프로토타입에는 키보드 입력이 필요합니다.')
     }
 
     this.cursors = keyboard.addKeys({
@@ -322,8 +322,8 @@ export class ArenaScene extends Phaser.Scene {
     this.isCodexOpen = !this.isCodexOpen
     this.applyInteractionPause(this.isCodexOpen)
     this.statusMessage = this.isCodexOpen
-      ? 'Field Codex open. Combat is paused while you inspect shared data.'
-      : 'Field Codex closed. Combat resumed.'
+      ? '현장 코덱스가 열렸습니다. 공유 데이터를 살펴보는 동안 전투가 일시정지됩니다.'
+      : '현장 코덱스가 닫혔습니다. 전투가 재개됩니다.'
     this.updateCodex()
     this.updateHud()
   }
@@ -796,7 +796,7 @@ export class ArenaScene extends Phaser.Scene {
       return true
     }
 
-    this.statusMessage = `${enemy.config.name} defeated. Keep collecting drops.`
+    this.statusMessage = `${enemy.config.name} 처치. 드롭을 계속 모으세요.`
     return true
   }
 
@@ -809,7 +809,7 @@ export class ArenaScene extends Phaser.Scene {
     this.lastPlayerHitAt = now
     this.playerHealth = Math.max(0, this.playerHealth - damage)
     this.syncPlayerHealthBar()
-    this.statusMessage = `Player hit for ${damage}. Stay mobile.`
+    this.statusMessage = `플레이어가 ${damage} 피해를 받았습니다. 계속 움직이세요.`
     this.player.setAlpha(0.55)
     this.tweens.add({
       targets: this.player,
@@ -839,7 +839,7 @@ export class ArenaScene extends Phaser.Scene {
   private openInventory(): void {
     this.isInventoryOpen = true
     this.applyInteractionPause(true)
-    this.statusMessage = 'Inventory opened. Combat is paused while you inspect and combine.'
+    this.statusMessage = '인벤토리가 열렸습니다. 살펴보고 조합하는 동안 전투가 일시정지됩니다.'
     this.updateHud()
   }
 
@@ -850,7 +850,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.isInventoryOpen = false
     this.applyInteractionPause(false)
-    this.statusMessage = 'Inventory closed. Combat resumed.'
+    this.statusMessage = '인벤토리가 닫혔습니다. 전투가 재개됩니다.'
     this.updateHud()
   }
 
@@ -905,13 +905,13 @@ export class ArenaScene extends Phaser.Scene {
 
     const nextWeaponId = equipOwnedWeapon(this.ownedWeaponIds, this.activeWeaponId, weaponId)
     if (nextWeaponId === this.activeWeaponId) {
-      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} is already equipped.`
+      this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name}은 이미 장착 중입니다.`
       this.updateHud()
       return
     }
 
     this.activeWeaponId = nextWeaponId
-    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} equipped.`
+    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} 장착 완료.`
     this.updateHud()
   }
 
@@ -932,7 +932,7 @@ export class ArenaScene extends Phaser.Scene {
         ownedWeaponIds: this.ownedWeaponIds,
         tuningState: this.tuningState,
       }, weaponId)
-      this.statusMessage = reason ?? 'That weapon cannot be tuned right now.'
+      this.statusMessage = reason ?? '지금은 해당 무기를 튜닝할 수 없습니다.'
       this.updateHud()
       return
     }
@@ -940,7 +940,7 @@ export class ArenaScene extends Phaser.Scene {
     const effectLabel = getTuningEffectLabel(result.effectId) ?? result.effectId
     this.inventory = result.nextInventory
     this.tuningState = result.nextTuningState
-    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} tuned: ${effectLabel}.`
+    this.statusMessage = `${WEAPON_DEFINITIONS[weaponId].name} 튜닝 완료: ${effectLabel}.`
     this.updateHud()
   }
 
@@ -1172,7 +1172,6 @@ export class ArenaScene extends Phaser.Scene {
     this.codex.update(getCodexState(false))
     this.physics.world.pause()
     this.freezeCombat(true)
-
     const payload = this.createResultPayload(outcome)
     this.hud.update(createRunResultHudState(payload))
     this.scene.start('result', payload)
@@ -1192,22 +1191,22 @@ export class ArenaScene extends Phaser.Scene {
     const tuningText = weapon.tuningLabel ? ` · ${weapon.tuningLabel}` : ''
 
     this.hud.update({
-      title: 'NeoD Prototype',
-      subtitle: this.activeWaveLabel || 'Preparing arena',
+      title: 'NeoD 프로토타입',
+      subtitle: this.activeWaveLabel || '아레나 준비 중',
       stats: [
-        `Health: ${this.playerHealth}/${this.playerMaxHealth}`,
-        `Weapon: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
-        `Enemies alive: ${this.enemies.length}`,
-        `Remaining spawns: ${this.remainingSpawns}`,
+        `체력: ${this.playerHealth}/${this.playerMaxHealth}`,
+        `무기: ${weapon.name} · ${getWeaponSummary(weapon)}${tuningText}`,
+        `생존한 적: ${this.enemies.length}`,
+        `남은 출현: ${this.remainingSpawns}`,
       ],
       inventory: describeInventoryEntries(this.inventory),
       recipes: describeAvailableRecipes(actionableRecipes),
       objective: this.isBossActive
-        ? 'Defeat the Crown Slime to clear the run.'
-        : 'Survive the waves, collect drops, and open inventory to combine upgrades.',
-      tip: 'WASD move · Auto-fire nearest enemy · Dodge telegraphs · Open inventory to combine or swap weapons · Q codex',
+        ? '크라운 슬라임을 쓰러뜨려 런을 클리어하세요.'
+        : '웨이브를 버티고 드롭을 모아 인벤토리에서 업그레이드를 조합하세요.',
+      tip: 'WASD 이동 · 가장 가까운 적 자동 사격 · 예고 공격 회피 · 인벤토리에서 조합 또는 무기 교체 · Q 코덱스',
       status: this.statusMessage,
-      inventoryButtonLabel: this.isInventoryOpen ? 'Resume run' : 'Open inventory',
+      inventoryButtonLabel: this.isInventoryOpen ? '런 재개' : '인벤토리 열기',
       inventoryButtonDisabled: this.isCodexOpen,
       modal: {
         isOpen: this.isInventoryOpen,
