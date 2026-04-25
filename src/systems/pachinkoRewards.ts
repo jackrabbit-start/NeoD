@@ -414,8 +414,9 @@ export function getAllTokenRewardRows(): Array<{ enemyId: EnemyId; tokenXp: numb
 export function applyEnemyPachinkoTokenProgress(
   state: PachinkoTokenProgressState,
   enemyId: EnemyId,
+  tokenMultiplier = 1,
 ): PachinkoTokenProgressResult {
-  const grantedTokenXp = getTokenXpForEnemy(enemyId)
+  const grantedTokenXp = Math.max(0, Math.round(getTokenXpForEnemy(enemyId) * tokenMultiplier))
   if (grantedTokenXp <= 0) {
     return {
       ...state,

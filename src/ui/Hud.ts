@@ -540,7 +540,7 @@ export class HudController {
     return choices.map((choice) => {
       const button = document.createElement('button')
       button.type = 'button'
-      button.className = 'hud-modal__item hud-modal__item--action'
+      button.className = `hud-modal__item hud-modal__item--action hud-modal__item--grade-${choice.grade}`
       button.dataset.action = 'passive-select'
       button.dataset.passiveId = choice.id
 
@@ -550,13 +550,17 @@ export class HudController {
       const title = document.createElement('strong')
       title.textContent = choice.name
 
+      const grade = document.createElement('small')
+      grade.className = `hud-modal__passive-grade hud-modal__passive-grade--${choice.grade}`
+      grade.textContent = choice.gradeLabel
+
       const summary = document.createElement('small')
       summary.textContent = choice.effectSummary
 
       const description = document.createElement('small')
       description.textContent = choice.description
 
-      textGroup.append(title, summary, description)
+      textGroup.append(title, grade, summary, description)
       button.append(textGroup)
       return button
     })

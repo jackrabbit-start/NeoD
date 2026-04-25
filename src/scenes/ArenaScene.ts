@@ -2770,6 +2770,8 @@ export class ArenaScene extends Phaser.Scene {
           name: choice.name,
           description: choice.description,
           effectSummary: choice.effectSummary,
+          grade: choice.grade,
+          gradeLabel: choice.gradeLabel,
         })),
       },
       pachinko: {
