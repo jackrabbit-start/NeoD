@@ -31,7 +31,7 @@ export function applyLootPickup(
 ): LootPickupResult {
   return {
     nextInventory: addItem(inventory, itemId),
-    statusMessage: `${ITEM_DEFINITIONS[itemId].name} 획득.`,
+    statusMessage: `Collected ${ITEM_DEFINITIONS[itemId].name}.`,
   }
 }
 
@@ -44,7 +44,7 @@ export function applyRecipeSelectionWorkflow(
   if (!result) {
     return {
       kind: 'not-actionable',
-      statusMessage: '해당 조합은 더 이상 실행할 수 없습니다. 다른 옵션을 선택하세요.',
+      statusMessage: 'That combine is no longer actionable. Choose another option.',
     }
   }
 
@@ -55,6 +55,6 @@ export function applyRecipeSelectionWorkflow(
     nextInventory: result.nextInventory,
     ownedWeaponIds: result.ownedWeaponIds,
     activeWeaponId: result.activeWeaponId,
-    statusMessage: `${weapon.name} 제작 및 장착 완료. 준비되면 런을 다시 진행하세요.`,
+    statusMessage: `${weapon.name} crafted and equipped. Resume the run when ready.`,
   }
 }

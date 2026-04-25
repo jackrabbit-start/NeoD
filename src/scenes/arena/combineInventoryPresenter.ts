@@ -5,7 +5,7 @@ export function describeInventoryEntries(inventory: InventoryState): string[] {
   const inventoryEntries = Object.entries(inventory) as [LootId, number][]
 
   if (inventoryEntries.length === 0) {
-    return ['아직 획득한 드롭이 없습니다.']
+    return ['No drops collected yet.']
   }
 
   return inventoryEntries.map(
@@ -15,10 +15,10 @@ export function describeInventoryEntries(inventory: InventoryState): string[] {
 
 export function describeAvailableRecipes(recipes: AvailableRecipe[]): string[] {
   if (recipes.length === 0) {
-    return ['지금 바로 가능한 조합이 없습니다.']
+    return ['No actionable combine yet.']
   }
 
   return recipes.map(
-    ({ recipe, weapon }) => `${recipe.name} → 피해 ${weapon.damage} (${recipe.note})`,
+    ({ recipe, weapon }) => `${recipe.name} → ${weapon.damage} dmg (${recipe.note})`,
   )
 }
