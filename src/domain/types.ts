@@ -20,7 +20,6 @@ export interface PachinkoHudState {
   isTokenInFlight: boolean
   latestReward: string | null
   synergy?: string
-  enemyOdds?: string[]
 }
 
 export type EnemyAnimationKey =
@@ -421,7 +420,6 @@ export interface HudStageSelectionState {
 export interface HudState {
   title: string
   subtitle: string
-  currentTimeLabel?: string
   stats: string[]
   inventory: string[]
   recipes: string[]
