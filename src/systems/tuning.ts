@@ -191,7 +191,15 @@ function getWeaponLevelUpgradeLabel(
 
   switch (weapon.attackBehavior.kind) {
     case 'single':
-      return `Lv.${playerStats.level} 공명 · 관통 ${playerStats.weaponSpecialTier + 1}회 · ${rangeLabel}`
+      return weapon.attackBehavior.boomerang
+        ? `Lv.${playerStats.level} 공명 · 귀환 강화 · ${rangeLabel}`
+        : weapon.attackBehavior.distanceScaling
+          ? `Lv.${playerStats.level} 공명 · 원거리 증폭 · ${rangeLabel}`
+          : `Lv.${playerStats.level} 공명 · 기본 강화 · ${rangeLabel}`
+    case 'split-shot':
+      return `Lv.${playerStats.level} 공명 · 갈래 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
+    case 'burst-fire':
+      return `Lv.${playerStats.level} 공명 · 박자 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
     case 'pierce':
       return `Lv.${playerStats.level} 공명 · 관통 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
     case 'chain':
@@ -202,6 +210,10 @@ function getWeaponLevelUpgradeLabel(
       return `Lv.${playerStats.level} 공명 · 탄막 +${playerStats.weaponSpecialTier} · 장판 강화`
     case 'impact-burst':
       return `Lv.${playerStats.level} 공명 · 폭발 반경 +${playerStats.weaponSpecialTier} · ${rangeLabel}`
+    case 'impact-aoe':
+      return `Lv.${playerStats.level} 공명 · 폭심 확대 · ${rangeLabel}`
+    case 'zone-control':
+      return `Lv.${playerStats.level} 공명 · 포드 지속 · 장판 강화`
     case 'melee-cleave':
       return `Lv.${playerStats.level} 공명 · 범위/타깃 강화 · ${rangeLabel}`
     default:
@@ -215,7 +227,15 @@ function getWeaponLevelUpgradeDescription(
 ): string {
   switch (weapon.attackBehavior.kind) {
     case 'single':
-      return '캐릭터 레벨 공명으로 단발 탄이 관통탄처럼 진화했습니다.'
+      return weapon.attackBehavior.boomerang
+        ? '캐릭터 레벨 공명으로 귀환 속도와 왕복 타격이 함께 강화됐습니다.'
+        : weapon.attackBehavior.distanceScaling
+          ? '캐릭터 레벨 공명으로 멀리서 맞힐수록 피해가 더 크게 압축됩니다.'
+          : `캐릭터 레벨 공명으로 무기 성능이 ${Math.round((playerStats.damageMultiplier - 1) * 100)}%만큼 증폭됐습니다.`
+    case 'split-shot':
+      return '캐릭터 레벨 공명으로 갈래 수가 늘어나 전방 차단 폭이 넓어졌습니다.'
+    case 'burst-fire':
+      return '캐릭터 레벨 공명으로 점사 박자가 늘어나 한 번 잡힌 라인을 더 오래 누릅니다.'
     case 'pierce':
       return '캐릭터 레벨 공명으로 관통 한계가 더 넓어졌습니다.'
     case 'chain':
@@ -226,6 +246,10 @@ function getWeaponLevelUpgradeDescription(
       return '캐릭터 레벨 공명으로 탄막 수와 장판 위력이 커졌습니다.'
     case 'impact-burst':
       return '캐릭터 레벨 공명으로 착탄 폭발 반경과 여파가 함께 강화됐습니다.'
+    case 'impact-aoe':
+      return '캐릭터 레벨 공명으로 폭심지 반경과 폭발 피해가 동시에 커졌습니다.'
+    case 'zone-control':
+      return '캐릭터 레벨 공명으로 감시 구역이 더 오래 남고 틱 피해가 더 단단해졌습니다.'
     case 'melee-cleave':
       return '캐릭터 레벨 공명으로 휘두르는 각도와 타깃 수가 확장됐습니다.'
     default:
@@ -241,14 +265,36 @@ function applyPlayerLevelWeaponMilestones(
 
   switch (behavior.kind) {
     case 'single':
-      if (specialTier <= 0) {
-        return behavior
+      if (behavior.boomerang) {
+        return {
+          ...behavior,
+          boomerang: {
+            ...behavior.boomerang,
+            outboundDistance: Math.round(behavior.boomerang.outboundDistance * playerStats.weaponRangeMultiplier),
+            returnDamageMultiplier: (behavior.boomerang.returnDamageMultiplier ?? 1) + 0.12 * specialTier,
+            returnHits: (behavior.boomerang.returnHits ?? 1) + specialTier,
+          },
+        }
       }
-
+      if (behavior.distanceScaling) {
+        return {
+          ...behavior,
+          distanceScaling: {
+            nearMultiplier: behavior.distanceScaling.nearMultiplier + 0.04 * specialTier,
+            farMultiplier: behavior.distanceScaling.farMultiplier + 0.18 * specialTier,
+          },
+        }
+      }
+      return behavior
+    case 'split-shot':
       return {
-        kind: 'pierce',
-        projectileLifetimeMs: behavior.projectileLifetimeMs,
-        maxHits: 1 + specialTier,
+        ...behavior,
+        projectileCount: behavior.projectileCount + specialTier,
+      }
+    case 'burst-fire':
+      return {
+        ...behavior,
+        shotsPerBurst: behavior.shotsPerBurst + specialTier,
       }
     case 'pierce':
       return {
@@ -279,6 +325,19 @@ function applyPlayerLevelWeaponMilestones(
         ...behavior,
         splashRadius: Math.round(behavior.splashRadius * playerStats.weaponRangeMultiplier),
         splashDamageMultiplier: Math.min(0.95, behavior.splashDamageMultiplier + 0.08 * specialTier),
+      }
+    case 'impact-aoe':
+      return {
+        ...behavior,
+        explosionRadius: Math.round(behavior.explosionRadius * playerStats.weaponRangeMultiplier),
+        explosionDamage: Math.max(1, Math.round(behavior.explosionDamage * playerStats.damageMultiplier)),
+      }
+    case 'zone-control':
+      return {
+        ...behavior,
+        zoneRadius: Math.round(behavior.zoneRadius * playerStats.weaponRangeMultiplier),
+        zoneDurationMs: behavior.zoneDurationMs + 220 * specialTier,
+        zoneDamage: Math.max(1, Math.round(behavior.zoneDamage * playerStats.damageMultiplier)),
       }
     case 'melee-cleave':
       return {

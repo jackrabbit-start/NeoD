@@ -69,9 +69,29 @@ export interface WeaponKnockbackDefinition {
   durationMs: number
 }
 
+export interface WeaponDistanceScalingDefinition {
+  nearMultiplier: number
+  farMultiplier: number
+}
+
+export interface WeaponExecuteDefinition {
+  thresholdRatio: number
+  damageMultiplier: number
+}
+
+export interface WeaponBoomerangDefinition {
+  outboundDistance: number
+  returnSpeedMultiplier: number
+  returnDamageMultiplier?: number
+  returnHits?: number
+}
+
 export interface WeaponSingleBehavior {
   kind: 'single'
   projectileLifetimeMs: number
+  distanceScaling?: WeaponDistanceScalingDefinition
+  execute?: WeaponExecuteDefinition
+  boomerang?: WeaponBoomerangDefinition
 }
 
 export interface WeaponSplitShotBehavior {
@@ -83,6 +103,7 @@ export interface WeaponSplitShotBehavior {
   damageMultiplier?: number
   speedMultiplier?: number
   maxHits?: number
+  execute?: WeaponExecuteDefinition
 }
 
 export interface WeaponBurstFireBehavior {
@@ -93,6 +114,7 @@ export interface WeaponBurstFireBehavior {
   spreadDegrees?: number
   damageMultiplier?: number
   speedMultiplier?: number
+  distanceScaling?: WeaponDistanceScalingDefinition
 }
 
 export interface WeaponSprayHazardBehavior {
@@ -104,12 +126,16 @@ export interface WeaponSprayHazardBehavior {
   hazardDurationMs: number
   hazardTickMs: number
   hazardDamage: number
+  execute?: WeaponExecuteDefinition
 }
 
 export interface WeaponPierceBehavior {
   kind: 'pierce'
   projectileLifetimeMs: number
   maxHits: number
+  distanceScaling?: WeaponDistanceScalingDefinition
+  execute?: WeaponExecuteDefinition
+  boomerang?: WeaponBoomerangDefinition
 }
 
 export interface WeaponChainBehavior {
@@ -128,6 +154,7 @@ export interface WeaponVolleyBehavior {
   damageMultiplier: number
   speedMultiplier: number
   maxHits: number
+  execute?: WeaponExecuteDefinition
 }
 
 export interface WeaponImpactBurstBehavior {
@@ -143,6 +170,7 @@ export interface WeaponImpactAoeBehavior {
   projectileLifetimeMs: number
   explosionRadius: number
   explosionDamage: number
+  distanceScaling?: WeaponDistanceScalingDefinition
 }
 
 export interface WeaponZoneControlBehavior {
@@ -153,6 +181,7 @@ export interface WeaponZoneControlBehavior {
   zoneTickMs: number
   zoneDamage: number
   speedMultiplier?: number
+  boomerang?: WeaponBoomerangDefinition
 }
 
 export interface WeaponMeleeCleaveBehavior {
@@ -161,6 +190,7 @@ export interface WeaponMeleeCleaveBehavior {
   arcDegrees: number
   visualDurationMs: number
   maxTargets: number
+  execute?: WeaponExecuteDefinition
 }
 
 export type WeaponAttackBehavior =

@@ -928,15 +928,31 @@ function applyAttackBehaviorPassives(
         projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
         hazardRadius: Math.max(1, Math.round(behavior.hazardRadius * totals.hazardRadiusMultiplier)),
       }
+    case 'split-shot':
+      return {
+        ...behavior,
+        projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
+      }
+    case 'burst-fire':
+      return {
+        ...behavior,
+        shotsPerBurst: Math.max(1, behavior.shotsPerBurst + totals.projectileCountDelta),
+      }
     case 'volley':
       return {
         ...behavior,
         projectileCount: Math.max(1, behavior.projectileCount + totals.projectileCountDelta),
       }
+    case 'zone-control':
+      return {
+        ...behavior,
+        zoneRadius: Math.max(1, Math.round(behavior.zoneRadius * totals.hazardRadiusMultiplier)),
+      }
     case 'single':
     case 'pierce':
     case 'chain':
     case 'impact-burst':
+    case 'impact-aoe':
       return behavior
     default:
       return behavior
