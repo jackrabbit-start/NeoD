@@ -1142,6 +1142,16 @@ test('run progression exposes per-enemy spawn chance rows for the current minute
   assert.equal(lateRows.reduce((sum, row) => sum + row.ratio, 0).toFixed(4), '1.0000')
 })
 
+test('hud places enemy spawn odds beside the game title for visibility', () => {
+  const hudSource = readFileSync(resolve(TEST_DIR, '../src/ui/Hud.ts'), 'utf8')
+  const styleSource = readFileSync(resolve(TEST_DIR, '../src/style.css'), 'utf8')
+
+  assert.ok(hudSource.includes('renderTitleEnemyOdds(state.pachinko?.enemyOdds)'))
+  assert.ok(hudSource.includes('hud-summary__enemy-odds'))
+  assert.ok(hudSource.includes('적 출현 확률 ·'))
+  assert.ok(styleSource.includes('.hud-summary__enemy-odds'))
+})
+
 test('nearest auto-attack target returns null when no active enemies are available', () => {
   assert.equal(resolveNearestAutoAttackTarget({ x: 10, y: 10 }, []), null)
   assert.equal(

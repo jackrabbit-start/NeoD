@@ -46,6 +46,22 @@ const renderSummarySection = (title: string, content: string, className = '') =>
   </section>
 `
 
+const renderTitleEnemyOdds = (enemyOdds?: string[]) => {
+  if (!enemyOdds || enemyOdds.length === 0) {
+    return ''
+  }
+
+  const [phaseLabel = '현재', ...enemyRows] = enemyOdds
+  return `
+    <div class="hud-summary__enemy-odds" aria-label="현재 적 출현 확률">
+      <span class="hud-summary__enemy-odds-label">적 출현 확률 · ${escapeHtml(phaseLabel)}</span>
+      <div class="hud-summary__enemy-odds-chips">
+        ${enemyRows.map((row) => `<span>${escapeHtml(row)}</span>`).join('')}
+      </div>
+    </div>
+  `
+}
+
 const getHudIconSrc = (iconKey?: string) =>
   iconKey ? getHudWeaponAssetPath(iconKey) : null
 
@@ -304,6 +320,7 @@ export class HudController {
           <div class="hud-summary__title-block">
             <h1>${escapeHtml(state.title)}</h1>
             <p>${escapeHtml(state.subtitle)}</p>
+            ${renderTitleEnemyOdds(state.pachinko?.enemyOdds)}
           </div>
           ${renderStatusPanel(state)}
           <button
@@ -320,9 +337,6 @@ export class HudController {
             `보상 레벨: Lv.${state.pachinko.level} · 누적 토큰 XP ${state.pachinko.totalTokenXp}`,
             `바닥 토큰: ${state.pachinko.droppedTokens}개 · 투입 중: ${state.pachinko.activeTokens}/${30}개 · 대기: ${state.pachinko.queuedTokens}개`,
             ...(state.pachinko.synergy ? [`시너지: ${state.pachinko.synergy}`] : []),
-            ...((state.pachinko.enemyOdds ?? []).length > 0
-              ? ['현재 적 출현 확률', ...(state.pachinko.enemyOdds ?? [])]
-              : []),
             `${state.pachinko.isTokenInFlight ? '파친코 토큰 다중 낙하 중' : '파친코 투입 대기 중'}`,
             `최근 보상: ${state.pachinko.latestReward ?? '아직 없음'}`,
           ]), 'hud-summary__section--pachinko') : ''}
