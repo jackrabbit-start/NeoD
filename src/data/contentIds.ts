@@ -17,6 +17,8 @@ export const WEAPON_IDS = [
   'arc-loom',
   'spark-carbine',
   'mist-vortex',
+  'slime-glaive',
+  'prism-cutter',
 ] as const
 
 export type WeaponId = (typeof WEAPON_IDS)[number]
@@ -28,6 +30,8 @@ export const RECIPE_IDS = [
   'arc-loom-recipe',
   'spark-carbine-recipe',
   'mist-vortex-recipe',
+  'slime-glaive-recipe',
+  'prism-cutter-recipe',
 ] as const
 
 export type RecipeId = (typeof RECIPE_IDS)[number]

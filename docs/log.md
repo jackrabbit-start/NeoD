@@ -25,3 +25,9 @@
 - Added `docs/wiki/ui-overlay-rendering.md` to preserve the Codex scroll-reset lesson for future DOM-backed overlays.
 - Updated `docs/index.md` so future agents can find the UI overlay rendering rule.
 - Source artifacts: `.omx/context/post-interview-codex-scroll-reset-20260425T105023Z.md` and PR #24.
+
+## [2026-04-25] gameplay | Captured melee weapon line architecture lesson
+
+- Added `docs/wiki/melee-weapon-line.md` to synthesize the melee-first interview, PRD, test spec, and implementation verification.
+- Updated `docs/index.md` so future agents can find the melee architecture guidance.
+- Source artifacts: `.omx/specs/deep-interview-weapon-capsule-variety.md`, `.omx/plans/prd-melee-weapon-line.md`, `.omx/plans/test-spec-melee-weapon-line.md`, and `.omx/context/post-interview-melee-weapon-line-20260425T114954Z.md`.

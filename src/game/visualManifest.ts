@@ -237,6 +237,18 @@ export const VECTOR_ASSETS: VectorAssetDefinition[] = [
     width: 96,
     height: 96,
   },
+  {
+    key: 'weapon-slime-glaive',
+    path: getHudWeaponAssetPath('weapon-slime-glaive'),
+    width: 96,
+    height: 96,
+  },
+  {
+    key: 'weapon-prism-cutter',
+    path: getHudWeaponAssetPath('weapon-prism-cutter'),
+    width: 96,
+    height: 96,
+  },
 ]
 
 export const IDLE_ANIMATIONS: AnimationDefinition[] = [

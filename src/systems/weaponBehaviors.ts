@@ -2,6 +2,7 @@ import type {
   WeaponChainBehavior,
   WeaponDefinition,
   WeaponKnockbackDefinition,
+  WeaponMeleeCleaveBehavior,
   WeaponPierceBehavior,
   WeaponSprayHazardBehavior,
 } from '../domain/types.js'
@@ -39,9 +40,21 @@ export interface ProjectileSpawnSpec {
   hazardOnExpire?: HazardSpawnSpec
 }
 
+export interface MeleeSwingSpec {
+  direction: Point
+  damage: number
+  tint: number
+  range: number
+  arcDegrees: number
+  visualDurationMs: number
+  maxTargets: number
+  knockback: WeaponKnockbackDefinition
+}
+
 export interface AttackPlan {
   cooldownMs: number
   projectiles: ProjectileSpawnSpec[]
+  meleeSwings: MeleeSwingSpec[]
 }
 
 export interface ChainCandidate {
@@ -115,6 +128,7 @@ const createHazardSpec = (
 const createBaseProjectile = (
   weapon: WeaponDefinition,
   direction: Point,
+  lifetimeMs: number,
   overrides: Partial<ProjectileSpawnSpec> = {},
 ): ProjectileSpawnSpec => ({
   direction,
@@ -122,7 +136,7 @@ const createBaseProjectile = (
   damage: weapon.damage,
   tint: weapon.projectileTint,
   radius: BASE_PROJECTILE_RADIUS,
-  lifetimeMs: weapon.attackBehavior.projectileLifetimeMs,
+  lifetimeMs,
   maxHits: 1,
   knockback: weapon.knockback,
   ...overrides,
@@ -141,10 +155,9 @@ const createSprayProjectiles = (
     const offset = (index - centerIndex) * behavior.spreadDegrees
     const spreadDirection = normalize(rotate(direction, offset))
 
-    return createBaseProjectile(weapon, spreadDirection, {
+    return createBaseProjectile(weapon, spreadDirection, behavior.projectileLifetimeMs, {
       damage,
       speed: Math.round(weapon.projectileSpeed * 0.78),
-      lifetimeMs: behavior.projectileLifetimeMs,
       hazardOnHit: hazard,
       hazardOnExpire: hazard,
     })
@@ -156,8 +169,7 @@ const createPierceProjectile = (
   direction: Point,
   behavior: WeaponPierceBehavior,
 ): ProjectileSpawnSpec =>
-  createBaseProjectile(weapon, direction, {
-    lifetimeMs: behavior.projectileLifetimeMs,
+  createBaseProjectile(weapon, direction, behavior.projectileLifetimeMs, {
     maxHits: behavior.maxHits,
   })
 
@@ -166,14 +178,28 @@ const createChainProjectile = (
   direction: Point,
   behavior: WeaponChainBehavior,
 ): ProjectileSpawnSpec =>
-  createBaseProjectile(weapon, direction, {
-    lifetimeMs: behavior.projectileLifetimeMs,
+  createBaseProjectile(weapon, direction, behavior.projectileLifetimeMs, {
     chain: {
       maxChains: behavior.maxChains,
       range: behavior.chainRange,
       falloff: behavior.chainFalloff,
     },
   })
+
+const createMeleeSwing = (
+  weapon: WeaponDefinition,
+  direction: Point,
+  behavior: WeaponMeleeCleaveBehavior,
+): MeleeSwingSpec => ({
+  direction,
+  damage: weapon.damage,
+  tint: weapon.projectileTint,
+  range: behavior.range,
+  arcDegrees: behavior.arcDegrees,
+  visualDurationMs: behavior.visualDurationMs,
+  maxTargets: behavior.maxTargets,
+  knockback: weapon.knockback,
+})
 
 export function buildAttackPlan(
   weapon: WeaponDefinition,
@@ -189,6 +215,7 @@ export function buildAttackPlan(
     return {
       cooldownMs: weapon.fireRateMs,
       projectiles: [],
+      meleeSwings: [],
     }
   }
 
@@ -197,24 +224,38 @@ export function buildAttackPlan(
       return {
         cooldownMs: weapon.fireRateMs,
         projectiles: createSprayProjectiles(weapon, direction, weapon.attackBehavior),
+        meleeSwings: [],
       }
     case 'pierce':
       return {
         cooldownMs: weapon.fireRateMs,
         projectiles: [createPierceProjectile(weapon, direction, weapon.attackBehavior)],
+        meleeSwings: [],
       }
     case 'chain':
       return {
         cooldownMs: weapon.fireRateMs,
         projectiles: [createChainProjectile(weapon, direction, weapon.attackBehavior)],
+        meleeSwings: [],
+      }
+    case 'melee-cleave':
+      return {
+        cooldownMs: weapon.fireRateMs,
+        projectiles: [],
+        meleeSwings: [createMeleeSwing(weapon, direction, weapon.attackBehavior)],
       }
     case 'single':
     default:
       return {
         cooldownMs: weapon.fireRateMs,
-        projectiles: [createBaseProjectile(weapon, direction)],
+        projectiles: [createBaseProjectile(weapon, direction, weapon.attackBehavior.projectileLifetimeMs)],
+        meleeSwings: [],
       }
   }
+}
+
+export function isAttackPlanActionable(attackPlan: AttackPlan): boolean {
+  return attackPlan.projectiles.length > 0 || attackPlan.meleeSwings.length > 0
 }
 
 export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
@@ -229,6 +270,8 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
       return '관통 사격'
     case 'chain':
       return '연쇄 번개'
+    case 'melee-cleave':
+      return '전방 참격'
     case 'single':
     default:
       return '기본 사격'
@@ -236,6 +279,10 @@ export function getWeaponIdentityLabel(weapon: WeaponDefinition): string {
 }
 
 export function getWeaponSummary(weapon: WeaponDefinition): string {
+  if (weapon.attackBehavior.kind === 'melee-cleave') {
+    return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}회 · 범위 ${weapon.attackBehavior.range} · ${getWeaponIdentityLabel(weapon)}`
+  }
+
   return `피해 ${weapon.damage} · 초당 ${Math.round(1000 / weapon.fireRateMs)}발 · ${getWeaponIdentityLabel(weapon)}`
 }
 
@@ -277,6 +324,51 @@ export function collectTargetsInRadius(
 ): number[] {
   return targets
     .filter((target) => isPointWithinRadius(source, target, radius + target.radius))
+    .map((target) => target.id)
+}
+
+export function collectTargetsInCleave(
+  source: Point,
+  direction: Point,
+  range: number,
+  arcDegrees: number,
+  targets: CircularTarget[],
+  maxTargets: number = Number.POSITIVE_INFINITY,
+): number[] {
+  const normalizedDirection = normalize(direction)
+  if (normalizedDirection.x === 0 && normalizedDirection.y === 0) {
+    return []
+  }
+
+  const halfArcRadians = (Math.max(0, Math.min(360, arcDegrees)) * Math.PI) / 360
+  const minimumDot = Math.cos(halfArcRadians)
+
+  return targets
+    .map((target) => {
+      const offset = {
+        x: target.x - source.x,
+        y: target.y - source.y,
+      }
+      const centerDistance = Math.hypot(offset.x, offset.y)
+      const targetDirection = normalize(offset)
+      const dot = targetDirection.x * normalizedDirection.x + targetDirection.y * normalizedDirection.y
+
+      return {
+        id: target.id,
+        centerDistance,
+        inRange: centerDistance <= range + target.radius,
+        inArc: centerDistance === 0 || dot >= minimumDot,
+      }
+    })
+    .filter((target) => target.inRange && target.inArc)
+    .sort((left, right) => {
+      if (left.centerDistance !== right.centerDistance) {
+        return left.centerDistance - right.centerDistance
+      }
+
+      return left.id - right.id
+    })
+    .slice(0, maxTargets)
     .map((target) => target.id)
 }
 
