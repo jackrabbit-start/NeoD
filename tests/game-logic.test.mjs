@@ -2552,6 +2552,10 @@ test('weapon milestone upgrades expand behavior every five and ten player levels
   assert.equal(levelTwentyArc.attackBehavior.ricochet?.maxBounces, 1)
   assert.equal(levelTwentyArc.attackBehavior.ricochet?.bounceRange, 108)
 
+  const highStarArc = deriveEffectiveWeaponStats('arc-loom', {}, 30, 20)
+  assert.equal(highStarArc.attackBehavior.ricochet?.maxBounces, 10)
+  assert.equal(highStarArc.attackBehavior.ricochet?.damageMultiplierPerBounce, 0.9)
+
   const levelTwentyMist = deriveEffectiveWeaponStats('mist-vortex', {}, 1, 20)
   assert.equal(levelTwentyMist.attackBehavior.kind, 'zone-control')
   assert.equal(levelTwentyMist.attackBehavior.zoneRadius, 32)

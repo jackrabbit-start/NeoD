@@ -89,7 +89,7 @@ const roundPercent = (value: number): number => Math.round(value * 100)
 
 const getLevelTier = (level: number): number => Math.max(0, Math.floor((Math.max(1, level) - 1) / 5))
 
-const MAX_RICOCHET_BOUNCES = 2
+const MAX_RICOCHET_BOUNCES = 10
 
 const createLevelScaledPercentRange = (
   baseMin: number,
