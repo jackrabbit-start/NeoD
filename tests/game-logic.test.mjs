@@ -669,11 +669,11 @@ test('pachinko slot modifiers never punish the base reward', () => {
 })
 
 test('pachinko slot index clamps boundaries and live table timing', () => {
-  assert.equal(PACHINKO_REWARD_TABLE_REFRESH_MS, 850)
+  assert.equal(PACHINKO_REWARD_TABLE_REFRESH_MS, 5000)
   assert.equal(getPachinkoRewardTableSeed(0), 0)
-  assert.equal(getPachinkoRewardTableSeed(849), 0)
-  assert.equal(getPachinkoRewardTableSeed(850), 1)
-  assert.equal(getPachinkoRewardTableSeed(1700), 2)
+  assert.equal(getPachinkoRewardTableSeed(4999), 0)
+  assert.equal(getPachinkoRewardTableSeed(5000), 1)
+  assert.equal(getPachinkoRewardTableSeed(1700), 0)
 
   assert.equal(resolvePachinkoSlotIndex(-1), 0)
   assert.equal(resolvePachinkoSlotIndex(0), 0)
